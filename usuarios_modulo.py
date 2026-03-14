@@ -160,8 +160,8 @@ def mostrar_modulo_usuarios(supabase):
                     edit_nom = st.text_input("Nombre", value=datos_u['nombre'])
                     edit_ema = st.text_input("Email", value=datos_u['email'])
                 with ce2:
-                    edit_mon = st.selectbox("Moneda", ["COP", "USD", "EUR", "ALL"], 
-                                           index=["COP", "USD", "EUR", "ALL"].index(datos_u['moneda']))
+                    edit_mon = st.selectbox("Moneda", ["EUR", "COP", "ALL"], 
+                                           index=["EUR", "COP", "ALL"].index(datos_u['moneda']))
                     ids_roles = list(DICCIONARIO_ROLES.keys())
                     idx_rol_act = ids_roles.index(datos_u['id_rol']) if datos_u['id_rol'] in ids_roles else 0
                     edit_rol = st.selectbox("Rol", options=list(DICCIONARIO_ROLES.items()), 
