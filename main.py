@@ -11,11 +11,11 @@ st.markdown("""
     <style>
     /* 1. Elimina el espacio vacío arriba de la sidebar */
     [data-testid="stSidebarUserContent"] {
-        padding-top: 10px;
+        padding-top: 5px;
     }
     /* 2. Reduce el espacio entre las métricas (relojes) */
     [data-testid="stMetric"] {
-        margin-bottom: -15px;
+        margin-bottom: -5px;
     }
     /* 3. Reduce el espacio del separador horizontal */
     hr {
@@ -23,7 +23,7 @@ st.markdown("""
     }
     /* 4. Reduce el espacio entre el título y el siguiente elemento */
     .st-emotion-cache-10o49cf { 
-        margin-bottom: -10px;
+        margin-bottom: -5px;
     }
     </style>
 """, unsafe_allow_html=True)
