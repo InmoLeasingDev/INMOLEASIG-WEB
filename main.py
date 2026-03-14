@@ -6,27 +6,7 @@ import pytz                    # <--- Y esta
 
 # 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-# 2. ESTE BLOQUE AQUÍ (Para el espacio en blanco)
-st.markdown("""
-    <style>
-    /* 1. Elimina el espacio vacío arriba de la sidebar */
-    [data-testid="stSidebarUserContent"] {
-        padding-top: 1px;
-    }
-    /* 2. Reduce el espacio entre las métricas (relojes) */
-    [data-testid="stMetric"] {
-        margin-bottom: -1px;
-    }
-    /* 3. Reduce el espacio del separador horizontal */
-    hr {
-        margin: 2px 0px;
-    }
-    /* 4. Reduce el espacio entre el título y el siguiente elemento */
-    .st-emotion-cache-10o49cf { 
-        margin-bottom: -1px;
-    }
-    </style>
-""", unsafe_allow_html=True)
+
 # 2. CONEXIÓN A SUPABASE (El nuevo motor que no falla)
 @st.cache_resource
 def get_supabase_client():
