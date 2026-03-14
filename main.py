@@ -1,8 +1,49 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
+from supabase import create_client
 
-# Configuración de la página
-st.set_page_config(page_title="INMOLEASING WEB", layout="wide")
+# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
+st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
+
+# 2. CONEXIÓN A SUPABASE (El nuevo motor que no falla)
+@st.cache_resource
+def get_supabase_client():
+    url = st.secrets["connections"]["supabase"]["url"]
+    key = st.secrets["connections"]["supabase"]["key"]
+    return create_client(url, key)
+
+conn = get_supabase_client()
+
+# 3. CONTROL DE SESIÓN
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+# --- PANTALLA DE LOGIN ---
+if not st.session_state.autenticado:
+    cols = st.columns([1, 2, 1])
+    with cols[1]:
+        st.title("🏢 INMOLEASING")
+        st.subheader("Acceso al Sistema")
+        
+        email_input = st.text_input("Correo electrónico")
+        pass_input = st.text_input("Contraseña", type="password")
+        
+        if st.button("Entrar", use_container_width=True):
+            try:
+                # Consulta con el nuevo motor (usamos .execute())
+                res = conn.table("usuarios").select("*").eq("email", email_input).eq("password", pass_input).execute()
+                
+                if len(res.data) > 0:
+                    st.session_state.autenticado = True
+                    st.session_state.usuario = res.data[0]
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario o contraseña incorrectos")
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
+    st.stop() # Detiene la ejecución aquí si no se ha logueado
+
+# --- TODO LO QUE SIGUE ES TU CÓDIGO RECUPERADO ---
 
 # Función para mostrar el mensaje de "En construcción"
 def mostrar_proximamente(modulo):
@@ -13,6 +54,9 @@ def mostrar_proximamente(modulo):
 # 1. MENÚ LATERAL
 with st.sidebar:
     st.title("🏢 INMOLEASING")
+    # Mostrar nombre del usuario logueado
+    st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre', 'Usuario')}**")
+    
     selected = option_menu(
         menu_title="Menú Principal",
         options=["Usuarios", "Propietarios", "Inmuebles", "Arrendamientos", "Bancos", "Informes"],
@@ -20,6 +64,10 @@ with st.sidebar:
         menu_icon="cast",
         default_index=0,
     )
+    
+    if st.button("Cerrar Sesión"):
+        st.session_state.autenticado = False
+        st.rerun()
 
 # --- LÓGICA DE NAVEGACIÓN ---
 
