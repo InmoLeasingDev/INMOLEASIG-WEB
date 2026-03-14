@@ -6,7 +6,7 @@ import pytz
 import usuarios_modulo 
 
 # 1. PRIMERO DEFINES LA FUNCIÓN
-# rem para forzar sincron
+
 def get_supabase_client():
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
@@ -14,10 +14,9 @@ def get_supabase_client():
 
 # 2. LUEGO CREAS LA VARIABLE (Esto iría después de la definición)
 supabase = get_supabase_client()
-conn = supabase
+
 # 3. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-
 
 # 5. CONTROL DE SESIÓN
 if "autenticado" not in st.session_state:
