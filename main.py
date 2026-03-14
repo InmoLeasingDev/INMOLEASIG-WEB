@@ -5,7 +5,28 @@ from datetime import datetime  # <--- Agrega esta
 import pytz                    # <--- Y esta
 
 # 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
-st.set_page_config(page_titl)
+st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
+# 2. ESTE BLOQUE AQUÍ (Para el espacio en blanco)
+st.markdown("""
+    <style>
+    /* 1. Elimina el espacio vacío arriba de la sidebar */
+    [data-testid="stSidebarUserContent"] {
+        padding-top: 1px;
+    }
+    /* 2. Reduce el espacio entre las métricas (relojes) */
+    [data-testid="stMetric"] {
+        margin-bottom: -1px;
+    }
+    /* 3. Reduce el espacio del separador horizontal */
+    hr {
+        margin: 2px 0px;
+    }
+    /* 4. Reduce el espacio entre el título y el siguiente elemento */
+    .st-emotion-cache-10o49cf { 
+        margin-bottom: -1px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 # 2. CONEXIÓN A SUPABASE (El nuevo motor que no falla)
 @st.cache_resource
 def get_supabase_client():
@@ -55,11 +76,21 @@ def mostrar_proximamente(modulo):
 # 1. MENÚ LATERAL
 with st.sidebar:
     st.title("🏢 INMOLEASING")
+    # Lógica de relojes
+    tz_madrid = pytz.timezone('Europe/Madrid')
+    tz_bogota = pytz.timezone('America/Bogota')
+    hora_madrid = datetime.now(tz_madrid).strftime("%H:%M")
+    hora_bogota = datetime.now(tz_bogota).strftime("%H:%M")
     
-    # 1. Nombre del Usuario y Saludo
+    # Diseño de relojes en columnas
+    c1, c2 = st.columns(2)
+    c1.metric("MADRID", hora_madrid)
+    c2.metric("BOGOTA", hora_bogota)
+    
+    st.markdown("---") # Separador visual
+    # Mostrar nombre del usuario logueado
     st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre', 'Usuario')}**")
     
-    # 2. Menú de Navegación (Lo que más se usa)
     selected = option_menu(
         menu_title="Menú Principal",
         options=["Usuarios", "Propietarios", "Inmuebles", "Arrendamientos", "Bancos", "Informes"],
@@ -68,57 +99,9 @@ with st.sidebar:
         default_index=0,
     )
     
-    # 3. Botón de Cerrar Sesión
-    if st.button("Cerrar Sesión", use_container_width=True):
+    if st.button("Cerrar Sesión"):
         st.session_state.autenticado = False
         st.rerun()
-
-    # --- ESPACIO FLEXIBLE ---
-    # Esto empuja los relojes hacia abajo si hay espacio en la pantalla
-    st.markdown("<br><br>", unsafe_allow_html=True) 
-    
-    # 4. RELOJES (Al final de todo)
-    st.markdown("---")
-    tz_madrid = pytz.timezone('Europe/Madrid')
-    tz_bogota = pytz.timezone('America/Bogota')
-    
-    hora_madrid = datetime.now(tz_madrid).strftime("%H:%M")
-    hora_bogota = datetime.now(tz_bogota).strftime("%H:%M")
-    
-    c1, c2 = st.columns(2)
-    c1.metric("🇪🇸 Madrid", hora_madrid)
-    c2.metric("🇨🇴 Bogotá", hora_bogota)
-
-# xyz
-#with st.sidebar:
-#    st.title("🏢 INMOLEASING")
-#    # Lógica de relojes
-#    tz_madrid = pytz.timezone('Europe/Madrid')
-#    tz_bogota = pytz.timezone('America/Bogota')
-#    hora_madrid = datetime.now(tz_madrid).strftime("%H:%M")
-#    hora_bogota = datetime.now(tz_bogota).strftime("%H:%M")
-#    
-#    # Diseño de relojes en columnas
-#    c1, c2 = st.columns(2)
-#    c1.metric("MADRID", hora_madrid)
-#    c2.metric("BOGOTA", hora_bogota)
-#    
-#    st.markdown("---") # Separador visual
-#    # Mostrar nombre del usuario logueado
-#    st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre', 'Usuario')}**")
-#    
-#    selected = option_menu(
-#        menu_title="Menú Principal",
-#        options=["Usuarios", "Propietarios", "Inmuebles", "Arrendamientos", "Bancos", "Informes"],
-#        icons=["person-gear", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"],
-#        menu_icon="cast",
-#        default_index=0,
-#    )
-#    
-#    if st.button("Cerrar Sesión"):
-#        st.session_state.autenticado = False
-#        st.rerun()
-# XYZ
 
 # --- LÓGICA DE NAVEGACIÓN ---
 
