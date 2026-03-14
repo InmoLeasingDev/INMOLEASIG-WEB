@@ -11,7 +11,7 @@ st.markdown("""
     <style>
     /* 1. Elimina el espacio vacío arriba de la sidebar */
     [data-testid="stSidebarUserContent"] {
-        padding-top: 35px;
+        padding-top: 1px;
     }
     /* 2. Reduce el espacio entre las métricas (relojes) */
     [data-testid="stMetric"] {
@@ -84,8 +84,8 @@ with st.sidebar:
     
     # Diseño de relojes en columnas
     c1, c2 = st.columns(2)
-    c1.metric("🇪🇸", hora_madrid)
-    c2.metric("🇨🇴", hora_bogota)
+    c1.metric("MADRID", hora_madrid)
+    c2.metric("BOGOTA", hora_bogota)
     
     st.markdown("---") # Separador visual
     # Mostrar nombre del usuario logueado
