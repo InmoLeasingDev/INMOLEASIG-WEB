@@ -1,14 +1,24 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 from supabase import create_client
-from datetime import datetime  # <--- Agrega esta
-import pytz                    # <--- Y esta
-import usuarios_modulo  # <--- Importas tu nuevo archivo
+from datetime import datetime
+import pytz
+import usuarios_modulo 
 
-# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
+# 1. PRIMERO DEFINES LA FUNCIÓN
+def get_supabase_client():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+# 2. LUEGO CREAS LA VARIABLE (Esto iría después de la definición)
+supabase = get_supabase_client()
+
+
+# 3. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
 
-# 2. CONEXIÓN A SUPABASE (El nuevo motor que no falla)
+# 4. CONEXIÓN A SUPABASE (El nuevo motor que no falla)
 @st.cache_resource
 def get_supabase_client():
     url = st.secrets["connections"]["supabase"]["url"]
@@ -17,7 +27,7 @@ def get_supabase_client():
 
 conn = get_supabase_client()
 
-# 3. CONTROL DE SESIÓN
+# 5. CONTROL DE SESIÓN
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
@@ -54,7 +64,7 @@ def mostrar_proximamente(modulo):
     st.write(f"Muy pronto tendrás aquí toda la **gestión de {modulo.lower()}**.")
     st.info("Estamos trabajando para integrar las bases de datos y funciones de este apartado.")
 
-# 1. MENÚ LATERAL
+# 6. MENÚ LATERAL
 with st.sidebar:
     st.title("🏢 INMOLEASING")
         # Mostrar nombre del usuario logueado
