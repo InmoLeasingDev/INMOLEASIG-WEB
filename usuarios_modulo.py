@@ -1,3 +1,7 @@
+import streamlit as st
+import pandas as pd
+from fpdf import FPDF
+
 def mostrar_modulo_usuarios(supabase):
     st.header("👤 Gestión de Usuarios")
     
