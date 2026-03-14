@@ -4,7 +4,7 @@ import re
 from fpdf import FPDF
 
 # ==========================================
-# 1. FUNCIÓN PDF CON FILAS SINCRONIZADAS (RECARGADA)
+# 1. FUNCIÓN PDF CON FILAS SINCRONIZADAS (ELIMINA EL DESCUADRE)
 # ==========================================
 def generar_pdf_usuarios(df, diccionario_roles):
     pdf = FPDF()
@@ -17,7 +17,7 @@ def generar_pdf_usuarios(df, diccionario_roles):
     pdf.set_font("Arial", "B", 10)
     pdf.set_fill_color(200, 220, 255)
     
-    cw = [55, 85, 50] 
+    cw = [55, 85, 50] # Anchos de columna
     headers = ["NOMBRE", "EMAIL", "ROL"]
     for i, h_text in enumerate(headers):
         pdf.cell(cw[i], 10, h_text, border=1, fill=True, align="C")
@@ -28,35 +28,29 @@ def generar_pdf_usuarios(df, diccionario_roles):
         rol_texto = diccionario_roles.get(row['id_rol'], "SIN ROL")
         textos = [str(row['nombre']), str(row['email']), str(rol_texto)]
         
-        # --- CÁLCULO DE ALTURA DE FILA ---
-        # Determinamos cuántas líneas ocupará el texto más largo
-        lineas_por_col = []
+        # --- PASO 1: Calcular altura máxima de la fila ---
+        alturas = []
         for i, txt in enumerate(textos):
-            # Calculamos ancho de texto vs ancho de columna
-            ancho_texto = pdf.get_string_width(txt)
-            n_lineas = int(ancho_texto / (cw[i] - 2)) + 1
-            lineas_por_col.append(n_lineas)
+            # Calculamos cuántas líneas ocupará el texto en ese ancho
+            n_lineas = pdf.get_string_width(txt) / (cw[i] - 2)
+            alturas.append(int(n_lineas) + 1)
         
-        max_l = max(lineas_por_col)
-        h_celda = 6 # Altura de cada línea individual
-        h_fila = h_celda * max_l # Altura total de la fila sincronizada
+        max_l = max(alturas)
+        h_fila = 6 * max_l # 6mm por línea de texto
         
-        # --- DIBUJADO DE CELDAS ---
-        x, y = pdf.get_x(), pdf.get_y()
+        # --- PASO 2: Dibujar la fila sincronizada ---
+        x_ini, y_ini = pdf.get_x(), pdf.get_y()
         
-        # Celda Nombre
-        pdf.multi_cell(cw[0], h_celda, textos[0], border=1)
-        pdf.set_xy(x + cw[0], y)
-        
-        # Celda Email
-        pdf.multi_cell(cw[1], h_celda, textos[1], border=1)
-        pdf.set_xy(x + cw[0] + cw[1], y)
-        
-        # Celda Rol (Aquí forzamos que use toda la altura h_fila)
-        pdf.multi_cell(cw[2], h_fila / max_l if max_l > 1 else h_fila, textos[2], border=1)
-        
-        # Reset al final de la fila
-        pdf.set_y(y + h_fila)
+        # Dibujamos primero los bordes de la fila completa para que coincidan
+        for i, w in enumerate(cw):
+            # Dibujamos un rectángulo vacío que sirve de borde perfecto
+            pdf.rect(pdf.get_x(), y_ini, w, h_fila)
+            # Ponemos el texto dentro sin bordes individuales (ya dibujamos el rect)
+            pdf.multi_cell(w, 6, textos[i], border=0, align='L')
+            # Volvemos arriba para la siguiente columna
+            pdf.set_xy(pdf.get_x() + w, y_ini)
+            
+        pdf.ln(h_fila) # Saltamos a la siguiente fila real
         
     return pdf.output(dest='S').encode('latin-1')
 
@@ -70,7 +64,7 @@ def es_correo_valido(correo):
 def mostrar_modulo_usuarios(supabase):
     st.header("👤 Gestión de Usuarios")
     
-    # Carga de datos
+    # Carga de datos base
     try:
         res_roles = supabase.table("roles").select("*").execute()
         df_roles = pd.DataFrame(res_roles.data) if res_roles.data else pd.DataFrame()
@@ -87,7 +81,7 @@ def mostrar_modulo_usuarios(supabase):
     # --- TAB 1: DIRECTORIO ---
     with tab1:
         if not df_raw.empty:
-            busqueda = st.text_input("🔍 Buscar usuario...", "").upper().strip()
+            busqueda = st.text_input("🔍 Buscar por nombre...", "").upper().strip()
             df_display = df_raw.copy().sort_values('nombre')
             df_display['Rol'] = df_display['id_rol'].map(DICCIONARIO_ROLES)
             if busqueda:
@@ -95,69 +89,54 @@ def mostrar_modulo_usuarios(supabase):
             
             st.dataframe(df_display[["nombre", "email", "moneda", "Rol"]], use_container_width=True, hide_index=True)
             
-            with st.expander("🛡️ Detalle de Permisos por Usuario", expanded=False):
-                u_sel = st.selectbox("Consulte facultades:", ["-- Seleccione --"] + df_display['nombre'].tolist())
-                if u_sel != "-- Seleccione --":
-                    row_u = df_display[df_display['nombre'] == u_sel].iloc[0]
-                    desc = DICCIONARIO_DESC.get(row_u['id_rol'], "Sin permisos.")
-                    st.info(f"**Rol:** {row_u['Rol']}\n\n**Facultades:**\n{desc}")
+            # --- SECCIÓN DE PERMISOS ---
+            st.markdown("---")
+            st.subheader("🛡️ Consulta de Facultades")
+            u_sel = st.selectbox("Seleccione un usuario para ver qué puede hacer:", ["-- Seleccione --"] + df_display['nombre'].tolist())
+            if u_sel != "-- Seleccione --":
+                row_u = df_display[df_display['nombre'] == u_sel].iloc[0]
+                st.info(f"**Permisos asignados a {u_sel}:**\n\n{DICCIONARIO_DESC.get(row_u['id_rol'], 'No tiene permisos definidos.')}")
             
             pdf_bytes = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
-            st.download_button("📄 Descargar Reporte PDF", pdf_bytes, "usuarios.pdf", "application/pdf")
+            st.download_button("📄 Exportar Reporte PDF", pdf_bytes, "reporte_usuarios.pdf", "application/pdf")
 
-    # --- TAB 2 Y 3: (REGISTRO Y EDICIÓN SE MANTIENEN IGUAL QUE TU ÚLTIMA VERSIÓN) ---
-    # ... (Se omiten por brevedad para enfocar en Tab 4 y PDF)
-
-    # --- TAB 4: ROLES Y PERMISOS GRANULARES ---
+    # --- TAB 4: ROLES (EL "CEREBRO" DE LOS PERMISOS) ---
     with tab4:
-        st.subheader("🛡️ Matriz de Acceso por Perfil")
+        st.subheader("🛡️ Configuración de Roles")
+        st.write("Aquí defines qué 'llaves' tiene cada grupo de usuarios.")
         
-        # LISTA DE ACCIONES QUE PROGRAMAREMOS EN EL FUTURO
-        opciones_permisos = [
-            "📋 Ver Directorio Usuarios",
-            "💰 Ver Balances Mensuales",
-            "🧾 Conciliación Bancaria",
-            "🚰 Ingresar Lecturas de Suministros",
-            "🏠 Crear/Editar Inmuebles",
-            "📉 Ver Reportes de Ocupación",
-            "⚙️ Configuración del Sistema"
+        # Definimos las "llaves" del sistema
+        permisos_maestros = [
+            "MODULO_USUARIOS", "MODULO_PROPIETARIOS", "MODULO_INMUEBLES", 
+            "MODULO_BANCOS", "LECTURA_CONTADORES", "VER_BALANCES", "CONCILIACION_BANCARIA"
         ]
         
-        col_a, col_b = st.columns(2)
+        col_izq, col_der = st.columns(2)
         
-        with col_a:
-            st.markdown("**Crear Perfil Nuevo**")
-            with st.form("form_nuevo_rol"):
-                n_rol_nom = st.text_input("Nombre del Rol")
-                n_rol_perm = st.multiselect("Permisos de este Rol:", opciones_permisos)
-                if st.form_submit_button("Guardar"):
-                    if n_rol_nom:
-                        desc_formateada = "\n".join(n_rol_perm)
-                        supabase.table("roles").insert({"nombre_rol": n_rol_nom.upper(), "descripcion": desc_formateada}).execute()
-                        st.success("Rol creado"); st.rerun()
+        with col_izq:
+            st.write("**Crear Nuevo Rol**")
+            with st.form("nuevo_rol_form"):
+                n_rol = st.text_input("Nombre (Ej: CONTADOR)")
+                n_perm = st.multiselect("Asignar Permisos:", permisos_maestros)
+                if st.form_submit_button("Crear Perfil"):
+                    if n_rol:
+                        desc_p = ", ".join(n_perm)
+                        supabase.table("roles").insert({"nombre_rol": n_rol.upper(), "descripcion": desc_p}).execute()
+                        st.success("Rol creado con éxito"); st.rerun()
 
-        with col_b:
-            st.markdown("**Modificar Perfil Existente**")
+        with col_der:
+            st.write("**Modificar Permisos**")
             if not df_roles.empty:
-                r_edit = st.selectbox("Seleccione Rol:", df_roles['nombre_rol'].tolist())
-                r_actual = df_roles[df_roles['nombre_rol'] == r_edit].iloc[0]
+                r_edit = st.selectbox("Seleccionar Rol para editar:", df_roles['nombre_rol'].tolist())
+                r_id = df_roles[df_roles['nombre_rol'] == r_edit]['id'].values[0]
                 
-                with st.form("form_edit_rol"):
-                    # Detectamos permisos previos
-                    previos = r_actual['descripcion'].split("\n") if r_actual['descripcion'] else []
-                    previos = [p for p in previos if p in opciones_permisos] # Filtro de seguridad
-                    
-                    e_rol_perm = st.multiselect("Editar Permisos:", opciones_permisos, default=previos)
-                    if st.form_submit_button("Actualizar"):
-                        desc_upd = "\n".join(e_rol_perm)
-                        supabase.table("roles").update({"descripcion": desc_upd}).eq("id", r_actual['id']).execute()
-                        st.success("Actualizado"); st.rerun()
+                # Convertimos el texto de la DB en lista para el multiselect
+                desc_actual = df_roles[df_roles['nombre_rol'] == r_edit]['descripcion'].values[0]
+                lista_actual = [p.strip() for p in desc_actual.split(",")] if desc_actual else []
                 
-                if st.button(f"🗑️ Borrar Rol {r_edit}", type="primary"):
-                    # Validamos si hay usuarios
-                    users_count = df_raw[df_raw['id_rol'] == r_actual['id']].shape[0]
-                    if users_count > 0:
-                        st.error(f"No puedes borrarlo. {users_count} usuarios lo están usando.")
-                    else:
-                        supabase.table("roles").delete().eq("id", r_actual['id']).execute()
-                        st.success("Borrado"); st.rerun()
+                with st.form("edit_rol_form"):
+                    e_perm = st.multiselect("Actualizar Permisos:", permisos_maestros, default=[p for p in lista_actual if p in permisos_maestros])
+                    if st.form_submit_button("Guardar Cambios"):
+                        nueva_desc = ", ".join(e_perm)
+                        supabase.table("roles").update({"descripcion": nueva_desc}).eq("id", r_id).execute()
+                        st.success("Permisos actualizados"); st.rerun()
