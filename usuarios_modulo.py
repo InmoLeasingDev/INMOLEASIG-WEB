@@ -49,7 +49,7 @@ def mostrar_modulo_usuarios(supabase):
 
     tab1, tab2, tab3 = st.tabs(["📋 Directorio", "➕ Nuevo Usuario", "⚙️ Gestionar"])
 
-    # --- TAB 1: DIRECTORIO CON INTERACTIVIDAD ---
+    # --- TAB 1: DIRECTORIO SEGURO PARA LA NUBE ---
     with tab1:
         if not df_raw.empty:
             col_b, _ = st.columns([2, 2])
@@ -62,41 +62,29 @@ def mostrar_modulo_usuarios(supabase):
             if busqueda:
                 df_display = df_display[df_display['nombre'].str.contains(busqueda)]
             
-            # Selección de fila para el foco (Compatible con v1.55.0)
-            seleccion_data = st.dataframe(
+            # Tabla estándar, sin funciones nuevas que rompan la nube
+            st.dataframe(
                 df_display[["nombre", "email", "moneda", "Rol"]],
                 use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single_row"
+                hide_index=True
             )
 
-            # Obtener usuario seleccionado del clic
-            usuario_foco_nombre = None
-            try:
-                if len(seleccion_data.selection.rows) > 0:
-                    idx_fila = seleccion_data.selection.rows[0]
-                    usuario_foco_nombre = df_display.iloc[idx_fila]['nombre']
-            except:
-                pass
-
-            # Detalle de Permisos con Escudo 🛡️
-            with st.expander("🛡️ Detalle de Permisos y Rol", expanded=True if usuario_foco_nombre else False):
+            # Detalle de Permisos con Escudo 🛡️ y Selectbox
+            with st.expander("🛡️ Detalle de Permisos y Rol", expanded=True):
                 nombres_lista = df_display['nombre'].tolist()
-                idx_def = nombres_lista.index(usuario_foco_nombre) if usuario_foco_nombre in nombres_lista else 0
-                u_detalle = st.selectbox("Información de:", nombres_lista, index=idx_def)
-                
-                if u_detalle:
-                    row_u = df_display[df_display['nombre'] == u_detalle].iloc[0]
-                    desc_rol = DICCIONARIO_DESC.get(row_u['id_rol'], "Sin descripción.")
-                    st.info(f"**Rol:** {row_u['Rol']}\n\n**Facultades:** {desc_rol}")
+                if nombres_lista:
+                    u_detalle = st.selectbox("Seleccione un usuario para ver sus permisos:", nombres_lista)
+                    if u_detalle:
+                        row_u = df_display[df_display['nombre'] == u_detalle].iloc[0]
+                        desc_rol = DICCIONARIO_DESC.get(row_u['id_rol'], "Sin descripción.")
+                        st.info(f"**Rol:** {row_u['Rol']}\n\n**Facultades:** {desc_rol}")
             
             pdf_bytes = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
             st.download_button("📄 Descargar Reporte PDF", pdf_bytes, "usuarios.pdf", "application/pdf")
         else:
             st.info("No hay usuarios registrados.")
 
-    # --- TAB 2: REGISTRO (SIN ERROR DE FOREIGN KEY) ---
+    # --- TAB 2: REGISTRO (CON FIX PARA PAOLA PETRO) ---
     with tab2:
         st.subheader("Crear nueva cuenta")
         with st.form("form_registro", clear_on_submit=True):
@@ -114,7 +102,7 @@ def mostrar_modulo_usuarios(supabase):
             if st.form_submit_button("🚀 Registrar Usuario"):
                 if n_nombre and n_email and n_pass:
                     try:
-                        # Forzamos id_rol como INT para evitar error de Paola Petro
+                        # Esto soluciona el error del ID 5 en Supabase
                         id_rol_final = int(n_rol_sel[0])
                         
                         supabase.table("usuarios").insert({
