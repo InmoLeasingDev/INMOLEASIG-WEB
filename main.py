@@ -76,7 +76,7 @@ with st.sidebar:
 # --- LÓGICA DE NAVEGACIÓN ---
 
 if selected == "Usuarios":
-    st.header("👤 Gestión de Usuarios")
+    
     usuarios_modulo.mostrar_modulo_usuarios(supabase) # <--- Llamas a la función    
 
 elif selected == "Propietarios":
