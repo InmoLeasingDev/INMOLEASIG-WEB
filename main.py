@@ -1,62 +1,73 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 
-# Configuración de la página
-st.set_page_config(page_title="INMOLEASING WEB", layout="wide")
+# 1. CONFIGURACIÓN (Debe ir siempre de primero)
+st.set_page_config(page_title="INMOLEASING", layout="wide")
 
-# Función para mostrar el mensaje de "En construcción"
-def mostrar_proximamente(modulo):
-    st.warning(f"### 🚧 Módulo en Desarrollo")
-    st.write(f"Muy pronto tendrás aquí toda la **gestión de {modulo.lower()}**.")
-    st.info("Estamos trabajando para integrar las bases de datos y funciones de este apartado.")
+# Ocultar menús de Streamlit para que se vea como una App real
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
-# 1. MENÚ LATERAL
+# 2. CONTROL DE SESIÓN
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+# --- PANTALLA DE LOGIN ---
+if not st.session_state.autenticado:
+    cols = st.columns([1, 2, 1])
+    with cols[1]:
+        st.title("🏢 INMOLEASING")
+        st.subheader("Acceso al Sistema")
+        
+        email_input = st.text_input("Correo electrónico")
+        pass_input = st.text_input("Contraseña", type="password")
+        
+        if st.button("Entrar", use_container_width=True):
+            try:
+                conn = st.connection("supabase", type="supabase")
+                res = conn.table("usuarios").select("*").eq("email", email_input).eq("password", pass_input).execute()
+                
+                if len(res.data) > 0:
+                    st.session_state.autenticado = True
+                    st.session_state.usuario = res.data[0]
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario o contraseña incorrectos")
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
+    st.stop()
+
+# --- SI EL USUARIO ESTÁ LOGUEADO, MOSTRAR EL CONTENIDO ---
+# Barra lateral con nombre y botón de salida
+st.sidebar.write(f"👤 Hola, **{st.session_state.usuario['nombre']}**")
+if st.sidebar.button("Cerrar Sesión"):
+    st.session_state.autenticado = False
+    st.rerun()
+
+# TU MENÚ QUE YA FUNCIONABA
 with st.sidebar:
-    st.title("🏢 INMOLEASING")
     selected = option_menu(
-        menu_title="Menú Principal",
-        options=["Usuarios", "Propietarios", "Inmuebles", "Arrendamientos", "Bancos", "Informes"],
-        icons=["person-gear", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"],
-        menu_icon="cast",
+        menu_title="INMOLEASING",
+        options=["Menú Principal", "Usuarios", "Propietarios", "Inmuebles", "Arrendamientos", "Bancos", "Informes"],
+        icons=["display", "person-badge", "people", "house", "file-earmark-text", "bank", "graph-up"],
+        menu_icon="building",
         default_index=0,
     )
 
-# --- LÓGICA DE NAVEGACIÓN ---
+# 3. LÓGICA DE LAS PÁGINAS
+if selected == "Menú Principal":
+    st.title("🏠 Dashboard Principal")
+    st.write(f"Bienvenido al sistema de gestión de moneda: {st.session_state.usuario['moneda']}")
 
-if selected == "Usuarios":
-    st.header("👤 Gestión de Usuarios")
-    mostrar_proximamente("Usuarios")
+elif selected == "Usuarios":
+    st.title("👤 Gestión de Usuarios")
+    st.info("Módulo en desarrollo")
 
 elif selected == "Propietarios":
-    st.header("🤝 Propietarios")
-    sub_tab = st.tabs(["Fichas Propietarios", "Contratos Propietarios"])
-    with sub_tab[0]:
-        mostrar_proximamente("Fichas de Propietarios")
-    with sub_tab[1]:
-        mostrar_proximamente("Contratos de Mandato")
-
-elif selected == "Inmuebles":
-    st.header("🏠 Gestión de Inmuebles")
-    sub_tab = st.tabs(["Unidades", "Inventarios", "Incidencias"])
-    with sub_tab[0]:
-        mostrar_proximamente("Unidades Habitacionales")
-    with sub_tab[1]:
-        mostrar_proximamente("Inventarios Detallados")
-    with sub_tab[2]:
-        mostrar_proximamente("Reporte de Incidencias")
-
-elif selected == "Arrendamientos":
-    st.header("📝 Arrendamientos")
-    sub_tab = st.tabs(["Contratos Arriendo", "Suministros"])
-    with sub_tab[0]:
-        mostrar_proximamente("Contratos de Arrendamiento")
-    with sub_tab[1]:
-        mostrar_proximamente("Control de Suministros")
-
-elif selected == "Bancos":
-    st.header("🏦 Conciliación Bancaria")
-    mostrar_proximamente("Bancos y Movimientos")
-
-elif selected == "Informes":
-    st.header("📊 Informes de Gestión")
-    mostrar_proximamente("Informes y Estadísticas")
+    st.title("👥 Propietarios")
+    # Aquí puedes poner el formulario que hicimos antes
