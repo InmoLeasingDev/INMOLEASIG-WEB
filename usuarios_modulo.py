@@ -46,7 +46,7 @@ def mostrar_modulo_usuarios(supabase):
                 n_rol = st.selectbox("Rol", options=[("Admin", 1), ("Agente", 2), ("Consultor", 3)], format_func=lambda x: x[0])
             with c2:
                 n_pass = st.text_input("Contraseña Temporal", type="password")
-                n_moneda = st.selectbox("Moneda Preferida", ["COP",  "EUR", "ALL"])
+                n_moneda = st.selectbox("Moneda Preferida", ["EUR",  "COP", "ALL"])
 
             if st.form_submit_button("💾 Guardar Usuario"):
                 if n_nombre and n_email and n_pass:
