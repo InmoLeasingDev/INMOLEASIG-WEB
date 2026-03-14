@@ -15,15 +15,15 @@ st.markdown("""
     }
     /* 2. Reduce el espacio entre las métricas (relojes) */
     [data-testid="stMetric"] {
-        margin-bottom: -5px;
+        margin-bottom: -1px;
     }
     /* 3. Reduce el espacio del separador horizontal */
     hr {
-        margin: 5px 0px;
+        margin: 2px 0px;
     }
     /* 4. Reduce el espacio entre el título y el siguiente elemento */
     .st-emotion-cache-10o49cf { 
-        margin-bottom: -5px;
+        margin-bottom: -1px;
     }
     </style>
 """, unsafe_allow_html=True)
