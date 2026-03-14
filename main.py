@@ -5,7 +5,7 @@ from datetime import datetime  # <--- Agrega esta
 import pytz                    # <--- Y esta
 
 # 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
-st.set_page_config(page_titl
+st.set_page_config(page_titl)
 # 2. CONEXIÓN A SUPABASE (El nuevo motor que no falla)
 @st.cache_resource
 def get_supabase_client():
