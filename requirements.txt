@@ -4,3 +4,4 @@ pandas
 streamlit-option-menu
 st-supabase-connection
 pytz
+fpdf
