@@ -56,19 +56,7 @@ def mostrar_proximamente(modulo):
 # 1. MENÚ LATERAL
 with st.sidebar:
     st.title("🏢 INMOLEASING")
-    # Lógica de relojes
-    tz_madrid = pytz.timezone('Europe/Madrid')
-    tz_bogota = pytz.timezone('America/Bogota')
-    hora_madrid = datetime.now(tz_madrid).strftime("%H:%M")
-    hora_bogota = datetime.now(tz_bogota).strftime("%H:%M")
-    
-    # Diseño de relojes en columnas
-    c1, c2 = st.columns(2)
-    c1.metric("MADRID", hora_madrid)
-    c2.metric("BOGOTA", hora_bogota)
-    
-    st.markdown("---") # Separador visual
-    # Mostrar nombre del usuario logueado
+        # Mostrar nombre del usuario logueado
     st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre', 'Usuario')}**")
     
     selected = option_menu(
