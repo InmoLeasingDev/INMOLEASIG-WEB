@@ -3,6 +3,7 @@ from streamlit_option_menu import option_menu
 from supabase import create_client
 from datetime import datetime  # <--- Agrega esta
 import pytz                    # <--- Y esta
+import usuarios_modulo  # <--- Importas tu nuevo archivo
 
 # 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
@@ -75,7 +76,7 @@ with st.sidebar:
 
 if selected == "Usuarios":
     st.header("👤 Gestión de Usuarios")
-    mostrar_proximamente("Usuarios")
+    usuarios_modulo.mostrar_modulo_usuarios(supabase) # <--- Llamas a la función    
 
 elif selected == "Propietarios":
     st.header("🤝 Propietarios")
