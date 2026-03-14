@@ -32,7 +32,7 @@ def generar_pdf_usuarios(df, diccionario_roles):
 def mostrar_modulo_usuarios(supabase):
     st.header("👤 Gestión de Usuarios")
     
-    # 1. Carga Dinámica de Roles y Descripciones
+    # --- CARGA DE ROLES ---
     try:
         res_roles = supabase.table("roles").select("id, nombre_rol, descripcion").execute()
         DICCIONARIO_ROLES = {rol['id']: rol['nombre_rol'] for rol in res_roles.data}
@@ -41,7 +41,7 @@ def mostrar_modulo_usuarios(supabase):
         st.error(f"Error al cargar roles: {e}")
         DICCIONARIO_ROLES, DICCIONARIO_DESC = {}, {}
         
-    # 2. Carga y Orden de Usuarios (A-Z)
+    # --- CARGA DE USUARIOS (ORDENADOS A-Z) ---
     res = supabase.table("usuarios").select("id, nombre, email, moneda, id_rol").execute()
     df_raw = pd.DataFrame(res.data) if res.data else pd.DataFrame()
     if not df_raw.empty:
@@ -49,7 +49,7 @@ def mostrar_modulo_usuarios(supabase):
 
     tab1, tab2, tab3 = st.tabs(["📋 Directorio", "➕ Nuevo Usuario", "⚙️ Gestionar"])
 
-    # --- TAB 1: DIRECTORIO CON FOCO DINÁMICO 🛡️ ---
+    # --- TAB 1: DIRECTORIO CON INTERACTIVIDAD ---
     with tab1:
         if not df_raw.empty:
             col_b, _ = st.columns([2, 2])
@@ -62,9 +62,8 @@ def mostrar_modulo_usuarios(supabase):
             if busqueda:
                 df_display = df_display[df_display['nombre'].str.contains(busqueda)]
             
-            # --- INTERACTIVIDAD: SELECCIÓN DE FILA ---
-            # Usamos la nueva API de selección de dataframe para versión 1.55.0
-            event = st.dataframe(
+            # Selección de fila para el foco (Compatible con v1.55.0)
+            seleccion_data = st.dataframe(
                 df_display[["nombre", "email", "moneda", "Rol"]],
                 use_container_width=True,
                 hide_index=True,
@@ -72,28 +71,32 @@ def mostrar_modulo_usuarios(supabase):
                 selection_mode="single_row"
             )
 
-            # Extraemos el usuario seleccionado del evento
+            # Obtener usuario seleccionado del clic
             usuario_foco_nombre = None
-            if len(event.selection.rows) > 0:
-                idx = event.selection.rows[0]
-                usuario_foco_nombre = df_display.iloc[idx]['nombre']
+            try:
+                if len(seleccion_data.selection.rows) > 0:
+                    idx_fila = seleccion_data.selection.rows[0]
+                    usuario_foco_nombre = df_display.iloc[idx_fila]['nombre']
+            except:
+                pass
 
-            # --- DETALLE CON ESCUDO 🛡️ ---
+            # Detalle de Permisos con Escudo 🛡️
             with st.expander("🛡️ Detalle de Permisos y Rol", expanded=True if usuario_foco_nombre else False):
                 nombres_lista = df_display['nombre'].tolist()
-                if nombres_lista:
-                    idx_def = nombres_lista.index(usuario_foco_nombre) if usuario_foco_nombre in nombres_lista else 0
-                    u_detalle = st.selectbox("Información de:", nombres_lista, index=idx_def)
-                    
-                    if u_detalle:
-                        row_u = df_display[df_display['nombre'] == u_detalle].iloc[0]
-                        desc_rol = DICCIONARIO_DESC.get(row_u['id_rol'], "Sin descripción.")
-                        st.info(f"**Rol:** {row_u['Rol']}\n\n**Facultades:** {desc_rol}")
+                idx_def = nombres_lista.index(usuario_foco_nombre) if usuario_foco_nombre in nombres_lista else 0
+                u_detalle = st.selectbox("Información de:", nombres_lista, index=idx_def)
+                
+                if u_detalle:
+                    row_u = df_display[df_display['nombre'] == u_detalle].iloc[0]
+                    desc_rol = DICCIONARIO_DESC.get(row_u['id_rol'], "Sin descripción.")
+                    st.info(f"**Rol:** {row_u['Rol']}\n\n**Facultades:** {desc_rol}")
             
             pdf_bytes = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
             st.download_button("📄 Descargar Reporte PDF", pdf_bytes, "usuarios.pdf", "application/pdf")
+        else:
+            st.info("No hay usuarios registrados.")
 
-    # --- TAB 2: REGISTRO (SOLUCIÓN ERROR FOREIGN KEY) ---
+    # --- TAB 2: REGISTRO (SIN ERROR DE FOREIGN KEY) ---
     with tab2:
         st.subheader("Crear nueva cuenta")
         with st.form("form_registro", clear_on_submit=True):
@@ -111,22 +114,22 @@ def mostrar_modulo_usuarios(supabase):
             if st.form_submit_button("🚀 Registrar Usuario"):
                 if n_nombre and n_email and n_pass:
                     try:
-                        # AJUSTE CRÍTICO: Aseguramos que id_rol sea un INT puro
-                        id_rol_val = int(n_rol_sel[0])
+                        # Forzamos id_rol como INT para evitar error de Paola Petro
+                        id_rol_final = int(n_rol_sel[0])
                         
                         supabase.table("usuarios").insert({
                             "nombre": n_nombre.strip().upper(),
                             "email": n_email.strip().lower(),
                             "password": n_pass,
                             "moneda": n_moneda,
-                            "id_rol": id_rol_val
+                            "id_rol": id_rol_final
                         }).execute()
-                        st.success(f"✅ Usuario {n_nombre.upper()} registrado con éxito.")
+                        st.success(f"✅ Usuario {n_nombre.upper()} registrado exitosamente.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar: {e}")
                 else:
-                    st.warning("⚠️ Por favor completa todos los campos.")
+                    st.warning("Complete todos los campos.")
 
     # --- TAB 3: GESTIONAR ---
     with tab3:
@@ -154,7 +157,7 @@ def mostrar_modulo_usuarios(supabase):
                         "moneda": edit_mon,
                         "id_rol": int(edit_rol[0])
                     }).eq("id", datos_u['id']).execute()
-                    st.success("Cambios guardados.")
+                    st.success("Cambios aplicados.")
                     st.rerun()
             
             if st.button(f"🗑️ Eliminar a {u_sel_nombre}", type="primary"):
