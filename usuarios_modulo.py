@@ -4,7 +4,7 @@ import re
 from fpdf import FPDF
 
 # ==========================================
-# 1. FUNCIÓN PARA GENERAR EL REPORTE PDF (MEJORADA)
+# 1. FUNCIÓN PARA GENERAR EL REPORTE PDF (FIX ALINEACIÓN TOTAL)
 # ==========================================
 def generar_pdf_usuarios(df, diccionario_roles):
     pdf = FPDF()
@@ -17,40 +17,47 @@ def generar_pdf_usuarios(df, diccionario_roles):
     pdf.set_font("Arial", "B", 10)
     pdf.set_fill_color(200, 220, 255)
     
-    col_width = [60, 80, 50] 
-    pdf.cell(col_width[0], 10, "NOMBRE", border=1, fill=True)
-    pdf.cell(col_width[1], 10, "EMAIL", border=1, fill=True)
-    pdf.cell(col_width[2], 10, "ROL", border=1, fill=True)
+    # Definimos anchos fijos
+    cw = [55, 85, 50] 
+    headers = ["NOMBRE", "EMAIL", "ROL"]
+    for i, h_text in enumerate(headers):
+        pdf.cell(cw[i], 10, h_text, border=1, fill=True, align="C")
     pdf.ln()
     
     pdf.set_font("Arial", "", 9)
     for _, row in df.iterrows():
         rol_texto = diccionario_roles.get(row['id_rol'], "SIN ROL")
         
-        # Calculamos altura necesaria (estimación por líneas)
-        # 1. Obtenemos cuántas líneas ocuparía el texto más largo
-        lineas_nombre = pdf.get_string_width(str(row['nombre'])) / col_width[0]
-        lineas_email = pdf.get_string_width(str(row['email'])) / col_width[1]
-        max_lines = max(int(lineas_nombre) + 1, int(lineas_email) + 1, 1)
-        h = 8 * max_lines # Altura de la fila
+        # --- LÓGICA DE ALTURA SINCRONIZADA ---
+        # Calculamos cuántas líneas ocupa cada celda para hallar la altura máxima del bloque
+        # Esto soluciona el error visual donde las celdas quedaban cortas
+        textos = [str(row['nombre']), str(row['email']), str(rol_texto)]
         
-        # Guardamos posición inicial
-        x_start = pdf.get_x()
-        y_start = pdf.get_y()
+        # Estimamos líneas por columna (ancho de letra promedio ~2mm)
+        lineas = []
+        for i, txt in enumerate(textos):
+            l = pdf.get_string_width(txt) / cw[i]
+            lineas.append(int(l) + 1)
         
-        # Dibujamos las 3 celdas con la misma altura 'h'
-        # Multi_cell con altura h/max_lines para que el texto se distribuya
-        pdf.multi_cell(col_width[0], h/max_lines, str(row['nombre']), border=1)
-        pdf.set_xy(x_start + col_width[0], y_start)
+        max_l = max(lineas)
+        h_fila = 7 * max_l # Altura base de 7mm por línea
         
-        pdf.multi_cell(col_width[1], h/max_lines, str(row['email']), border=1)
-        pdf.set_xy(x_start + col_width[0] + col_width[1], y_start)
+        # Dibujamos las celdas de la fila una por una manteniendo el Y
+        x_start, y_start = pdf.get_x(), pdf.get_y()
         
-        pdf.multi_cell(col_width[2], h, str(rol_texto), border=1) # El rol suele ser corto
+        # Celda 1 (Nombre)
+        pdf.multi_cell(cw[0], h_fila/max_l, textos[0], border=1)
+        pdf.set_xy(x_start + cw[0], y_start)
         
-        # Movemos el cursor al final de la fila más alta
-        pdf.set_y(y_start + h)
+        # Celda 2 (Email)
+        pdf.multi_cell(cw[1], h_fila/max_l, textos[1], border=1)
+        pdf.set_xy(x_start + cw[0] + cw[1], y_start)
         
+        # Celda 3 (Rol)
+        pdf.multi_cell(cw[2], h_fila/max_l, textos[2], border=1)
+        
+        # El cursor queda al final de la fila más alta automáticamente para la siguiente
+    
     return pdf.output(dest='S').encode('latin-1')
 
 def es_correo_valido(correo):
@@ -78,114 +85,109 @@ def mostrar_modulo_usuarios(supabase):
     if not df_raw.empty:
         df_raw = df_raw.sort_values(by='nombre', ascending=True)
 
-    # TABS (4 pestañas ahora)
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Directorio", "➕ Nuevo Usuario", "⚙️ Gestionar", "🛡️ Roles y Permisos"])
 
     # --- TAB 1: DIRECTORIO ---
     with tab1:
         if not df_raw.empty:
-            busqueda = st.text_input("🔍 Buscar usuario...", "").upper().strip()
+            busqueda = st.text_input("🔍 Buscar por nombre...", "").upper().strip()
             df_display = df_raw.copy()
             df_display['Rol'] = df_display['id_rol'].map(DICCIONARIO_ROLES)
             if busqueda:
                 df_display = df_display[df_display['nombre'].str.contains(busqueda)]
             
             st.dataframe(df_display[["nombre", "email", "moneda", "Rol"]], use_container_width=True, hide_index=True)
-
-            with st.expander("🛡️ Detalle de Permisos por Usuario", expanded=False):
-                nombres_lista = ["-- Seleccione --"] + df_display['nombre'].tolist()
-                u_detalle = st.selectbox("Consulte facultades:", nombres_lista)
-                if u_detalle != "-- Seleccione --":
-                    row_u = df_display[df_display['nombre'] == u_detalle].iloc[0]
-                    desc = DICCIONARIO_DESC.get(row_u['id_rol'], "Sin descripción.")
-                    st.info(f"**Rol:** {row_u['Rol']}\n\n**Facultades:**\n{desc}")
+            
+            with st.expander("👁️ Ver Permisos Detallados", expanded=False):
+                u_sel = st.selectbox("Seleccione un usuario:", ["-- Seleccione --"] + df_display['nombre'].tolist())
+                if u_sel != "-- Seleccione --":
+                    row_u = df_display[df_display['nombre'] == u_sel].iloc[0]
+                    st.info(f"**Facultades asignadas:**\n\n{DICCIONARIO_DESC.get(row_u['id_rol'], 'Sin permisos definidos.')}")
             
             pdf_bytes = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
-            st.download_button("📄 Descargar PDF", pdf_bytes, "usuarios.pdf", "application/pdf")
+            st.download_button("📄 Exportar Reporte PDF", pdf_bytes, "usuarios_inmoleasing.pdf", "application/pdf")
 
-    # --- TAB 2: REGISTRO ---
+    # --- TAB 2: REGISTRO (SIN BORRADO DE DATOS SI HAY ERROR) ---
     with tab2:
-        st.subheader("Crear nueva cuenta")
-        with st.form("form_registro"):
-            c1, c2 = st.columns(2)
-            n_nombre = c1.text_input("Nombre Completo")
-            n_email = c1.text_input("Correo Electrónico")
-            n_pass = c2.text_input("Contraseña Temporal", type="password")
-            n_moneda = c2.selectbox("Moneda", ["COP", "USD", "EUR", "ALL"])
-            n_rol_sel = st.selectbox("Asignar Rol", options=list(DICCIONARIO_ROLES.items()), format_func=lambda x: x[1])
-
-            if st.form_submit_button("🚀 Registrar Usuario"):
-                if n_nombre and n_email and n_pass:
-                    if not es_correo_valido(n_email.strip()):
-                        st.error("⚠️ Formato de correo inválido.")
+        st.subheader("Registrar Colaborador")
+        with st.form("registro_persistente"):
+            col1, col2 = st.columns(2)
+            n_nom = col1.text_input("Nombre Completo")
+            n_ema = col1.text_input("Correo")
+            n_pas = col2.text_input("Password", type="password")
+            n_mon = col2.selectbox("Moneda Base", ["COP", "USD", "EUR", "ALL"])
+            n_rol = st.selectbox("Rol", options=list(DICCIONARIO_ROLES.items()), format_func=lambda x: x[1])
+            
+            if st.form_submit_button("✅ Crear Cuenta"):
+                if n_nom and n_ema and n_pas:
+                    if not es_correo_valido(n_ema):
+                        st.error("⚠️ El correo no tiene un formato válido.")
                     else:
-                        try:
-                            supabase.table("usuarios").insert({
-                                "nombre": n_nombre.strip().upper(),
-                                "email": n_email.strip().lower(),
-                                "password": n_pass,
-                                "moneda": n_moneda,
-                                "id_rol": int(n_rol_sel[0])
-                            }).execute()
-                            st.success("✅ ¡Registrado!"); st.rerun()
-                        except Exception as e:
-                            st.error(f"Error: {e}")
+                        supabase.table("usuarios").insert({
+                            "nombre": n_nom.upper(), "email": n_ema.lower(), 
+                            "password": n_pas, "moneda": n_mon, "id_rol": n_rol[0]
+                        }).execute()
+                        st.success("Usuario creado."); st.rerun()
                 else:
-                    st.warning("⚠️ Complete todos los campos.")
+                    st.warning("Complete todos los campos.")
 
-    # --- TAB 3: GESTIONAR ---
+    # --- TAB 3: GESTIONAR (EDITAR / ELIMINAR) ---
     with tab3:
         if not df_raw.empty:
-            u_sel = st.selectbox("Seleccione usuario para editar/eliminar", df_raw['nombre'].tolist())
-            datos_u = df_raw[df_raw['nombre'] == u_sel].iloc[0]
-            with st.form("form_edit"):
-                e_nom = st.text_input("Nombre", value=datos_u['nombre'])
-                e_ema = st.text_input("Email", value=datos_u['email'])
-                e_rol = st.selectbox("Rol", options=list(DICCIONARIO_ROLES.items()), 
-                                    index=list(DICCIONARIO_ROLES.keys()).index(datos_u['id_rol']), 
+            u_edit = st.selectbox("Usuario a modificar:", df_raw['nombre'].tolist())
+            u_data = df_raw[df_raw['nombre'] == u_edit].iloc[0]
+            with st.form("edicion_u"):
+                e_nom = st.text_input("Nombre", u_data['nombre'])
+                e_ema = st.text_input("Email", u_data['email'])
+                e_rol = st.selectbox("Cambiar Rol", options=list(DICCIONARIO_ROLES.items()), 
+                                    index=list(DICCIONARIO_ROLES.keys()).index(u_data['id_rol']), 
                                     format_func=lambda x: x[1])
-                if st.form_submit_button("💾 Actualizar"):
+                if st.form_submit_button("💾 Guardar Cambios"):
                     supabase.table("usuarios").update({
-                        "nombre": e_nom.upper(), "email": e_ema.lower(), "id_rol": int(e_rol[0])
-                    }).eq("id", datos_u['id']).execute()
-                    st.success("Actualizado"); st.rerun()
-            if st.button(f"🗑️ Eliminar {u_sel}", type="primary"):
-                supabase.table("usuarios").delete().eq("id", datos_u['id']).execute()
+                        "nombre": e_nom.upper(), "email": e_ema.lower(), "id_rol": e_rol[0]
+                    }).eq("id", u_data['id']).execute()
+                    st.success("Datos actualizados"); st.rerun()
+            
+            if st.button(f"🗑️ Eliminar permanentemente a {u_edit}", type="primary"):
+                supabase.table("usuarios").delete().eq("id", u_data['id']).execute()
                 st.rerun()
 
-    # --- TAB 4: ROLES Y PERMISOS (NUEVO) ---
+    # --- TAB 4: ROLES Y PERMISOS (GESTIÓN ESTRUCTURADA) ---
     with tab4:
-        st.subheader("🛡️ Configuración de Roles")
-        col1, col2 = st.columns(2)
+        st.subheader("🛡️ Centro de Control de Permisos")
         
-        with col1:
-            st.markdown("**➕ Crear Nuevo Rol**")
-            with st.form("nuevo_rol_form", clear_on_submit=True):
-                nr_nom = st.text_input("Nombre del Rol (Ej: AUDITOR)")
-                nr_des = st.text_area("Descripción de Permisos (use viñetas)")
-                if st.form_submit_button("Guardar Rol"):
+        # Acciones predefinidas para facilitar la gestión
+        permisos_sugeridos = ["Ver Inmuebles", "Crear Arrendamientos", "Eliminar Registros", "Exportar PDF", "Ver Reportes Financieros", "Gestionar Bancos"]
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**Crear Perfil de Acceso**")
+            with st.form("nuevo_perfil", clear_on_submit=True):
+                nr_nom = st.text_input("Nombre del Perfil (Ej: AUDITOR)")
+                nr_perm = st.multiselect("Asignar Facultades:", permisos_sugeridos)
+                if st.form_submit_button("➕ Crear Rol"):
                     if nr_nom:
-                        supabase.table("roles").insert({"nombre_rol": nr_nom.upper(), "descripcion": nr_des}).execute()
-                        st.success("Rol creado exitosamente."); st.rerun()
-
-        with col2:
-            st.markdown("**⚙️ Gestionar Roles Existentes**")
+                        desc_final = "\n".join([f"• {p}" for p in nr_perm])
+                        supabase.table("roles").insert({"nombre_rol": nr_nom.upper(), "descripcion": desc_final}).execute()
+                        st.success("Perfil creado"); st.rerun()
+        
+        with c2:
+            st.markdown("**Editar/Eliminar Perfiles**")
             if not df_roles.empty:
-                r_sel = st.selectbox("Seleccione Rol", df_roles['nombre_rol'].tolist())
-                r_data = df_roles[df_roles['nombre_rol'] == r_sel].iloc[0]
+                r_sel = st.selectbox("Seleccionar Perfil", df_roles['nombre_rol'].tolist())
+                r_id = df_roles[df_roles['nombre_rol'] == r_sel]['id'].values[0]
+                r_desc = df_roles[df_roles['nombre_rol'] == r_sel]['descripcion'].values[0]
                 
-                with st.form("edit_rol_form"):
-                    er_des = st.text_area("Editar Permisos", value=r_data['descripcion'])
-                    if st.form_submit_button("Actualizar Descripción"):
-                        supabase.table("roles").update({"descripcion": er_des}).eq("id", r_data['id']).execute()
-                        st.success("Permisos actualizados."); st.rerun()
+                with st.form("edit_perfil"):
+                    er_desc = st.text_area("Modificar Facultades (Lista):", value=r_desc, height=150)
+                    if st.form_submit_button("💾 Actualizar Perfil"):
+                        supabase.table("roles").update({"descripcion": er_desc}).eq("id", r_id).execute()
+                        st.success("Permisos actualizados"); st.rerun()
                 
-                # BOTÓN DE ELIMINAR ROL CON SEGURIDAD
-                if st.button(f"🗑️ Eliminar Rol: {r_sel}", type="primary"):
-                    # Verificar si hay usuarios usándolo
-                    usuarios_con_rol = df_raw[df_raw['id_rol'] == r_data['id']]
-                    if not usuarios_con_rol.empty:
-                        st.error(f"No se puede eliminar: {len(usuarios_con_rol)} usuarios tienen este rol asignado.")
+                if st.button(f"🗑️ Eliminar Rol {r_sel}", type="primary", help="Solo se puede eliminar si no hay usuarios usándolo"):
+                    usuarios_con_ese_rol = df_raw[df_raw['id_rol'] == r_id]
+                    if not usuarios_con_ese_rol.empty:
+                        st.error(f"⚠️ Error: Hay {len(usuarios_con_ese_rol)} usuarios con este rol. Cámbialos primero.")
                     else:
-                        supabase.table("roles").delete().eq("id", r_data['id']).execute()
-                        st.success("Rol eliminado."); st.rerun()
+                        supabase.table("roles").delete().eq("id", r_id).execute()
+                        st.success("Rol eliminado"); st.rerun()
