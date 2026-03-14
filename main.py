@@ -6,6 +6,7 @@ import pytz
 import usuarios_modulo 
 
 # 1. PRIMERO DEFINES LA FUNCIÓN
+# rem para forzar sincron
 def get_supabase_client():
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
