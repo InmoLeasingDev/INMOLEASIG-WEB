@@ -36,34 +36,54 @@ def mostrar_modulo_usuarios(supabase):
 
     # --- TAB 2: NUEVO USUARIO (CREATE) ---
     with tab2:
-        st.subheader("Registrar nuevo acceso")
-        with st.form("form_nuevo_usuario", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                n_nombre = st.text_input("Nombre Completo").upper()
-                #n_nombre = n_nombre.upper()
-                n_email = st.text_input("Correo Electrónico").lower()
-                #n_email = n_email.lower()
-                # Selector de Rol (Asegúrate que los IDs coincidan con tu tabla 'roles')
-                n_rol = st.selectbox("Rol", options=[("Admin", 1), ("Agente", 2), ("Consultor", 3)], format_func=lambda x: x[0])
-            with c2:
-                n_pass = st.text_input("Contraseña Temporal", type="password")
-                n_moneda = st.selectbox("Moneda Preferida", ["EUR",  "COP", "ALL"])
+    st.subheader("Crear nuevo acceso")
+    with st.form("form_registro", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            n_nombre = st.text_input("Nombre Completo")
+            n_email = st.text_input("Correo Electrónico")
+        with col2:
+            n_pass = st.text_input("Contraseña", type="password")
+            n_moneda = st.selectbox("Moneda", ["COP", "USD", "ALL", "EUR"])
+        
+        # Selector de Rol
+        n_rol = st.selectbox("Asignar Rol", 
+                           options=[("Administrador", 1), ("Agente", 2), ("Consultor", 3)], 
+                           format_func=lambda x: x[0])
 
-            if st.form_submit_button("💾 Guardar Usuario"):
-                if n_nombre and n_email and n_pass:
-                    try:
-                        supabase.table("usuarios").insert({
-                            "nombre": n_nombre, "email": n_email, 
-                            "password": n_pass, "moneda": n_moneda, "id_rol": n_rol[1]
-                        }).execute()
-                        st.success("✅ Usuario creado exitosamente")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al guardar: {e}")
-                else:
-                    st.warning("Completa los campos obligatorios.")
+        if st.form_submit_button("🚀 Registrar Usuario"):
+            # --- 🛡️ ZONA DE VALIDACIÓN Y RE-APRENDIZAJE ---
+            
+            # 1. Quitamos espacios y estandarizamos
+            email_limpio = n_email.strip().lower()
+            nombre_limpio = n_nombre.strip().upper()
 
+            # 2. Lógica de validación (El "Filtro")
+            if not nombre_limpio or not email_limpio or not n_pass:
+                st.error("⚠️ Todos los campos son obligatorios.")
+            
+            elif "@" not in email_limpio or "." not in email_limpio:
+                # Aquí validamos que el correo parezca un correo
+                st.error(f"❌ '{email_limpio}' no es un correo válido. Debe contener @ y un punto.")
+            
+            elif len(n_pass) < 4:
+                st.error("⚠️ La contraseña debe tener al menos 4 caracteres.")
+                
+            else:
+                # --- ✅ TODO OK: ENVIAR A SUPABASE ---
+                try:
+                    datos = {
+                        "nombre": nombre_limpio,
+                        "email": email_limpio,
+                        "password": n_pass,
+                        "moneda": n_moneda,
+                        "id_rol": n_rol[1] 
+                    }
+                    supabase.table("usuarios").insert(datos).execute()
+                    st.success(f"✅ ¡Usuario {nombre_limpio} creado con éxito!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error de base de datos: {e}")
     # --- TAB 3: GESTIONAR (UPDATE / DELETE) ---
     with tab3:
         st.subheader("Modificar o Eliminar")
