@@ -18,15 +18,6 @@ supabase = get_supabase_client()
 # 3. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
 
-# 4. CONEXIÓN A SUPABASE (El nuevo motor que no falla)
-@st.cache_resource
-def get_supabase_client():
-    url = st.secrets["connections"]["supabase"]["url"]
-    key = st.secrets["connections"]["supabase"]["key"]
-    return create_client(url, key)
-
-conn = get_supabase_client()
-
 # 5. CONTROL DE SESIÓN
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
