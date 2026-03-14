@@ -63,7 +63,7 @@ def mostrar_modulo_usuarios(supabase):
                         "email": nuevo_email,
                         "password": nuevo_pass,
                         "moneda": nuevo_moneda,
-                        "role_id": nuevo_rol_id # Verifica que este nombre de columna sea correcto
+                        "id_rol": nuevo_rol_id # Verifica que este nombre de columna sea correcto
                     }
                     try:
                         supabase.table("usuarios").insert(datos).execute()
