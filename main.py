@@ -29,7 +29,13 @@ if not st.session_state.autenticado:
         
         if st.button("Entrar", use_container_width=True):
             try:
-                conn = st.connection("supabase", type="supabase")
+                #conn = st.connection("supabase", type="supabase")
+                from supabase import create_client
+
+                # Usa los secretos directamente
+                url = st.secrets["connections"]["supabase"]["url"]
+                key = st.secrets["connections"]["supabase"]["key"]
+                supabase = create_client(url, key)
                 res = conn.table("usuarios").select("*").eq("email", email_input).eq("password", pass_input).execute()
                 
                 if len(res.data) > 0:
