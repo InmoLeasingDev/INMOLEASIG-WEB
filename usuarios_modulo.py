@@ -40,10 +40,10 @@ def mostrar_modulo_usuarios(supabase):
         with st.form("form_nuevo_usuario", clear_on_submit=True):
             c1, c2 = st.columns(2)
             with c1:
-                n_nombre = st.text_input("Nombre Completo")
-                n_nombre = n_nombre.upper()
-                n_email = st.text_input("Correo Electrónico")
-                n_email = n_email.lower()
+                n_nombre = st.text_input("Nombre Completo").upper()
+                #n_nombre = n_nombre.upper()
+                n_email = st.text_input("Correo Electrónico").lower()
+                #n_email = n_email.lower()
                 # Selector de Rol (Asegúrate que los IDs coincidan con tu tabla 'roles')
                 n_rol = st.selectbox("Rol", options=[("Admin", 1), ("Agente", 2), ("Consultor", 3)], format_func=lambda x: x[0])
             with c2:
