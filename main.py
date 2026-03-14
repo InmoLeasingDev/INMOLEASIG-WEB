@@ -11,7 +11,7 @@ st.markdown("""
     <style>
     /* 1. Elimina el espacio vacío arriba de la sidebar */
     [data-testid="stSidebarUserContent"] {
-        padding-top: 20px;
+        padding-top: 10px;
     }
     /* 2. Reduce el espacio entre las métricas (relojes) */
     [data-testid="stMetric"] {
