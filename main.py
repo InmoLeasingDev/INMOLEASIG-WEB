@@ -35,7 +35,7 @@ if not st.session_state.autenticado:
         if st.button("Entrar", use_container_width=True):
             try:
                 # Consulta con el nuevo motor (usamos .execute())
-                res = supabase.table("usuarios").select("*").eq("email", email_input).eq("password", pass_input).execute()
+                res = conn.table("usuarios").select("*").eq("email", email_input).eq("password", pass_input).execute()
                 
                 if len(res.data) > 0:
                     st.session_state.autenticado = True
