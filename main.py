@@ -1,16 +1,36 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 from supabase import create_client
+import hashlib
+from datetime import datetime
 
-# 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN (¡Debe ir primero!)
-st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
+# ==========================================
+# 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
+# ==========================================
+st.set_page_config(
+    page_title="INMOLEASING WEB", 
+    layout="wide", 
+    page_icon="🏢"
+)
 
-# --- CONTROL DE VERSIONES ---
-APP_VERSION = "v1.2.0" # Actualizado por la unificación de Finanzas
+APP_VERSION = "v1.4.0" 
 
 import usuarios_modulo 
+import propietarios_modulo 
 
-# 2. CONEXIÓN A BASE DE DATOS
+# ==========================================
+# 2. FUNCIONES DE SEGURIDAD
+# ==========================================
+def encriptar_password(password):
+    """
+    Convierte la contraseña en texto plano a un Hash SHA-256
+    para que viaje y se almacene de forma segura.
+    """
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# ==========================================
+# 3. CONEXIÓN A BASE DE DATOS
+# ==========================================
 @st.cache_resource 
 def get_supabase_client():
     url = st.secrets["SUPABASE_URL"]
@@ -19,13 +39,18 @@ def get_supabase_client():
 
 supabase = get_supabase_client()
 
-# 3. CONTROL DE SESIÓN
+# ==========================================
+# 4. CONTROL DE SESIÓN
+# ==========================================
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
-# --- PANTALLA DE LOGIN ---
+# ==========================================
+# 5. PANTALLA DE LOGIN
+# ==========================================
 if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
+    
     with cols[1]:
         st.title("🏢 INMOLEASING")
         st.markdown(f"**Acceso al Sistema** *(Versión {APP_VERSION})*")
@@ -35,20 +60,47 @@ if not st.session_state.autenticado:
         
         if st.button("Entrar", use_container_width=True):
             try:
-                res = supabase.table("usuarios").select("*").eq("email", email_input).eq("password", pass_input).eq("estado", "ACTIVO").execute()
+                # Encriptamos la clave digitada antes de enviarla
+                pass_hash = encriptar_password(pass_input)
                 
+                # Consulta a Supabase verificando credenciales y estado activo
+                res = supabase.table("usuarios").select("*").eq(
+                    "email", email_input.lower()
+                ).eq(
+                    "password", pass_hash
+                ).eq(
+                    "estado", "ACTIVO"
+                ).execute()
+                
+                # Si hay coincidencia, el usuario existe y las claves cuadran
                 if len(res.data) > 0:
+                    usuario_data = res.data[0]
+                    
+                    # Guardamos los datos en la memoria de la sesión
                     st.session_state.autenticado = True
-                    st.session_state.usuario = res.data[0]
-                    st.session_state.usuario_actual = res.data[0]['nombre'] 
+                    st.session_state.usuario = usuario_data
+                    st.session_state.usuario_actual = usuario_data['nombre'] 
+                    st.session_state.moneda_usuario = usuario_data['moneda'] 
+                    
+                    # Actualizamos la fecha del último acceso en la base de datos
+                    ahora = datetime.utcnow().isoformat()
+                    supabase.table("usuarios").update({
+                        "ultimo_acceso": ahora
+                    }).eq("id", usuario_data['id']).execute()
+                    
+                    # Refrescamos la página para entrar al sistema
                     st.rerun()
                 else:
                     st.error("❌ Usuario/contraseña incorrectos o cuenta INACTIVA.")
+                    
             except Exception as e:
-                st.error(f"Error de conexión: {e}")
-    st.stop()
+                st.error(f"Error de conexión con la base de datos: {e}")
+                
+    st.stop() # Detiene la ejecución aquí si no está autenticado
 
-# --- MENÚ LATERAL ---
+# ==========================================
+# 6. MENÚ LATERAL Y NAVEGACIÓN
+# ==========================================
 def mostrar_proximamente(modulo):
     st.warning(f"### 🚧 Módulo en Desarrollo")
     st.write(f"Muy pronto tendrás aquí toda la **gestión de {modulo.lower()}**.")
@@ -56,62 +108,64 @@ def mostrar_proximamente(modulo):
 with st.sidebar:
     st.title("🏢 INMOLEASING")
     st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre', 'Usuario')}**")
+    st.caption(f"Región/Moneda: **{st.session_state.get('moneda_usuario', 'ALL')}**")
     st.caption(f"Versión: {APP_VERSION}")
     
     selected = option_menu(
         menu_title="Menú Principal",
-        options=["Dashboard", "Usuarios", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"],
-        icons=["speedometer2", "person-gear", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"],
+        options=[
+            "Dashboard", 
+            "Usuarios", 
+            "Propietarios", 
+            "Inmuebles", 
+            "Arrendamientos", 
+            "Finanzas", 
+            "Informes"
+        ],
+        icons=[
+            "speedometer2", 
+            "person-gear", 
+            "person-badge", 
+            "house-door", 
+            "file-earmark-check", 
+            "bank", 
+            "graph-up-arrow"
+        ],
         menu_icon="cast",
         default_index=0,
     )
     
-    if st.button("Cerrar Sesión"):
+    st.markdown("---")
+    if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
         st.session_state.usuario_actual = None
+        st.session_state.moneda_usuario = None
         st.rerun()
 
-# --- LÓGICA DE NAVEGACIÓN ---
+# ==========================================
+# 7. ENRUTADOR DE MÓDULOS
+# ==========================================
 if selected == "Dashboard":
     st.header("📈 Dashboard Principal")
-    mostrar_proximamente("Panel de Control (Dashboard)")
+    mostrar_proximamente("Panel de Control")
 
 elif selected == "Usuarios":
     usuarios_modulo.mostrar_modulo_usuarios(supabase)
 
 elif selected == "Propietarios":
-    st.header("🤝 Propietarios")
-    sub_tab = st.tabs(["Fichas Propietarios", "Contratos Propietarios"])
-    with sub_tab[0]:
-        mostrar_proximamente("Fichas de Propietarios")
-    with sub_tab[1]:
-        mostrar_proximamente("Contratos de Mandato")
+    propietarios_modulo.mostrar_modulo_propietarios(supabase)
 
 elif selected == "Inmuebles":
     st.header("🏠 Gestión de Inmuebles")
-    sub_tab = st.tabs(["Inmuebles Principales", "Unidades Habitacionales", "Inventarios", "Incidencias"])
-    with sub_tab[0]:
-        mostrar_proximamente("Inmuebles")
-    with sub_tab[1]:
-        mostrar_proximamente("Unidades")
-    with sub_tab[2]:
-        mostrar_proximamente("Inventarios Detallados")
-    with sub_tab[3]:
-        mostrar_proximamente("Reporte de Incidencias")
+    mostrar_proximamente("Inmuebles")
 
 elif selected == "Arrendamientos":
     st.header("📝 Arrendamientos")
-    sub_tab = st.tabs(["Arrendatarios", "Contratos Arriendo", "Suministros"])
-    for i, tab_name in enumerate(["Arrendatarios", "Contratos", "Suministros"]):
-        with sub_tab[i]:
-            mostrar_proximamente(tab_name)
+    mostrar_proximamente("Contratos")
 
 elif selected == "Finanzas":
     st.header("🏦 Finanzas y Contabilidad")
-    sub_tab = st.tabs(["Bancos y Conciliación", "Cuentas por Cobrar (CXC)", "Cuentas por Pagar (CXP)", "PyG", "Balance"])
-    for i, tab_name in enumerate(["Bancos", "CXC", "CXP", "PyG", "Balance"]):
-        with sub_tab[i]:
-            mostrar_proximamente(tab_name)
+    mostrar_proximamente("Bancos y Contabilidad")
 
 elif selected == "Informes":
     st.header("📊 Informes de Gestión")
