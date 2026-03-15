@@ -10,11 +10,14 @@ def log_accion(supabase, accion, detalle):
     try:
         supabase.table("logs_actividad").insert({"accion": accion, "detalle": detalle}).execute()
     except Exception as e:
-        pass # Si falla el log, no rompemos la app
+        pass 
 
 def es_correo_valido(correo):
     patron = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     return re.match(patron, correo) is not None
+
+# Catálogo predefinido de iconos para facultades
+LISTA_ICONOS = ['👥', '🤝', '🏠', '🏦', '🚰', '💰', '🧾', '📊', '⚙️', '🔒', '📄', '✏️', '🗑️', '🔍', '🚀', '🔔', '📅', '🔑']
 
 # ==========================================
 # 1. FUNCIÓN PDF: VERSIÓN PERFECTA
@@ -111,7 +114,7 @@ def mostrar_modulo_usuarios(supabase):
             n_nom = col1.text_input("Nombre Completo")
             n_ema = col1.text_input("Correo Institucional")
             n_pas = col2.text_input("Password", type="password")
-            n_mon = col2.selectbox("Moneda Base", ["EUR", "COP", "ALL"]) # Monedas ordenadas
+            n_mon = col2.selectbox("Moneda Base", ["EUR", "COP", "ALL"]) # Orden estricto de monedas
             n_rol = st.selectbox("Rol Asignado", options=list(DICCIONARIO_ROLES.items()), format_func=lambda x: x[1])
             
             if st.form_submit_button("✅ Crear Usuario"):
@@ -128,94 +131,151 @@ def mostrar_modulo_usuarios(supabase):
                 else:
                     st.warning("⚠️ Todos los campos son obligatorios.")
 
-    # --- TAB 3: GESTIONAR (BÚSQUEDA Y CONFIRMACIÓN) ---
+    # --- TAB 3: GESTIONAR ---
     with tab3:
         if not df_raw.empty:
-            busqueda_edit = st.text_input("🔍 Buscar usuario a gestionar...", "").upper().strip()
-            df_edit = df_raw.copy()
-            if busqueda_edit:
-                df_edit = df_edit[df_edit['nombre'].str.contains(busqueda_edit)]
+            # 1. ORDEN ALFABÉTICO (Mejora solicitada)
+            nombres_ordenados = df_raw.sort_values('nombre')['nombre'].tolist()
             
-            if not df_edit.empty:
-                u_edit = st.selectbox("Seleccione un usuario:", df_edit['nombre'].tolist())
-                u_data = df_edit[df_edit['nombre'] == u_edit].iloc[0]
+            st.info("💡 **Tip:** Haz clic en la caja de abajo y empieza a teclear el nombre para buscar rápidamente (Autocomplete).")
+            u_edit = st.selectbox("Seleccione un usuario a gestionar:", nombres_ordenados)
+            u_data = df_raw[df_raw['nombre'] == u_edit].iloc[0]
+            
+            with st.form("form_edicion"):
+                e_nom = st.text_input("Nombre", u_data['nombre'])
+                e_ema = st.text_input("Email", u_data['email'])
+                index_rol = list(DICCIONARIO_ROLES.keys()).index(u_data['id_rol']) if u_data['id_rol'] in DICCIONARIO_ROLES else 0
+                e_rol = st.selectbox("Cambiar Rol", options=list(DICCIONARIO_ROLES.items()), index=index_rol, format_func=lambda x: x[1])
                 
-                with st.form("form_edicion"):
-                    e_nom = st.text_input("Nombre", u_data['nombre'])
-                    e_ema = st.text_input("Email", u_data['email'])
-                    index_rol = list(DICCIONARIO_ROLES.keys()).index(u_data['id_rol']) if u_data['id_rol'] in DICCIONARIO_ROLES else 0
-                    e_rol = st.selectbox("Cambiar Rol", options=list(DICCIONARIO_ROLES.items()), index=index_rol, format_func=lambda x: x[1])
-                    
-                    if st.form_submit_button("💾 Guardar Cambios"):
-                        if es_correo_valido(e_ema):
-                            supabase.table("usuarios").update({
-                                "nombre": e_nom.upper(), "email": e_ema.lower(), "id_rol": e_rol[0]
-                            }).eq("id", u_data['id']).execute()
-                            log_accion(supabase, "EDITAR", f"Datos actualizados de: {e_nom.upper()}")
-                            st.success("Cambios aplicados."); st.rerun()
-                        else:
-                            st.error("❌ Correo inválido.")
-                
-                # Zona de Peligro: Confirmación antes de eliminar
-                st.markdown("---")
-                st.markdown("**🚨 Zona de Peligro**")
-                confirmar = st.checkbox(f"Confirmo que deseo eliminar permanentemente a {u_edit}")
-                if confirmar:
-                    if st.button("🗑️ Eliminar Usuario", type="primary"):
-                        supabase.table("usuarios").delete().eq("id", u_data['id']).execute()
-                        log_accion(supabase, "ELIMINAR", f"Usuario borrado: {u_data['nombre']}")
-                        st.rerun()
-            else:
-                st.info("No se encontraron coincidencias.")
+                if st.form_submit_button("💾 Guardar Cambios"):
+                    if es_correo_valido(e_ema):
+                        supabase.table("usuarios").update({
+                            "nombre": e_nom.upper(), "email": e_ema.lower(), "id_rol": e_rol[0]
+                        }).eq("id", u_data['id']).execute()
+                        log_accion(supabase, "EDITAR", f"Datos actualizados de: {e_nom.upper()}")
+                        st.success("Cambios aplicados."); st.rerun()
+                    else:
+                        st.error("❌ Correo inválido.")
+            
+            # 2. ELIMINAR CON CONFIRMACIÓN (Botón -> Confirmación)
+            st.markdown("---")
+            if "confirmar_borrado_user" not in st.session_state:
+                st.session_state.confirmar_borrado_user = None
 
-    # --- TAB 4: ROLES Y FACULTADES (SUB-NAVEGACIÓN) ---
+            if st.button("🗑️ Eliminar Usuario", type="primary"):
+                st.session_state.confirmar_borrado_user = u_data['id']
+                st.rerun()
+
+            if st.session_state.confirmar_borrado_user == u_data['id']:
+                st.warning(f"⚠️ ¿Estás totalmente seguro de eliminar permanentemente a {u_edit}?")
+                c_si, c_no = st.columns(2)
+                if c_si.button("✅ Sí, eliminar definitivamente"):
+                    supabase.table("usuarios").delete().eq("id", u_data['id']).execute()
+                    log_accion(supabase, "ELIMINAR", f"Usuario borrado: {u_edit}")
+                    st.session_state.confirmar_borrado_user = None
+                    st.rerun()
+                if c_no.button("❌ Cancelar operación"):
+                    st.session_state.confirmar_borrado_user = None
+                    st.rerun()
+
+    # --- TAB 4: ROLES Y FACULTADES ---
     with tab4:
-        seccion = st.radio("Gestionar:", ["Roles de Usuario", "Catálogo de Facultades"], horizontal=True)
+        seccion = st.radio("Seleccione el área a configurar:", ["Roles de Usuario", "Catálogo de Facultades"], horizontal=True)
         st.markdown("---")
         
+        # --- SECCIÓN: ROLES ---
         if seccion == "Roles de Usuario":
             c1, c2 = st.columns(2)
             with c1:
+                st.markdown("### ✨ Crear Rol") # Título añadido
                 with st.form("n_rol_form"):
                     nr_nom = st.text_input("Nombre del nuevo Rol")
                     nr_llaves = st.multiselect("Asignar Facultades:", llaves_iconos)
-                    if st.form_submit_button("Crear Perfil"):
+                    if st.form_submit_button("Guardar Nuevo Rol"):
                         if nr_nom:
                             supabase.table("roles").insert({"nombre_rol": nr_nom.upper(), "descripcion": ", ".join(nr_llaves)}).execute()
                             log_accion(supabase, "ROL", f"Rol creado: {nr_nom.upper()}")
                             st.rerun()
             with c2:
+                st.markdown("### ⚙️ Gestión de Roles") # Título añadido
                 if not df_roles.empty:
-                    r_edit = st.selectbox("Editar Facultades de:", df_roles['nombre_rol'].tolist())
+                    r_edit = st.selectbox("Seleccione Rol a editar:", df_roles['nombre_rol'].tolist())
                     r_row = df_roles[df_roles['nombre_rol'] == r_edit].iloc[0]
                     previas = [p.strip() for p in r_row['descripcion'].split(",")] if r_row['descripcion'] else []
+                    
                     with st.form("e_rol_form"):
                         er_llaves = st.multiselect("Modificar Facultades:", llaves_iconos, default=[p for p in previas if p in llaves_iconos])
-                        if st.form_submit_button("Actualizar"):
+                        if st.form_submit_button("Actualizar Rol"):
                             supabase.table("roles").update({"descripcion": ", ".join(er_llaves)}).eq("id", r_row['id']).execute()
                             log_accion(supabase, "ROL", f"Facultades actualizadas para: {r_edit}")
                             st.success("Permisos actualizados."); st.rerun()
+
+                    # Eliminar Rol con confirmación
+                    if "confirmar_borrado_rol" not in st.session_state:
+                        st.session_state.confirmar_borrado_rol = None
+                        
+                    if st.button("🗑️ Eliminar este Rol"):
+                        st.session_state.confirmar_borrado_rol = r_row['id']
+                        st.rerun()
+                        
+                    if st.session_state.confirmar_borrado_rol == r_row['id']:
+                        st.warning(f"⚠️ ¿Seguro que deseas eliminar el rol {r_edit}?")
+                        c_si_rol, c_no_rol = st.columns(2)
+                        if c_si_rol.button("✅ Sí, eliminar Rol"):
+                            supabase.table("roles").delete().eq("id", r_row['id']).execute()
+                            log_accion(supabase, "ROL", f"Rol eliminado: {r_edit}")
+                            st.session_state.confirmar_borrado_rol = None
+                            st.rerun()
+                        if c_no_rol.button("❌ Cancelar"):
+                            st.session_state.confirmar_borrado_rol = None
+                            st.rerun()
                             
+        # --- SECCIÓN: FACULTADES ---
         elif seccion == "Catálogo de Facultades":
             col_f1, col_f2 = st.columns(2)
             with col_f1:
-                st.write("**Nueva Facultad**")
+                st.markdown("### ✨ Crear Facultad")
                 with st.form("form_facultad"):
-                    f_ico = st.text_input("Icono (Emoji, ej: 🔑)")
-                    f_nom = st.text_input("Nombre Técnico (Ej: REPORTE_PAGOS)")
+                    f_ico = st.selectbox("Selecciona un Icono", LISTA_ICONOS) # Galería de iconos
+                    f_nom = st.text_input("Nombre de la Facultad (Ej: VER_REPORTES)")
                     if st.form_submit_button("Añadir Facultad"):
                         if f_nom:
                             supabase.table("facultades").insert({"icono": f_ico, "nombre_facultad": f_nom.upper()}).execute()
                             log_accion(supabase, "FACULTAD", f"Creada: {f_nom.upper()}")
                             st.rerun()
             with col_f2:
-                st.write("**Facultades Existentes**")
+                st.markdown("### ⚙️ Gestión de Facultades")
                 if not df_fac.empty:
-                    st.dataframe(df_fac[['icono', 'nombre_facultad']], hide_index=True, use_container_width=True)
-                    # Eliminación simple de facultades
-                    f_del = st.selectbox("Eliminar Facultad:", df_fac['nombre_facultad'].tolist())
-                    f_id = df_fac[df_fac['nombre_facultad'] == f_del]['id'].values[0]
-                    if st.button("❌ Borrar", type="primary"):
-                        supabase.table("facultades").delete().eq("id", f_id).execute()
-                        log_accion(supabase, "FACULTAD", f"Eliminada: {f_del}")
+                    # CRUD COMPLETO: Seleccionar para editar/borrar
+                    f_edit_nom = st.selectbox("Seleccione Facultad:", df_fac['nombre_facultad'].tolist())
+                    f_row = df_fac[df_fac['nombre_facultad'] == f_edit_nom].iloc[0]
+                    
+                    with st.form("edit_facultad"):
+                        idx_icono = LISTA_ICONOS.index(f_row['icono']) if f_row['icono'] in LISTA_ICONOS else 0
+                        ef_ico = st.selectbox("Cambiar Icono", LISTA_ICONOS, index=idx_icono)
+                        ef_nom = st.text_input("Cambiar Nombre", f_row['nombre_facultad'])
+                        
+                        if st.form_submit_button("💾 Actualizar Facultad"):
+                            supabase.table("facultades").update({"icono": ef_ico, "nombre_facultad": ef_nom.upper()}).eq("id", f_row['id']).execute()
+                            log_accion(supabase, "FACULTAD", f"Actualizada: {ef_nom.upper()}")
+                            st.rerun()
+                            
+                    # Eliminar Facultad con confirmación
+                    if "confirmar_borrado_fac" not in st.session_state:
+                        st.session_state.confirmar_borrado_fac = None
+                        
+                    if st.button("🗑️ Eliminar Facultad"):
+                        st.session_state.confirmar_borrado_fac = f_row['id']
                         st.rerun()
+                        
+                    if st.session_state.confirmar_borrado_fac == f_row['id']:
+                        st.warning(f"⚠️ ¿Eliminar facultad {f_edit_nom}?")
+                        cf_si, cf_no = st.columns(2)
+                        if cf_si.button("✅ Sí, borrar"):
+                            supabase.table("facultades").delete().eq("id", f_row['id']).execute()
+                            log_accion(supabase, "FACULTAD", f"Eliminada: {f_edit_nom}")
+                            st.session_state.confirmar_borrado_fac = None
+                            st.rerun()
+                        if cf_no.button("❌ Cancelar"):
+                            st.session_state.confirmar_borrado_fac = None
+                            st.rerun()
