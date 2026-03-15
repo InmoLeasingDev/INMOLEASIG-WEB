@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v2.1 PRO" # Adaptación a lectura de bloque de texto
+APP_VERSION = "v2.2 PRO" # Menú siempre visible con bloqueos en pantalla
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -99,12 +99,9 @@ if not st.session_state.autenticado:
                             res_rol = supabase.table("roles").select("*").eq("id", id_rol).execute()
                             if res_rol.data:
                                 r_data = res_rol.data[0]
-                                # Extraemos TODO el texto que vimos en tu pantalla
                                 texto_facultades_gigante = str(r_data).upper()
-                                # Si tienes una columna específica para el nombre del rol (ej. "ADMINISTRADOR"), la tomamos aquí:
                                 nombre_del_rol = str(r_data.get('nombre_rol', r_data.get('nombre', 'ROL CONFIGURADO'))).upper()
 
-                        # Guardamos el texto gigante en la sesión
                         usuario_data['rol_nombre'] = nombre_del_rol
                         usuario_data['facultades_texto'] = texto_facultades_gigante
                         
@@ -121,7 +118,7 @@ if not st.session_state.autenticado:
     st.stop()
 
 # ==========================================
-# 6. MENÚ LATERAL INTELIGENTE
+# 6. MENÚ LATERAL SIEMPRE VISIBLE
 # ==========================================
 with st.sidebar:
     st.title("🏢 INMOLEASING")
@@ -132,33 +129,32 @@ with st.sidebar:
     
     st.caption(f"Perfil: **{rol_actual}**")
 
-    opciones_permitidas = []
-    
-    # Buscamos las palabras clave dentro de tu texto gigante de la base de datos
+    # Calculamos QUÉ módulos tiene permitidos (Pero no los ocultamos)
+    st.session_state.opciones_permitidas = []
     for menu_item, facultad_requerida in DICCIONARIO_MENU_FACULTADES.items():
         if facultad_requerida in texto_facultades:
-            opciones_permitidas.append(menu_item)
+            st.session_state.opciones_permitidas.append(menu_item)
 
-    # El Administrador Global ve todo
     if "ADMINISTRADOR" in texto_facultades or "ADMINISTRADOR" in rol_actual:
-        opciones_permitidas = list(DICCIONARIO_MENU_FACULTADES.keys())
+        st.session_state.opciones_permitidas = list(DICCIONARIO_MENU_FACULTADES.keys())
 
-    if not opciones_permitidas:
-        opciones_permitidas = ["Dashboard"]
+    if not st.session_state.opciones_permitidas:
+        st.session_state.opciones_permitidas = ["Dashboard"]
 
+    # Mostramos TODOS los botones siempre
     menu_map = {
         "Dashboard": "speedometer2", "Usuarios": "person-gear", "Operadores": "briefcase",
         "Propietarios": "person-badge", "Inmuebles": "house-door", "Arrendamientos": "file-earmark-check",
         "Finanzas": "bank", "Informes": "graph-up-arrow"
     }
     
-    opciones_ordenadas = [opt for opt in menu_map.keys() if opt in opciones_permitidas]
-    iconos_ordenados = [menu_map[opt] for opt in opciones_ordenadas]
+    opciones_todas = list(menu_map.keys())
+    iconos_todos = list(menu_map.values())
 
     selected = option_menu(
         menu_title="Menú Principal",
-        options=opciones_ordenadas, 
-        icons=iconos_ordenados,     
+        options=opciones_todas, 
+        icons=iconos_todos,     
         menu_icon="cast",
         default_index=0,
     )
@@ -170,18 +166,25 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 7. ENRUTADOR DE MÓDULOS
+# 7. ENRUTADOR CON CUSTODIO DE ACCESO
 # ==========================================
-if selected == "Dashboard":
-    st.header("📈 Dashboard Principal")
-    st.info("Aquí irán las gráficas y resúmenes de la operación.")
-
-elif selected == "Usuarios":
-    usuarios_modulo.mostrar_modulo_usuarios(supabase)
-
-elif selected == "Operadores":
-    operadores_modulo.mostrar_modulo_operadores(supabase)
-
+# Si el usuario hace clic en algo que no está en su lista de permitidos, le ponemos el candado
+if selected not in st.session_state.opciones_permitidas:
+    st.error(f"### 🔒 Acceso Restringido")
+    st.warning(f"Tu perfil actual (**{rol_actual}**) no cuenta con las facultades necesarias para visualizar o gestionar el módulo de **{selected}**.")
+    st.info("Si consideras que esto es un error, por favor contacta con el administrador del sistema para que asigne esta facultad a tu rol.")
 else:
-    st.header(f"Módulo: {selected}")
-    st.info("Módulo en construcción. Pronto estará disponible.")
+    # Si sí tiene permiso, cargamos el módulo correspondiente
+    if selected == "Dashboard":
+        st.header("📈 Dashboard Principal")
+        st.info("Aquí irán las gráficas y resúmenes de la operación.")
+
+    elif selected == "Usuarios":
+        usuarios_modulo.mostrar_modulo_usuarios(supabase)
+
+    elif selected == "Operadores":
+        operadores_modulo.mostrar_modulo_operadores(supabase)
+
+    else:
+        st.header(f"Módulo: {selected}")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
