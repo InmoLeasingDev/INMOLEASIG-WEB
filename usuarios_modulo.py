@@ -40,8 +40,8 @@ def generar_pdf_usuarios(df, diccionario_roles):
     
     pdf.set_font("Arial", "B", 10)
     pdf.set_fill_color(200, 220, 255)
-    cw = [55, 85, 50] 
-    headers = ["NOMBRE", "EMAIL", "ROL"]
+    cw = [55, 70, 40, 25] # Ajustado para incluir Estado
+    headers = ["NOMBRE", "EMAIL", "ROL", "ESTADO"]
     for i, h_text in enumerate(headers):
         pdf.cell(cw[i], 10, h_text, border=1, fill=True, align="C")
     pdf.ln()
@@ -49,7 +49,8 @@ def generar_pdf_usuarios(df, diccionario_roles):
     pdf.set_font("Arial", "", 9)
     for _, row in df.iterrows():
         rol_texto = diccionario_roles.get(row['id_rol'], "SIN ROL")
-        textos = [str(row['nombre']), str(row['email']), str(rol_texto)]
+        estado_texto = str(row.get('estado', 'ACTIVO'))
+        textos = [str(row['nombre']), str(row['email']), str(rol_texto), estado_texto]
         
         lineas_por_col = [len(pdf.multi_cell(cw[i], 7, txt, split_only=True)) for i, txt in enumerate(textos)]
         h_fila = 7 * max(lineas_por_col)
@@ -79,7 +80,6 @@ def generar_pdf_logs(df_logs):
     
     pdf.set_font("Arial", "B", 8)
     pdf.set_fill_color(220, 220, 220)
-    # Ajustamos anchos para incluir al usuario (Total = 190mm)
     cw = [25, 30, 30, 105] 
     headers = ["FECHA", "USUARIO", "ACCION", "DETALLE"]
     for i, h_text in enumerate(headers):
@@ -117,11 +117,8 @@ def generar_pdf_logs(df_logs):
 # ==========================================
 def mostrar_modulo_usuarios(supabase):
     st.header("👤 Gestión de Usuarios y Accesos")
-    
-    # USUARIO SIMULADO (Hasta que hagamos el login real)
     usuario_actual = st.session_state.get("usuario_actual", "ADMINISTRADOR")
     
-    # --- Carga de Datos ---
     try:
         res_roles = supabase.table("roles").select("*").execute()
         df_roles = pd.DataFrame(res_roles.data) if res_roles.data else pd.DataFrame()
@@ -137,6 +134,9 @@ def mostrar_modulo_usuarios(supabase):
         
     res_u = supabase.table("usuarios").select("*").execute()
     df_raw = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
+    # Asegurarnos de que exista la columna estado localmente si la tabla está recién actualizada
+    if not df_raw.empty and 'estado' not in df_raw.columns:
+        df_raw['estado'] = 'ACTIVO'
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Directorio", "➕ Nuevo Usuario", "⚙️ Gestionar", "🛡️ Facultades y Roles", "📜 Logs de Actividad"])
 
@@ -146,10 +146,14 @@ def mostrar_modulo_usuarios(supabase):
             busqueda = st.text_input("🔍 Buscar usuario...", "").upper().strip()
             df_display = df_raw.copy().sort_values('nombre')
             df_display['Rol'] = df_display['id_rol'].map(DICCIONARIO_ROLES)
+            
+            # Mostramos el estado
+            df_display['estado'] = df_display['estado'].fillna('ACTIVO')
+            
             if busqueda:
                 df_display = df_display[df_display['nombre'].str.contains(busqueda)]
             
-            st.dataframe(df_display[["nombre", "email", "moneda", "Rol"]], use_container_width=True, hide_index=True)
+            st.dataframe(df_display[["nombre", "email", "moneda", "Rol", "estado"]], use_container_width=True, hide_index=True)
             pdf_bytes = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
             st.download_button("📄 Exportar Reporte PDF", pdf_bytes, "usuarios_inmoleasing.pdf", "application/pdf")
 
@@ -171,19 +175,26 @@ def mostrar_modulo_usuarios(supabase):
                     else:
                         supabase.table("usuarios").insert({
                             "nombre": n_nom.upper(), "email": n_ema.lower(), 
-                            "password": n_pas, "moneda": n_mon, "id_rol": n_rol[0]
+                            "password": n_pas, "moneda": n_mon, "id_rol": n_rol[0],
+                            "estado": "ACTIVO" # Por defecto activo
                         }).execute()
                         log_accion(supabase, usuario_actual, "CREAR USUARIO", f"Registrado: {n_nom.upper()} | Rol ID: {n_rol[0]}")
                         st.success(f"¡Usuario {n_nom.upper()} creado!"); st.rerun()
                 else:
                     st.warning("⚠️ Todos los campos son obligatorios.")
 
-    # --- TAB 3: GESTIONAR ---
+    # --- TAB 3: GESTIONAR (CON SOFT DELETE) ---
     with tab3:
         if not df_raw.empty:
             nombres_ordenados = df_raw.sort_values('nombre')['nombre'].tolist()
             u_edit = st.selectbox("Seleccione un usuario a gestionar (Autocomplete habilitado):", nombres_ordenados)
             u_data = df_raw[df_raw['nombre'] == u_edit].iloc[0]
+            estado_actual = u_data.get('estado', 'ACTIVO')
+            
+            if estado_actual == 'INACTIVO':
+                st.error(f"⚠️ El usuario {u_edit} está INACTIVO y no tiene acceso al sistema.")
+            else:
+                st.success(f"✅ El usuario {u_edit} está ACTIVO.")
             
             with st.form("form_edicion"):
                 e_nom = st.text_input("Nombre", u_data['nombre'])
@@ -196,7 +207,7 @@ def mostrar_modulo_usuarios(supabase):
                         supabase.table("usuarios").update({
                             "nombre": e_nom.upper(), "email": e_ema.lower(), "id_rol": e_rol[0]
                         }).eq("id", u_data['id']).execute()
-                        log_accion(supabase, usuario_actual, "EDITAR USUARIO", f"Actualizado: {e_nom.upper()} | Nuevo Rol ID: {e_rol[0]}")
+                        log_accion(supabase, usuario_actual, "EDITAR USUARIO", f"Actualizado: {e_nom.upper()}")
                         st.success("Cambios aplicados."); st.rerun()
                     else:
                         st.error("❌ Correo inválido.")
@@ -205,16 +216,24 @@ def mostrar_modulo_usuarios(supabase):
             if "confirmar_borrado_user" not in st.session_state:
                 st.session_state.confirmar_borrado_user = None
 
-            if st.button("🗑️ Eliminar Usuario", type="primary"):
-                st.session_state.confirmar_borrado_user = u_data['id']
-                st.rerun()
+            # Botón dinámico según el estado
+            if estado_actual == 'ACTIVO':
+                if st.button("🚫 Desactivar Usuario (Soft Delete)", type="primary"):
+                    st.session_state.confirmar_borrado_user = u_data['id']
+                    st.rerun()
+            else:
+                if st.button("♻️ Reactivar Usuario"):
+                    supabase.table("usuarios").update({"estado": "ACTIVO"}).eq("id", u_data['id']).execute()
+                    log_accion(supabase, usuario_actual, "REACTIVAR USUARIO", f"Acceso restaurado a: {u_edit}")
+                    st.rerun()
 
             if st.session_state.confirmar_borrado_user == u_data['id']:
-                st.warning(f"⚠️ ¿Estás totalmente seguro de eliminar permanentemente a {u_edit}?")
+                st.warning(f"⚠️ ¿Desactivar a {u_edit}? Perderá acceso al sistema inmediatamente.")
                 c_si, c_no = st.columns(2)
-                if c_si.button("✅ Sí, eliminar definitivamente"):
-                    supabase.table("usuarios").delete().eq("id", u_data['id']).execute()
-                    log_accion(supabase, usuario_actual, "ELIMINAR USUARIO", f"Borrado: {u_edit}")
+                if c_si.button("✅ Sí, Desactivar"):
+                    # BORRADO LÓGICO: Solo actualizamos el estado
+                    supabase.table("usuarios").update({"estado": "INACTIVO"}).eq("id", u_data['id']).execute()
+                    log_accion(supabase, usuario_actual, "INACTIVAR USUARIO", f"Acceso bloqueado a: {u_edit}")
                     st.session_state.confirmar_borrado_user = None
                     st.rerun()
                 if c_no.button("❌ Cancelar operación"):
@@ -278,7 +297,7 @@ def mostrar_modulo_usuarios(supabase):
             with c1:
                 st.markdown("### ✨ Crear Rol")
                 with st.form("n_rol_form"):
-                    nr_nom = st.text_input("Nombre del nuevo Rol")
+                    nr_nom = st.text_input("Nombre del nuevo Rol (Ej: AUDITOR)")
                     nr_llaves = st.multiselect("Asignar Facultades:", llaves_iconos)
                     if st.form_submit_button("Guardar Nuevo Rol"):
                         if nr_nom:
@@ -319,7 +338,7 @@ def mostrar_modulo_usuarios(supabase):
                             st.session_state.confirmar_borrado_rol = None
                             st.rerun()
 
-    # --- TAB 5: LOGS Y AUDITORÍA (CON FILTRO POR USUARIO) ---
+    # --- TAB 5: LOGS Y AUDITORÍA ---
     with tab5:
         st.subheader("📜 Auditoría y Registro de Actividades")
         
@@ -337,7 +356,6 @@ def mostrar_modulo_usuarios(supabase):
             with col_f1:
                 fecha_rango = st.date_input("Rango de Fechas", value=[])
             with col_f2:
-                # Nuevo: Filtro exacto por Usuario
                 usuarios_unicos = ["Todos"] + sorted(df_logs['usuario'].dropna().unique().tolist())
                 usuario_filtro = st.selectbox("Filtrar por Usuario", usuarios_unicos)
             with col_f3:
