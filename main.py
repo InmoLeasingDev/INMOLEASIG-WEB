@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v2.8 PRO" # Pantalla de Bienvenida con Portada
+APP_VERSION = "v2.9 PRO" # Botón de Inicio y Portada Corporativa Fix
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -29,13 +29,8 @@ DICCIONARIO_MENU_FACULTADES = {
 # ==========================================
 st.markdown("""
     <style>
-        /* Ocultar el espacio vacío superior */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; }
-        
-        /* Ajuste fino del margen superior para el título */
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
-        
-        /* Sube ligeramente el contenido del panel principal */
         .block-container { padding-top: 1.5rem !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -59,14 +54,10 @@ def get_supabase_client():
 supabase = get_supabase_client()
 
 # ==========================================
-# 4. CONTROL DE SESIÓN Y BIENVENIDA
+# 4. CONTROL DE SESIÓN
 # ==========================================
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
-
-# Esta bandera controlará cuándo mostrar la pantalla de bienvenida
-if "bienvenida" not in st.session_state:
-    st.session_state.bienvenida = True 
 
 # ==========================================
 # 5. LOGIN BLINDADO
@@ -111,7 +102,6 @@ if not st.session_state.autenticado:
                                 texto_facultades_gigante = str(r_data).upper()
                                 nombre_del_rol = str(r_data.get('nombre_rol', r_data.get('nombre', 'ROL CONFIGURADO'))).upper()
 
-                        # Guardamos los datos de la sesión
                         usuario_data['rol_nombre'] = nombre_del_rol
                         usuario_data['facultades_texto'] = texto_facultades_gigante
                         
@@ -119,9 +109,6 @@ if not st.session_state.autenticado:
                         st.session_state.usuario = usuario_data
                         st.session_state.moneda_usuario = usuario_data.get('moneda', 'ALL')
                         
-                        # Al loguearse correctamente, forzamos que se muestre la bienvenida
-                        st.session_state.bienvenida = True 
-
                         supabase.table("usuarios").update({"ultimo_acceso": datetime.utcnow().isoformat()}).eq("id", usuario_data['id']).execute()
                         st.rerun()
                         
@@ -156,27 +143,16 @@ with st.sidebar:
     if "ADMINISTRADOR" in texto_facultades or "ADMINISTRADOR" in rol_actual:
         st.session_state.opciones_permitidas = list(DICCIONARIO_MENU_FACULTADES.keys())
 
-    # Menú Maestro con iconos
-    menu_map = {
-        "Dashboard": "speedometer2", "Usuarios": "person-gear", "Operadores": "briefcase",
-        "Propietarios": "person-badge", "Inmuebles": "house-door", "Arrendamientos": "file-earmark-check",
-        "Finanzas": "bank", "Informes": "graph-up-arrow"
-    }
-    
-    opciones_todas = list(menu_map.keys())
-    iconos_todos = list(menu_map.values())
-
-    # Si estamos en pantalla de bienvenida, no preseleccionamos nada (None)
-    # Si no, mantenemos el Dashboard como predeterminado si tienen acceso
-    indice_por_defecto = None if st.session_state.bienvenida else 0
+    # Agregamos "Inicio" al principio de las opciones siempre
+    opciones_todas = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"]
+    iconos_todos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
 
     selected = option_menu(
         menu_title=None,
         options=opciones_todas, 
         icons=iconos_todos,     
         menu_icon="cast",
-        # Al inicio, ninguna opción está preseleccionada
-        default_index=indice_por_defecto, 
+        default_index=0, # Inicia siempre en "Inicio" (índice 0) evitando el error de Streamlit
     )
     
     st.markdown("<hr style='margin-top: -1.2rem; margin-bottom: 1rem;'>", unsafe_allow_html=True)
@@ -189,12 +165,8 @@ with st.sidebar:
 # 7. ENRUTADOR CON PANTALLA DE BIENVENIDA
 # ==========================================
 
-# LÓGICA DE DETECCIÓN: Si el usuario seleccionó una opción, desactivamos la bienvenida
-if selected is not None:
-    st.session_state.bienvenida = False
-
-# CASO 1: Mostrar Pantalla de Bienvenida con la imagen portada
-if st.session_state.bienvenida:
+# 1. Si seleccionaron Inicio, mostramos la Portada (Acceso libre para todos)
+if selected == "Inicio":
     st.write("# ") # Espacio
     cols_b = st.columns([1, 6, 1])
     with cols_b[1]:
@@ -202,47 +174,48 @@ if st.session_state.bienvenida:
         st.markdown(f"**Te damos la bienvenida al Sistema Integral de Gestión Inmobiliaria.**")
         st.caption(f"Versión actual: {APP_VERSION}")
         
-        # Cargamos la imagen portada que me proporcionaste. Asegúrate de tener el archivo en la carpeta.
-        st.image("uploaded:PORTADA 1.jpg", use_container_width=True)
+        # Cargamos tu imagen (Debe estar en la misma carpeta que main.py)
+        try:
+            st.image("PORTADA 1.jpg", use_container_width=True)
+        except:
+            st.warning("No se encontró la imagen 'PORTADA 1.jpg'. Asegúrate de que esté en la carpeta del proyecto.")
+            
         st.info("👋 Por favor, selecciona una opción en el menú lateral para comenzar a operar.")
 
-# CASO 2: El usuario ya seleccionó una opción del menú
-elif selected:
-    # Verificamos permisos contra la lista de permitidos calculada en el sidebar
-    if selected not in st.session_state.opciones_permitidas:
-        st.error(f"### 🔒 Acceso Restringido")
-        st.warning(f"Tu perfil actual (**{rol_actual}**) no cuenta con las facultades necesarias para visualizar o gestionar el módulo de **{selected}**.")
-        st.info("Si consideras que esto es un error, por favor contacta con el administrador del sistema para que asigne esta facultad a tu rol.")
-    
-    else:
-        # El usuario TIENE acceso al módulo seleccionado
-        if selected == "Dashboard":
-            st.header("📈 Dashboard Principal")
-            st.info("Aquí irán las gráficas y resúmenes de la operación.")
+# 2. Si seleccionan algo más, verificamos que tengan permiso
+elif selected not in st.session_state.opciones_permitidas:
+    st.error(f"### 🔒 Acceso Restringido")
+    st.warning(f"Tu perfil actual (**{rol_actual}**) no cuenta con las facultades necesarias para visualizar o gestionar el módulo de **{selected}**.")
+    st.info("Si consideras que esto es un error, por favor contacta con el administrador del sistema para que asigne esta facultad a tu rol.")
 
-        elif selected == "Usuarios":
-            usuarios_modulo.mostrar_modulo_usuarios(supabase)
+# 3. Si tienen permiso, cargamos el módulo
+else:
+    if selected == "Dashboard":
+        st.header("📈 Dashboard Principal")
+        st.info("Aquí irán las gráficas y resúmenes de la operación.")
 
-        elif selected == "Operadores":
-            operadores_modulo.mostrar_modulo_operadores(supabase)
+    elif selected == "Usuarios":
+        usuarios_modulo.mostrar_modulo_usuarios(supabase)
 
-        # Módulos en construcción (con emojis)
-        elif selected == "Propietarios":
-            st.header("🤝 Propietarios")
-            st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+    elif selected == "Operadores":
+        operadores_modulo.mostrar_modulo_operadores(supabase)
 
-        elif selected == "Inmuebles":
-            st.header("🏠 Gestión de Inmuebles")
-            st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+    elif selected == "Propietarios":
+        st.header("🤝 Propietarios")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
 
-        elif selected == "Arrendamientos":
-            st.header("📝 Arrendamientos")
-            st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+    elif selected == "Inmuebles":
+        st.header("🏠 Gestión de Inmuebles")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
 
-        elif selected == "Finanzas":
-            st.header("🏦 Finanzas y Contabilidad")
-            st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+    elif selected == "Arrendamientos":
+        st.header("📝 Arrendamientos")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
 
-        elif selected == "Informes":
-            st.header("📊 Informes de Gestión")
-            st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+    elif selected == "Finanzas":
+        st.header("🏦 Finanzas y Contabilidad")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+
+    elif selected == "Informes":
+        st.header("📊 Informes de Gestión")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
