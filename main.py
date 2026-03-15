@@ -13,7 +13,7 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-APP_VERSION = "v1.5.2" # Ajuste Visual CSS Agresivo y Módulo Operadores
+APP_VERSION = "v1.5.2" # Ajuste Visual CSS Agresivo y Módulo Operadores ok
 
 # ==========================================
 # 1.5 AJUSTES VISUALES (CSS MODIFICADO)
