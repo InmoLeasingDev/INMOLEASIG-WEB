@@ -13,15 +13,19 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-APP_VERSION = "v1.4.0" 
+APP_VERSION = "v1.4.1" # Actualizado con blindaje de espacios
 
 import usuarios_modulo 
-# import propietarios_modulo  <--- LO DEJAMOS APAGADO POR AHORA
+# import propietarios_modulo  <--- Sigue apagado hasta que lo creemos
 
 # ==========================================
 # 2. FUNCIONES DE SEGURIDAD
 # ==========================================
 def encriptar_password(password):
+    """
+    Convierte la contraseña en texto plano a un Hash SHA-256
+    para que viaje y se almacene de forma segura.
+    """
     return hashlib.sha256(password.encode()).hexdigest()
 
 # ==========================================
@@ -51,13 +55,16 @@ if not st.session_state.autenticado:
         st.title("🏢 INMOLEASING")
         st.markdown(f"**Acceso al Sistema** *(Versión {APP_VERSION})*")
         
-        email_input = st.text_input("Correo electrónico")
-        pass_input = st.text_input("Contraseña", type="password")
+        # AQUÍ ESTÁ LA MAGIA: .strip() elimina espacios accidentales
+        email_input = st.text_input("Correo electrónico").strip()
+        pass_input = st.text_input("Contraseña", type="password").strip()
         
         if st.button("Entrar", use_container_width=True):
             try:
+                # Encriptamos la clave digitada (ya limpia de espacios)
                 pass_hash = encriptar_password(pass_input)
                 
+                # Consulta a Supabase verificando credenciales y estado activo
                 res = supabase.table("usuarios").select("*").eq(
                     "email", email_input.lower()
                 ).eq(
@@ -66,19 +73,23 @@ if not st.session_state.autenticado:
                     "estado", "ACTIVO"
                 ).execute()
                 
+                # Si hay coincidencia, el usuario existe y las claves cuadran
                 if len(res.data) > 0:
                     usuario_data = res.data[0]
                     
+                    # Guardamos los datos en la memoria de la sesión
                     st.session_state.autenticado = True
                     st.session_state.usuario = usuario_data
                     st.session_state.usuario_actual = usuario_data['nombre'] 
                     st.session_state.moneda_usuario = usuario_data['moneda'] 
                     
+                    # Actualizamos la fecha del último acceso en la base de datos
                     ahora = datetime.utcnow().isoformat()
                     supabase.table("usuarios").update({
                         "ultimo_acceso": ahora
                     }).eq("id", usuario_data['id']).execute()
                     
+                    # Refrescamos la página para entrar al sistema
                     st.rerun()
                 else:
                     st.error("❌ Usuario/contraseña incorrectos o cuenta INACTIVA.")
@@ -86,7 +97,7 @@ if not st.session_state.autenticado:
             except Exception as e:
                 st.error(f"Error de conexión con la base de datos: {e}")
                 
-    st.stop()
+    st.stop() # Detiene la ejecución aquí si no está autenticado
 
 # ==========================================
 # 6. MENÚ LATERAL Y NAVEGACIÓN
@@ -144,7 +155,7 @@ elif selected == "Usuarios":
 
 elif selected == "Propietarios":
     st.header("🤝 Propietarios")
-    mostrar_proximamente("Propietarios") # <--- LO DEJAMOS COMO PROXIMAMENTE POR AHORA
+    mostrar_proximamente("Propietarios") # Sigue como Próximamente
 
 elif selected == "Inmuebles":
     st.header("🏠 Gestión de Inmuebles")
