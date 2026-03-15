@@ -25,14 +25,33 @@ def limpiar_texto_pdf(texto):
         return ""
     return str(texto).encode('latin-1', 'ignore').decode('latin-1')
 
-# NUEVO: Función inteligente para ordenar ignorando los emojis
 def ordenar_facultades_alfabeticamente(cadena_facultades):
     if not cadena_facultades:
         return []
-    # Separamos las facultades por la coma
     facs = [f.strip() for f in cadena_facultades.split(",") if f.strip()]
-    # Ordenamos basándonos solo en la palabra que está DESPUÉS del espacio (ignorando el emoji)
     return sorted(facs, key=lambda x: x.split(" ", 1)[-1] if " " in x else x)
+
+# NUEVO: Función para simular borrado/actualización en cascada
+def sincronizar_roles_facultad(supabase, df_roles, fac_vieja, fac_nueva=None):
+    if df_roles.empty: return
+    for _, row in df_roles.iterrows():
+        desc_actual = row.get('descripcion', '')
+        if desc_actual and fac_vieja in desc_actual:
+            lista_facs = [f.strip() for f in desc_actual.split(",") if f.strip()]
+            if fac_vieja in lista_facs:
+                if fac_nueva:
+                    # Si se editó, reemplazamos el nombre
+                    idx = lista_facs.index(fac_vieja)
+                    lista_facs[idx] = fac_nueva
+                else:
+                    # Si se borró, la quitamos de la lista
+                    lista_facs.remove(fac_vieja)
+                
+                nueva_desc = ", ".join(lista_facs)
+                try:
+                    supabase.table("roles").update({"descripcion": nueva_desc}).eq("id", int(row['id'])).execute()
+                except:
+                    pass
 
 LISTA_ICONOS = [
     '🏠', '🏢', '🏬', '🏗️', '🔑', '🚪', '🏘️', '🏭',
@@ -108,7 +127,6 @@ def generar_pdf_usuarios_detallado(df, diccionario_roles, diccionario_desc):
         facs_raw = diccionario_desc.get(row['id_rol'], "")
         
         if facs_raw:
-            # FIX: Aplicamos el ordenamiento alfabético real
             facs_ordenadas = ordenar_facultades_alfabeticamente(facs_raw)
             lista_facs = [f"- {f}" for f in facs_ordenadas]
             facs_texto = "\n".join(lista_facs)
@@ -156,7 +174,6 @@ def generar_pdf_roles(df_roles):
     for _, row in df_roles.iterrows():
         facs_raw = row['descripcion']
         if facs_raw:
-            # FIX: Aplicamos el ordenamiento alfabético real
             facs_ordenadas = ordenar_facultades_alfabeticamente(facs_raw)
             lista_facs = [f"- {f}" for f in facs_ordenadas]
             facs_texto = "\n".join(lista_facs)
@@ -279,7 +296,6 @@ def mostrar_modulo_usuarios(supabase):
                 facultades_user = DICCIONARIO_DESC.get(rol_id_user, "")
                 
                 if facultades_user:
-                    # FIX: Ordenamiento inteligente ignorando emojis
                     facs_ordenadas = ordenar_facultades_alfabeticamente(facultades_user)
                     lista_facs = [f"- {fac}" for fac in facs_ordenadas]
                     facs_formateadas = "\n".join(lista_facs)
@@ -336,7 +352,6 @@ def mostrar_modulo_usuarios(supabase):
                 st.success(f"✅ El usuario {u_edit} está ACTIVO.")
             
             with st.form("form_edicion"):
-                # FIX: Estructura de formulario PRO (Nombre y Email en medias columnas)
                 col_e1, col_e2 = st.columns(2)
                 with col_e1:
                     e_nom = st.text_input("Nombre", u_data['nombre'])
@@ -422,6 +437,7 @@ def mostrar_modulo_usuarios(supabase):
                 if not df_fac.empty:
                     f_edit_nom = st.selectbox("Seleccione Facultad:", df_fac['nombre_facultad'].tolist())
                     f_row = df_fac[df_fac['nombre_facultad'] == f_edit_nom].iloc[0]
+                    fac_vieja_str = f"{f_row['icono']} {f_row['nombre_facultad']}"
                     
                     with st.form("edit_facultad"):
                         idx_icono = LISTA_ICONOS.index(f_row['icono']) if f_row['icono'] in LISTA_ICONOS else 0
@@ -429,7 +445,10 @@ def mostrar_modulo_usuarios(supabase):
                         ef_nom = st.text_input("Cambiar Nombre", f_row['nombre_facultad'])
                         
                         if st.form_submit_button("💾 Actualizar Facultad"):
+                            fac_nueva_str = f"{ef_ico} {ef_nom.upper()}"
                             supabase.table("facultades").update({"icono": ef_ico, "nombre_facultad": ef_nom.upper()}).eq("id", int(f_row['id'])).execute()
+                            # ACTUALIZACIÓN EN CASCADA
+                            sincronizar_roles_facultad(supabase, df_roles, fac_vieja_str, fac_nueva_str)
                             log_accion(supabase, usuario_actual, "EDITAR FACULTAD", f"Facultad modificada: {ef_nom.upper()}")
                             st.rerun()
                             
@@ -441,10 +460,12 @@ def mostrar_modulo_usuarios(supabase):
                         st.rerun()
                         
                     if st.session_state.confirmar_borrado_fac == f_row['id']:
-                        st.warning(f"⚠️ ¿Eliminar facultad {f_edit_nom}?")
+                        st.warning(f"⚠️ ¿Eliminar facultad {f_edit_nom}? Se quitará automáticamente de los roles que la tengan.")
                         cf_si, cf_no = st.columns(2)
                         if cf_si.button("✅ Sí, borrar facultad"):
                             supabase.table("facultades").delete().eq("id", int(f_row['id'])).execute()
+                            # BORRADO EN CASCADA
+                            sincronizar_roles_facultad(supabase, df_roles, fac_vieja_str, None)
                             log_accion(supabase, usuario_actual, "ELIMINAR FACULTAD", f"Facultad borrada: {f_edit_nom}")
                             st.session_state.confirmar_borrado_fac = None
                             st.rerun()
