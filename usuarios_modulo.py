@@ -25,7 +25,7 @@ LISTA_ICONOS = [
     '💰', '🏦', '🧾', '💲', '💳', '📈', '📉', '💸',
     '👥', '👤', '🤝', '👨‍💼', '👩‍💼', '👷', '🕵️', '🧑‍💻',
     '⚙️', '🛠️', '🔧', '🔒', '🔓', '🛡️', '✅', '❌', '🗑️', '✏️', '🔍',
-    '🚰', '💡', '🔥', '⚡', '📊', '📑', '📄', '📅', '🚀', '🔔', '🌐', '📌'
+    '🚰', '💡', '🔥', '⚡', '📊', '📑', '📄', '📅', '🚀', '🔔', '🌐', '📌', '📝'
 ]
 
 # ==========================================
@@ -40,7 +40,7 @@ def generar_pdf_usuarios(df, diccionario_roles):
     
     pdf.set_font("Arial", "B", 10)
     pdf.set_fill_color(200, 220, 255)
-    cw = [55, 70, 40, 25] # Ajustado para incluir Estado
+    cw = [55, 70, 40, 25] 
     headers = ["NOMBRE", "EMAIL", "ROL", "ESTADO"]
     for i, h_text in enumerate(headers):
         pdf.cell(cw[i], 10, h_text, border=1, fill=True, align="C")
@@ -50,7 +50,7 @@ def generar_pdf_usuarios(df, diccionario_roles):
     for _, row in df.iterrows():
         rol_texto = diccionario_roles.get(row['id_rol'], "SIN ROL")
         estado_texto = str(row.get('estado', 'ACTIVO'))
-        textos = [str(row['nombre']), str(row['email']), str(rol_texto), estado_texto]
+        textos = [str(row['NOMBRE']), str(row['EMAIL']), str(rol_texto), estado_texto]
         
         lineas_por_col = [len(pdf.multi_cell(cw[i], 7, txt, split_only=True)) for i, txt in enumerate(textos)]
         h_fila = 7 * max(lineas_por_col)
@@ -123,6 +123,8 @@ def mostrar_modulo_usuarios(supabase):
         res_roles = supabase.table("roles").select("*").execute()
         df_roles = pd.DataFrame(res_roles.data) if res_roles.data else pd.DataFrame()
         DICCIONARIO_ROLES = {rol['id']: rol['nombre_rol'] for rol in res_roles.data}
+        # Diccionario extra para buscar las facultades de cada rol fácilmente
+        DICCIONARIO_DESC = {rol['id']: rol['descripcion'] for rol in res_roles.data}
         
         res_fac = supabase.table("facultades").select("*").execute()
         df_fac = pd.DataFrame(res_fac.data) if res_fac.data else pd.DataFrame()
@@ -130,11 +132,10 @@ def mostrar_modulo_usuarios(supabase):
             df_fac = df_fac.sort_values('nombre_facultad')
         llaves_iconos = [f"{row['icono']} {row['nombre_facultad']}" for _, row in df_fac.iterrows()] if not df_fac.empty else []
     except:
-        df_roles, df_fac, DICCIONARIO_ROLES, llaves_iconos = pd.DataFrame(), pd.DataFrame(), {}, []
+        df_roles, df_fac, DICCIONARIO_ROLES, DICCIONARIO_DESC, llaves_iconos = pd.DataFrame(), pd.DataFrame(), {}, {}, []
         
     res_u = supabase.table("usuarios").select("*").execute()
     df_raw = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
-    # Asegurarnos de que exista la columna estado localmente si la tabla está recién actualizada
     if not df_raw.empty and 'estado' not in df_raw.columns:
         df_raw['estado'] = 'ACTIVO'
 
@@ -145,15 +146,30 @@ def mostrar_modulo_usuarios(supabase):
         if not df_raw.empty:
             busqueda = st.text_input("🔍 Buscar usuario...", "").upper().strip()
             df_display = df_raw.copy().sort_values('nombre')
-            df_display['Rol'] = df_display['id_rol'].map(DICCIONARIO_ROLES)
             
-            # Mostramos el estado
-            df_display['estado'] = df_display['estado'].fillna('ACTIVO')
+            # Formateamos las columnas para la vista (Mayúsculas)
+            df_display['ROL'] = df_display['id_rol'].map(DICCIONARIO_ROLES)
+            df_display['ESTADO'] = df_display['estado'].fillna('ACTIVO')
+            df_display.rename(columns={'nombre': 'NOMBRE', 'email': 'EMAIL', 'moneda': 'MONEDA'}, inplace=True)
             
             if busqueda:
-                df_display = df_display[df_display['nombre'].str.contains(busqueda)]
+                df_display = df_display[df_display['NOMBRE'].str.contains(busqueda)]
             
-            st.dataframe(df_display[["nombre", "email", "moneda", "Rol", "estado"]], use_container_width=True, hide_index=True)
+            # Streamlit renderiza los headers en negrilla por defecto
+            st.dataframe(df_display[["NOMBRE", "EMAIL", "MONEDA", "ROL", "ESTADO"]], use_container_width=True, hide_index=True)
+            
+            # --- VISOR DE DETALLES (Mejora solicitada) ---
+            st.markdown("---")
+            st.markdown("### 🔍 Consultar Facultades por Usuario")
+            u_consulta = st.selectbox("Selecciona un usuario para ver sus permisos:", ["-- Selecciona --"] + df_display['NOMBRE'].tolist())
+            
+            if u_consulta != "-- Selecciona --":
+                # Buscamos el ID del rol de ese usuario
+                rol_id_user = df_display[df_display['NOMBRE'] == u_consulta]['id_rol'].values[0]
+                facultades_user = DICCIONARIO_DESC.get(rol_id_user, "No tiene facultades asignadas.")
+                st.info(f"**Facultades de {u_consulta}:**\n\n{facultades_user}")
+
+            st.markdown("---")
             pdf_bytes = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
             st.download_button("📄 Exportar Reporte PDF", pdf_bytes, "usuarios_inmoleasing.pdf", "application/pdf")
 
@@ -176,37 +192,46 @@ def mostrar_modulo_usuarios(supabase):
                         supabase.table("usuarios").insert({
                             "nombre": n_nom.upper(), "email": n_ema.lower(), 
                             "password": n_pas, "moneda": n_mon, "id_rol": n_rol[0],
-                            "estado": "ACTIVO" # Por defecto activo
+                            "estado": "ACTIVO" 
                         }).execute()
                         log_accion(supabase, usuario_actual, "CREAR USUARIO", f"Registrado: {n_nom.upper()} | Rol ID: {n_rol[0]}")
                         st.success(f"¡Usuario {n_nom.upper()} creado!"); st.rerun()
                 else:
                     st.warning("⚠️ Todos los campos son obligatorios.")
 
-    # --- TAB 3: GESTIONAR (CON SOFT DELETE) ---
+    # --- TAB 3: GESTIONAR (CON CAMBIO DE PASSWORD) ---
     with tab3:
         if not df_raw.empty:
             nombres_ordenados = df_raw.sort_values('nombre')['nombre'].tolist()
-            u_edit = st.selectbox("Seleccione un usuario a gestionar (Autocomplete habilitado):", nombres_ordenados)
+            u_edit = st.selectbox("Seleccione un usuario a gestionar:", nombres_ordenados)
             u_data = df_raw[df_raw['nombre'] == u_edit].iloc[0]
             estado_actual = u_data.get('estado', 'ACTIVO')
             
             if estado_actual == 'INACTIVO':
-                st.error(f"⚠️ El usuario {u_edit} está INACTIVO y no tiene acceso al sistema.")
+                st.error(f"⚠️ El usuario {u_edit} está INACTIVO.")
             else:
                 st.success(f"✅ El usuario {u_edit} está ACTIVO.")
             
             with st.form("form_edicion"):
                 e_nom = st.text_input("Nombre", u_data['nombre'])
                 e_ema = st.text_input("Email", u_data['email'])
+                
+                # NUEVO: Cambio de contraseña
+                e_pas = st.text_input("Nueva Contraseña", type="password", help="Déjalo en blanco si no deseas cambiar la contraseña actual.")
+                
                 index_rol = list(DICCIONARIO_ROLES.keys()).index(u_data['id_rol']) if u_data['id_rol'] in DICCIONARIO_ROLES else 0
                 e_rol = st.selectbox("Cambiar Rol", options=list(DICCIONARIO_ROLES.items()), index=index_rol, format_func=lambda x: x[1])
                 
                 if st.form_submit_button("💾 Guardar Cambios"):
                     if es_correo_valido(e_ema):
-                        supabase.table("usuarios").update({
+                        datos_a_actualizar = {
                             "nombre": e_nom.upper(), "email": e_ema.lower(), "id_rol": e_rol[0]
-                        }).eq("id", u_data['id']).execute()
+                        }
+                        # Si escribió algo en el password, lo actualizamos también
+                        if e_pas.strip() != "":
+                            datos_a_actualizar["password"] = e_pas
+                            
+                        supabase.table("usuarios").update(datos_a_actualizar).eq("id", u_data['id']).execute()
                         log_accion(supabase, usuario_actual, "EDITAR USUARIO", f"Actualizado: {e_nom.upper()}")
                         st.success("Cambios aplicados."); st.rerun()
                     else:
@@ -216,7 +241,6 @@ def mostrar_modulo_usuarios(supabase):
             if "confirmar_borrado_user" not in st.session_state:
                 st.session_state.confirmar_borrado_user = None
 
-            # Botón dinámico según el estado
             if estado_actual == 'ACTIVO':
                 if st.button("🚫 Desactivar Usuario (Soft Delete)", type="primary"):
                     st.session_state.confirmar_borrado_user = u_data['id']
@@ -228,10 +252,9 @@ def mostrar_modulo_usuarios(supabase):
                     st.rerun()
 
             if st.session_state.confirmar_borrado_user == u_data['id']:
-                st.warning(f"⚠️ ¿Desactivar a {u_edit}? Perderá acceso al sistema inmediatamente.")
+                st.warning(f"⚠️ ¿Desactivar a {u_edit}?")
                 c_si, c_no = st.columns(2)
                 if c_si.button("✅ Sí, Desactivar"):
-                    # BORRADO LÓGICO: Solo actualizamos el estado
                     supabase.table("usuarios").update({"estado": "INACTIVO"}).eq("id", u_data['id']).execute()
                     log_accion(supabase, usuario_actual, "INACTIVAR USUARIO", f"Acceso bloqueado a: {u_edit}")
                     st.session_state.confirmar_borrado_user = None
@@ -249,9 +272,10 @@ def mostrar_modulo_usuarios(supabase):
             col_f1, col_f2 = st.columns(2)
             with col_f1:
                 st.markdown("### ✨ Crear Facultad")
+                st.info("💡 **Sugerencia:** Crea estas facultades para coincidir con tu menú: \nMODULO_DASHBOARD, MODULO_USUARIOS, MODULO_PROPIETARIOS, MODULO_INMUEBLES, MODULO_ARRENDAMIENTOS, MODULO_FINANZAS, MODULO_INFORMES")
                 with st.form("form_facultad"):
                     f_ico = st.selectbox("Selecciona un Icono", LISTA_ICONOS) 
-                    f_nom = st.text_input("Nombre Técnico (Ej: REPORTE_PAGOS)")
+                    f_nom = st.text_input("Nombre Técnico (Ej: MODULO_FINANZAS)")
                     if st.form_submit_button("Añadir Facultad"):
                         if f_nom:
                             supabase.table("facultades").insert({"icono": f_ico, "nombre_facultad": f_nom.upper()}).execute()
@@ -341,7 +365,6 @@ def mostrar_modulo_usuarios(supabase):
     # --- TAB 5: LOGS Y AUDITORÍA ---
     with tab5:
         st.subheader("📜 Auditoría y Registro de Actividades")
-        
         try:
             res_logs = supabase.table("logs_actividad").select("*").order("fecha", desc=True).execute()
             df_logs = pd.DataFrame(res_logs.data) if res_logs.data else pd.DataFrame()
@@ -352,7 +375,6 @@ def mostrar_modulo_usuarios(supabase):
             df_logs['fecha'] = pd.to_datetime(df_logs['fecha']).dt.tz_localize(None)
 
             col_f1, col_f2, col_f3 = st.columns([1, 1, 1])
-            
             with col_f1:
                 fecha_rango = st.date_input("Rango de Fechas", value=[])
             with col_f2:
@@ -362,16 +384,13 @@ def mostrar_modulo_usuarios(supabase):
                 txt_filtro = st.text_input("Buscar texto libre:", "").upper()
 
             df_logs_filtrado = df_logs.copy()
-            
             if len(fecha_rango) == 2:
                 df_logs_filtrado = df_logs_filtrado[
                     (df_logs_filtrado['fecha'].dt.date >= fecha_rango[0]) & 
                     (df_logs_filtrado['fecha'].dt.date <= fecha_rango[1])
                 ]
-                
             if usuario_filtro != "Todos":
                 df_logs_filtrado = df_logs_filtrado[df_logs_filtrado['usuario'] == usuario_filtro]
-            
             if txt_filtro:
                 mask_accion = df_logs_filtrado['accion'].str.contains(txt_filtro, case=False, na=False)
                 mask_detalle = df_logs_filtrado['detalle'].str.contains(txt_filtro, case=False, na=False)
