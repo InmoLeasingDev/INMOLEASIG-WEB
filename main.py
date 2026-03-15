@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v2.3 PRO" # Rediseño estético de la cabecera lateral
+APP_VERSION = "v2.4 PRO" # Ajuste fino de márgenes y separadores
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -25,12 +25,13 @@ DICCIONARIO_MENU_FACULTADES = {
 }
 
 # ==========================================
-# 1.6 AJUSTES VISUALES CSS
+# 1.6 AJUSTES VISUALES CSS (MÁRGENES SUAVIZADOS)
 # ==========================================
 st.markdown("""
     <style>
+        /* Reducimos la agresividad del margen superior para que el título no se salga de la pantalla */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; }
-        [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; margin-top: -4.5rem !important; }
+        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -2rem !important; }
         .block-container { padding-top: 1.5rem !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -121,24 +122,21 @@ if not st.session_state.autenticado:
 # 6. MENÚ LATERAL ESTÉTICO Y VISIBLE
 # ==========================================
 with st.sidebar:
-    # 1. Título
     st.title("🏢 INMOLEASING")
-    # 2. Versión
     st.caption(f"Versión: {APP_VERSION}")
-    st.markdown("---")
-    # 3. Hola Usuario
+    
+    # Quitamos la primera línea separadora para que no se vea tan recargado
     st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre')}**")
-    # 4. Región / Moneda
     st.caption(f"Región/Moneda: **{st.session_state.moneda_usuario}**")
     
     rol_actual = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
     texto_facultades = st.session_state.usuario.get('facultades_texto', '')
     
-    # 5. Perfil (Mantenemos esto porque es muy útil visualmente)
     st.caption(f"Perfil: **{rol_actual}**")
+    
+    # Dejamos solo UNA línea separadora justo antes de empezar el menú
     st.markdown("---")
 
-    # Calculamos QUÉ módulos tiene permitidos (Pero no los ocultamos)
     st.session_state.opciones_permitidas = []
     for menu_item, facultad_requerida in DICCIONARIO_MENU_FACULTADES.items():
         if facultad_requerida in texto_facultades:
@@ -150,7 +148,6 @@ with st.sidebar:
     if not st.session_state.opciones_permitidas:
         st.session_state.opciones_permitidas = ["Dashboard"]
 
-    # Mostramos TODOS los botones siempre
     menu_map = {
         "Dashboard": "speedometer2", "Usuarios": "person-gear", "Operadores": "briefcase",
         "Propietarios": "person-badge", "Inmuebles": "house-door", "Arrendamientos": "file-earmark-check",
@@ -161,7 +158,7 @@ with st.sidebar:
     iconos_todos = list(menu_map.values())
 
     selected = option_menu(
-        menu_title=None, # Quitamos el texto "Menú Principal" para que quede más limpio
+        menu_title=None,
         options=opciones_todas, 
         icons=iconos_todos,     
         menu_icon="cast",
@@ -186,11 +183,4 @@ else:
         st.info("Aquí irán las gráficas y resúmenes de la operación.")
 
     elif selected == "Usuarios":
-        usuarios_modulo.mostrar_modulo_usuarios(supabase)
-
-    elif selected == "Operadores":
-        operadores_modulo.mostrar_modulo_operadores(supabase)
-
-    else:
-        st.header(f"Módulo: {selected}")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+        usuarios_modulo.mostrar_modulo_
