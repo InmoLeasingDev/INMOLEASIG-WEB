@@ -155,7 +155,6 @@ def mostrar_modulo_usuarios(supabase):
             
             st.dataframe(df_display[["NOMBRE", "EMAIL", "MONEDA", "ROL", "ESTADO"]], use_container_width=True, hide_index=True)
             
-            # --- VISOR DE DETALLES MEJORADO ---
             st.markdown("---")
             st.markdown("### 🔍 Consultar Facultades por Usuario")
             u_consulta = st.selectbox("Selecciona un usuario para ver sus permisos:", ["-- Selecciona --"] + df_display['NOMBRE'].tolist())
@@ -165,8 +164,8 @@ def mostrar_modulo_usuarios(supabase):
                 facultades_user = DICCIONARIO_DESC.get(rol_id_user, "")
                 
                 if facultades_user:
-                    # Formateamos las facultades como una lista con viñetas para que se vea limpio
-                    lista_facs = [f"- {fac.strip()}" for fac in facultades_user.split(",") if fac.strip()]
+                    # FIX: Ahora se ordenan alfabéticamente antes de mostrarlas (uso de sorted())
+                    lista_facs = sorted([f"- {fac.strip()}" for fac in facultades_user.split(",") if fac.strip()])
                     facs_formateadas = "\n".join(lista_facs)
                     st.info(f"**Facultades asignadas al usuario {u_consulta}:**\n\n{facs_formateadas}")
                 else:
@@ -192,7 +191,6 @@ def mostrar_modulo_usuarios(supabase):
                     if not es_correo_valido(n_ema):
                         st.error("❌ Formato de correo inválido.")
                     else:
-                        # Aseguramos que el id_rol sea entero (int)
                         supabase.table("usuarios").insert({
                             "nombre": n_nom.upper(), "email": n_ema.lower(), 
                             "password": n_pas, "moneda": n_mon, "id_rol": int(n_rol[0]),
@@ -221,20 +219,30 @@ def mostrar_modulo_usuarios(supabase):
                 e_ema = st.text_input("Email", u_data['email'])
                 e_pas = st.text_input("Nueva Contraseña", type="password", help="Déjalo en blanco si no deseas cambiar la contraseña actual.")
                 
-                index_rol = list(DICCIONARIO_ROLES.keys()).index(u_data['id_rol']) if u_data['id_rol'] in DICCIONARIO_ROLES else 0
-                e_rol = st.selectbox("Cambiar Rol", options=list(DICCIONARIO_ROLES.items()), index=index_rol, format_func=lambda x: x[1])
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    index_rol = list(DICCIONARIO_ROLES.keys()).index(u_data['id_rol']) if u_data['id_rol'] in DICCIONARIO_ROLES else 0
+                    e_rol = st.selectbox("Cambiar Rol", options=list(DICCIONARIO_ROLES.items()), index=index_rol, format_func=lambda x: x[1])
+                with col_m2:
+                    # FIX: Ahora se puede editar la moneda / región
+                    monedas_disponibles = ["EUR", "COP", "ALL"]
+                    moneda_user = str(u_data.get('moneda', 'ALL'))
+                    idx_mon = monedas_disponibles.index(moneda_user) if moneda_user in monedas_disponibles else 2
+                    e_mon = st.selectbox("Cambiar Moneda Base (Región)", monedas_disponibles, index=idx_mon)
                 
                 if st.form_submit_button("💾 Guardar Cambios"):
                     if es_correo_valido(e_ema):
                         datos_a_actualizar = {
-                            "nombre": e_nom.upper(), "email": e_ema.lower(), "id_rol": int(e_rol[0])
+                            "nombre": e_nom.upper(), 
+                            "email": e_ema.lower(), 
+                            "id_rol": int(e_rol[0]),
+                            "moneda": e_mon  # Guardamos la nueva moneda
                         }
                         if e_pas.strip() != "":
                             datos_a_actualizar["password"] = e_pas
                             
-                        # FIX: Aseguramos que el ID del usuario se envíe como int()
                         supabase.table("usuarios").update(datos_a_actualizar).eq("id", int(u_data['id'])).execute()
-                        log_accion(supabase, usuario_actual, "EDITAR USUARIO", f"Actualizado: {e_nom.upper()}")
+                        log_accion(supabase, usuario_actual, "EDITAR USUARIO", f"Actualizado: {e_nom.upper()} | Nueva Región: {e_mon}")
                         st.success("Cambios aplicados."); st.rerun()
                     else:
                         st.error("❌ Correo inválido.")
@@ -265,7 +273,7 @@ def mostrar_modulo_usuarios(supabase):
                     st.session_state.confirmar_borrado_user = None
                     st.rerun()
 
-    # --- TAB 4: ROLES Y FACULTADES ---
+    # --- TAB 4 y 5: (Sin cambios, continúan funcionando perfecto) ---
     with tab4:
         seccion = st.radio("Seleccione el paso a configurar:", ["1. Catálogo de Facultades", "2. Roles de Usuario"], horizontal=True)
         st.markdown("---")
@@ -295,7 +303,6 @@ def mostrar_modulo_usuarios(supabase):
                         ef_nom = st.text_input("Cambiar Nombre", f_row['nombre_facultad'])
                         
                         if st.form_submit_button("💾 Actualizar Facultad"):
-                            # FIX: int() casting
                             supabase.table("facultades").update({"icono": ef_ico, "nombre_facultad": ef_nom.upper()}).eq("id", int(f_row['id'])).execute()
                             log_accion(supabase, usuario_actual, "EDITAR FACULTAD", f"Facultad modificada: {ef_nom.upper()}")
                             st.rerun()
@@ -342,7 +349,6 @@ def mostrar_modulo_usuarios(supabase):
                     with st.form("e_rol_form"):
                         er_llaves = st.multiselect("Modificar Facultades:", llaves_iconos, default=[p for p in previas if p in llaves_iconos])
                         if st.form_submit_button("Actualizar Rol"):
-                            # FIX: int() casting
                             supabase.table("roles").update({"descripcion": ", ".join(er_llaves)}).eq("id", int(r_row['id'])).execute()
                             log_accion(supabase, usuario_actual, "EDITAR ROL", f"Facultades actualizadas para el rol: {r_edit}")
                             st.success("Permisos actualizados."); st.rerun()
