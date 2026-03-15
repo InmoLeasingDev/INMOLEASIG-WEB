@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v2.5 PRO" # Ajuste milimétrico de cabecera y separador
+APP_VERSION = "v2.6 PRO" # Separadores simétricos, iconos restaurados y Dashboard protegido
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -25,18 +25,18 @@ DICCIONARIO_MENU_FACULTADES = {
 }
 
 # ==========================================
-# 1.6 AJUSTES VISUALES CSS (PIXEL PERFECT)
+# 1.6 AJUSTES VISUALES CSS (SIMETRÍA PERFECTA)
 # ==========================================
 st.markdown("""
     <style>
         /* Ocultar el espacio vacío que Streamlit deja arriba por defecto */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; }
         
-        /* Bajamos el título: pasamos de -2rem a -0.5rem para darle respiro arriba */
+        /* Ajuste fino del margen superior para el título */
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
         
-        /* Ajuste de la línea separadora para que esté más pegada al texto del perfil */
-        [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 1rem !important; }
+        /* Simetría para las líneas separadoras (arriba y abajo del menú) */
+        [data-testid="stSidebar"] hr { margin-top: 0.75rem !important; margin-bottom: 0.75rem !important; }
         
         /* Sube ligeramente el contenido del panel principal */
         .block-container { padding-top: 1.5rem !important; }
@@ -140,7 +140,7 @@ with st.sidebar:
     
     st.caption(f"Perfil: **{rol_actual}**")
     
-    # Línea separadora ajustada (el CSS la pega más arriba)
+    # Línea separadora simétrica superior
     st.markdown("---")
 
     st.session_state.opciones_permitidas = []
@@ -151,8 +151,8 @@ with st.sidebar:
     if "ADMINISTRADOR" in texto_facultades or "ADMINISTRADOR" in rol_actual:
         st.session_state.opciones_permitidas = list(DICCIONARIO_MENU_FACULTADES.keys())
 
-    if not st.session_state.opciones_permitidas:
-        st.session_state.opciones_permitidas = ["Dashboard"]
+    # Eliminamos la regla que forzaba el Dashboard a estar siempre permitido.
+    # Ahora si no tienen nada, la lista estará vacía y saltará el candado al hacer clic en cualquier lado.
 
     menu_map = {
         "Dashboard": "speedometer2", "Usuarios": "person-gear", "Operadores": "briefcase",
@@ -171,13 +171,14 @@ with st.sidebar:
         default_index=0,
     )
     
+    # Línea separadora simétrica inferior
     st.markdown("---")
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
 
 # ==========================================
-# 7. ENRUTADOR CON CUSTODIO DE ACCESO
+# 7. ENRUTADOR CON CUSTODIO DE ACCESO Y EMOJIS
 # ==========================================
 if selected not in st.session_state.opciones_permitidas:
     st.error(f"### 🔒 Acceso Restringido")
@@ -194,6 +195,22 @@ else:
     elif selected == "Operadores":
         operadores_modulo.mostrar_modulo_operadores(supabase)
 
-    else:
-        st.header(f"Módulo: {selected}")
+    elif selected == "Propietarios":
+        st.header("🤝 Propietarios")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+
+    elif selected == "Inmuebles":
+        st.header("🏠 Gestión de Inmuebles")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+
+    elif selected == "Arrendamientos":
+        st.header("📝 Arrendamientos")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+
+    elif selected == "Finanzas":
+        st.header("🏦 Finanzas y Contabilidad")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+
+    elif selected == "Informes":
+        st.header("📊 Informes de Gestión")
         st.info("🚧 Módulo en construcción. Pronto estará disponible.")
