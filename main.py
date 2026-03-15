@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v2.9.1 PRO" # Corrección de ruta de imagen portada
+APP_VERSION = "v2.9.2 PRO" # Sincronización final de la imagen portada
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -171,7 +171,7 @@ if selected == "Inicio":
         st.markdown(f"**Te damos la bienvenida al Sistema Integral de Gestión Inmobiliaria.**")
         st.caption(f"Versión actual: {APP_VERSION}")
         
-        # AHORA BUSCAMOS EL ARCHIVO CON EL NOMBRE CORREGIDO
+        # BUSCAMOS EL ARCHIVO EXACTO QUE SUBISTE A GITHUB
         try:
             st.image("portada.jpg", use_container_width=True)
         except:
