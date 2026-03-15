@@ -6,7 +6,7 @@ from supabase import create_client
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
 
 # --- CONTROL DE VERSIONES ---
-APP_VERSION = "v1.1.0" # Yo actualizaré este número en cada entrega
+APP_VERSION = "v1.2.0" # Actualizado por la unificación de Finanzas
 
 import usuarios_modulo 
 
@@ -35,7 +35,6 @@ if not st.session_state.autenticado:
         
         if st.button("Entrar", use_container_width=True):
             try:
-                # IMPORTANTE: Ahora solo deja entrar a los usuarios ACTIVOS
                 res = supabase.table("usuarios").select("*").eq("email", email_input).eq("password", pass_input).eq("estado", "ACTIVO").execute()
                 
                 if len(res.data) > 0:
@@ -57,12 +56,12 @@ def mostrar_proximamente(modulo):
 with st.sidebar:
     st.title("🏢 INMOLEASING")
     st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre', 'Usuario')}**")
-    st.caption(f"Versión: {APP_VERSION}") # Muestra la versión en el menú
+    st.caption(f"Versión: {APP_VERSION}")
     
     selected = option_menu(
         menu_title="Menú Principal",
-        options=["Dashboard", "Usuarios", "Propietarios", "Inmuebles", "Arrendamientos", "Bancos", "Contabilidad", "Informes"],
-        icons=["speedometer2", "person-gear", "person-badge", "house-door", "file-earmark-check", "bank", "calculator", "graph-up-arrow"],
+        options=["Dashboard", "Usuarios", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"],
+        icons=["speedometer2", "person-gear", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"],
         menu_icon="cast",
         default_index=0,
     )
@@ -107,14 +106,10 @@ elif selected == "Arrendamientos":
         with sub_tab[i]:
             mostrar_proximamente(tab_name)
 
-elif selected == "Bancos":
-    st.header("🏦 Bancos y Conciliación")
-    mostrar_proximamente("Bancos y Movimientos")
-
-elif selected == "Contabilidad":
-    st.header("🧾 Contabilidad y Finanzas")
-    sub_tab = st.tabs(["Cuentas por Cobrar (CXC)", "Cuentas por Pagar (CXP)", "PyG", "Balance"])
-    for i, tab_name in enumerate(["CXC", "CXP", "PyG", "Balance"]):
+elif selected == "Finanzas":
+    st.header("🏦 Finanzas y Contabilidad")
+    sub_tab = st.tabs(["Bancos y Conciliación", "Cuentas por Cobrar (CXC)", "Cuentas por Pagar (CXP)", "PyG", "Balance"])
+    for i, tab_name in enumerate(["Bancos", "CXC", "CXP", "PyG", "Balance"]):
         with sub_tab[i]:
             mostrar_proximamente(tab_name)
 
