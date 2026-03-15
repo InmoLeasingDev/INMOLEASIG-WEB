@@ -13,13 +13,13 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-APP_VERSION = "v1.6.2" # Matriz de Facultades y Permisos Dinámicos
+APP_VERSION = "v1.6.3" # Buscador de Roles Inteligente y Diagnóstico
 
 # ==========================================
 # 1.5 MATRIZ DE FACULTADES (PERMISOS POR ROL)
 # ==========================================
-# Aquí definimos exactamente qué opciones del menú puede ver cada rol.
-# Los nombres aquí DEBEN coincidir con los nombres que creaste en la tabla 'roles' de Supabase.
+# IMPORTANTE: Los nombres aquí (ADMINISTRADOR, LECTOR) deben ser EXACTAMENTE 
+# iguales (letra por letra) a como están escritos en tu base de datos.
 MAPA_FACULTADES = {
     "ADMINISTRADOR": [
         "Dashboard", "Usuarios", "Operadores", "Propietarios", 
@@ -33,7 +33,7 @@ MAPA_FACULTADES = {
     ]
 }
 
-# Modulos que SIEMPRE se muestran, sin importar el rol (por si acaso el rol falla)
+# Modulos que SIEMPRE se muestran
 FACULTADES_POR_DEFECTO = ["Dashboard"]
 
 # ==========================================
@@ -80,7 +80,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 # ==========================================
-# 5. PANTALLA DE LOGIN
+# 5. PANTALLA DE LOGIN CON DIAGNÓSTICO DE ROL
 # ==========================================
 if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
@@ -111,18 +111,35 @@ if not st.session_state.autenticado:
                     elif pass_db != pass_hash:
                         st.error("❌ La contraseña no coincide.")
                     else:
-                        # Buscamos la Facultad/Rol real usando el id_rol
+                        # === MAGIA NUEVA: DIAGNÓSTICO DE ROLES ===
                         id_rol = usuario_data.get('id_rol')
                         rol_nombre = "SIN ROL"
                         
                         if id_rol:
                             try:
-                                res_rol = supabase.table("roles").select("nombre").eq("id", id_rol).execute()
+                                # Traemos TODAS las columnas de la tabla roles (*)
+                                res_rol = supabase.table("roles").select("*").eq("id", id_rol).execute()
+                                
                                 if len(res_rol.data) > 0:
-                                    rol_nombre = str(res_rol.data[0]['nombre']).strip().upper()
+                                    rol_data = res_rol.data[0]
+                                    
+                                    # Buscamos de forma inteligente la columna que tiene el texto
+                                    if 'nombre' in rol_data:
+                                        rol_nombre = str(rol_data['nombre']).strip().upper()
+                                    elif 'rol' in rol_data:
+                                        rol_nombre = str(rol_data['rol']).strip().upper()
+                                    elif 'descripcion' in rol_data:
+                                        rol_nombre = str(rol_data['descripcion']).strip().upper()
+                                    else:
+                                        st.error(f"⚠️ ¡Atención! Tu tabla 'roles' no tiene una columna llamada 'nombre', 'rol' o 'descripcion'. Estas son tus columnas: {list(rol_data.keys())}")
+                                        st.stop()
+                                else:
+                                    st.error(f"⚠️ El id_rol '{id_rol}' que tiene este usuario NO EXISTE en tu tabla de roles.")
+                                    st.stop()
                             except Exception as e:
-                                print(f"Error buscando el rol: {e}")
-                        
+                                st.error(f"⚠️ Error intentando leer la tabla 'roles' en Supabase: {e}")
+                                st.stop()
+
                         usuario_data['rol_nombre'] = rol_nombre
 
                         st.session_state.autenticado = True
@@ -136,7 +153,7 @@ if not st.session_state.autenticado:
                         st.rerun()
                         
             except Exception as e:
-                st.error(f"Error de conexión con la base de datos: {e}")
+                st.error(f"Error general: {e}")
                 
     st.stop()
 
@@ -156,10 +173,8 @@ with st.sidebar:
     st.caption(f"Facultad/Rol: **{rol_usuario}**")
     st.caption(f"Versión: {APP_VERSION}")
 
-    # Consultamos la Matriz de Facultades para ver qué opciones tiene permitidas este rol
     modulos_permitidos = MAPA_FACULTADES.get(rol_usuario, FACULTADES_POR_DEFECTO)
 
-    # Definimos la estructura base total
     menu_completo = [
         {"nombre": "Dashboard", "icono": "speedometer2"},
         {"nombre": "Usuarios", "icono": "person-gear"},
@@ -171,7 +186,6 @@ with st.sidebar:
         {"nombre": "Informes", "icono": "graph-up-arrow"}
     ]
 
-    # Filtramos: Solo agregamos al menú si el nombre del módulo está en la lista de permitidos
     menu_final_opciones = []
     menu_final_iconos = []
 
@@ -201,7 +215,6 @@ with st.sidebar:
 rol_usuario_enrutador = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
 modulos_permitidos_enrutador = MAPA_FACULTADES.get(rol_usuario_enrutador, FACULTADES_POR_DEFECTO)
 
-# DOBLE CANDADO: Verificamos que lo que intentan abrir realmente esté en sus facultades
 if selected in modulos_permitidos_enrutador:
 
     if selected == "Dashboard":
@@ -235,5 +248,4 @@ if selected in modulos_permitidos_enrutador:
         mostrar_proximamente("Reportes Consolidados")
 
 else:
-    # Si alguien burla el menú e intenta cargar un módulo por fuerza bruta:
-    st.error(f"🚫 Acceso denegado. Tu rol de '{rol_usuario_enrutador}' no tiene facultades para ver el módulo: {selected}.")
+    st.error(f"🚫 Acceso denegado. Tu rol '{rol_usuario_enrutador}' no tiene facultades para este módulo.")
