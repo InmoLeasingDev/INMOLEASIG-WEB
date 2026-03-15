@@ -13,19 +13,15 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-APP_VERSION = "v1.4.1" # Actualizado con blindaje de espacios
+APP_VERSION = "v1.4.2" # Modo Diagnóstico 🔍
 
 import usuarios_modulo 
-# import propietarios_modulo  <--- Sigue apagado hasta que lo creemos
+# import propietarios_modulo  <--- Sigue apagado hasta reparar el login
 
 # ==========================================
 # 2. FUNCIONES DE SEGURIDAD
 # ==========================================
 def encriptar_password(password):
-    """
-    Convierte la contraseña en texto plano a un Hash SHA-256
-    para que viaje y se almacene de forma segura.
-    """
     return hashlib.sha256(password.encode()).hexdigest()
 
 # ==========================================
@@ -46,7 +42,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 # ==========================================
-# 5. PANTALLA DE LOGIN
+# 5. PANTALLA DE LOGIN (CON DIAGNÓSTICO)
 # ==========================================
 if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
@@ -55,49 +51,49 @@ if not st.session_state.autenticado:
         st.title("🏢 INMOLEASING")
         st.markdown(f"**Acceso al Sistema** *(Versión {APP_VERSION})*")
         
-        # AQUÍ ESTÁ LA MAGIA: .strip() elimina espacios accidentales
         email_input = st.text_input("Correo electrónico").strip()
         pass_input = st.text_input("Contraseña", type="password").strip()
         
         if st.button("Entrar", use_container_width=True):
             try:
-                # Encriptamos la clave digitada (ya limpia de espacios)
+                email_limpio = email_input.lower()
                 pass_hash = encriptar_password(pass_input)
                 
-                # Consulta a Supabase verificando credenciales y estado activo
-                res = supabase.table("usuarios").select("*").eq(
-                    "email", email_input.lower()
-                ).eq(
-                    "password", pass_hash
-                ).eq(
-                    "estado", "ACTIVO"
-                ).execute()
+                # DIAGNÓSTICO 1: Buscamos SOLO por correo para ver qué nos trae Supabase
+                res = supabase.table("usuarios").select("*").eq("email", email_limpio).execute()
                 
-                # Si hay coincidencia, el usuario existe y las claves cuadran
-                if len(res.data) > 0:
-                    usuario_data = res.data[0]
-                    
-                    # Guardamos los datos en la memoria de la sesión
-                    st.session_state.autenticado = True
-                    st.session_state.usuario = usuario_data
-                    st.session_state.usuario_actual = usuario_data['nombre'] 
-                    st.session_state.moneda_usuario = usuario_data['moneda'] 
-                    
-                    # Actualizamos la fecha del último acceso en la base de datos
-                    ahora = datetime.utcnow().isoformat()
-                    supabase.table("usuarios").update({
-                        "ultimo_acceso": ahora
-                    }).eq("id", usuario_data['id']).execute()
-                    
-                    # Refrescamos la página para entrar al sistema
-                    st.rerun()
+                if len(res.data) == 0:
+                    st.error(f"❌ No se encontró ningún usuario con el correo exacto: '{email_limpio}'")
                 else:
-                    st.error("❌ Usuario/contraseña incorrectos o cuenta INACTIVA.")
+                    usuario_data = res.data[0]
+                    estado_db = usuario_data.get('estado')
+                    pass_db = usuario_data.get('password')
                     
+                    # DIAGNÓSTICO 2: Verificamos el estado
+                    if estado_db != 'ACTIVO':
+                        st.error(f"❌ Cuenta encontrada, pero su estado es: '{estado_db}' (Debe ser exactamente 'ACTIVO')")
+                        
+                    # DIAGNÓSTICO 3: Verificamos la contraseña
+                    elif pass_db != pass_hash:
+                        st.error("❌ La contraseña no coincide.")
+                        st.warning(f"🔍 **DIAGNÓSTICO HASH:**\n\nTu Supabase tiene: `{pass_db}`\nTu Streamlit generó: `{pass_hash}`")
+                        
+                    # SI TODO ESTÁ PERFECTO:
+                    else:
+                        st.session_state.autenticado = True
+                        st.session_state.usuario = usuario_data
+                        st.session_state.usuario_actual = usuario_data['nombre'] 
+                        st.session_state.moneda_usuario = usuario_data['moneda'] 
+                        
+                        ahora = datetime.utcnow().isoformat()
+                        supabase.table("usuarios").update({"ultimo_acceso": ahora}).eq("id", usuario_data['id']).execute()
+                        
+                        st.rerun()
+                        
             except Exception as e:
                 st.error(f"Error de conexión con la base de datos: {e}")
                 
-    st.stop() # Detiene la ejecución aquí si no está autenticado
+    st.stop()
 
 # ==========================================
 # 6. MENÚ LATERAL Y NAVEGACIÓN
@@ -155,7 +151,7 @@ elif selected == "Usuarios":
 
 elif selected == "Propietarios":
     st.header("🤝 Propietarios")
-    mostrar_proximamente("Propietarios") # Sigue como Próximamente
+    mostrar_proximamente("Propietarios")
 
 elif selected == "Inmuebles":
     st.header("🏠 Gestión de Inmuebles")
