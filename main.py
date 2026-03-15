@@ -13,10 +13,11 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-APP_VERSION = "v1.4.3" # Blindaje Definitivo Anti-Espacios DB
+APP_VERSION = "v1.5.0" # Añadido Módulo de Operadores
 
 import usuarios_modulo 
-# import propietarios_modulo  <--- Sigue apagado hasta entrar con éxito
+import operadores_modulo
+# import propietarios_modulo  <--- Sigue apagado hasta que lo creemos
 
 # ==========================================
 # 2. FUNCIONES DE SEGURIDAD
@@ -112,6 +113,7 @@ with st.sidebar:
         options=[
             "Dashboard", 
             "Usuarios", 
+            "Operadores",
             "Propietarios", 
             "Inmuebles", 
             "Arrendamientos", 
@@ -121,6 +123,7 @@ with st.sidebar:
         icons=[
             "speedometer2", 
             "person-gear", 
+            "briefcase",
             "person-badge", 
             "house-door", 
             "file-earmark-check", 
@@ -147,6 +150,9 @@ if selected == "Dashboard":
 
 elif selected == "Usuarios":
     usuarios_modulo.mostrar_modulo_usuarios(supabase)
+
+elif selected == "Operadores":
+    operadores_modulo.mostrar_modulo_operadores(supabase)
 
 elif selected == "Propietarios":
     st.header("🤝 Propietarios")
