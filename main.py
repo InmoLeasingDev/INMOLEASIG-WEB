@@ -7,36 +7,44 @@ from datetime import datetime
 # ==========================================
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
-st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v2.9.2 PRO" # Sincronización final de la imagen portada
+st.set_page_config(
+    page_title="INMOLEASING WEB", 
+    layout="wide", 
+    page_icon="🏢"
+)
+
+APP_VERSION = "v1.7.0 PRO" # Ajuste de Espacios y Reducción de Foto
 
 # ==========================================
-# 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
-# ==========================================
-DICCIONARIO_MENU_FACULTADES = {
-    "Dashboard": "MODULO DASHBOARD",
-    "Usuarios": "MODULO USUARIOS",
-    "Operadores": "MODULO OPERADORES",
-    "Propietarios": "MODULO PROPIETARIOS",
-    "Inmuebles": "MODULO INMUEBLES",
-    "Arrendamientos": "MODULO ARRENDAMIENTOS",
-    "Finanzas": "MODULO FINANZAS",
-    "Informes": "MODULO INFORMES"
-}
-
-# ==========================================
-# 1.6 AJUSTES VISUALES CSS
+# 1.5 AJUSTES VISUALES CSS (PIXEL PERFECT)
 # ==========================================
 st.markdown("""
     <style>
+        /* Ocultar el espacio vacío que Streamlit deja arriba por defecto */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; }
-        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
+        
+        /* Ajuste fino del margen superior para el título: pasamos de -4.5rem a -1rem para que baje un poco con suavidad */
+        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -1rem !important; }
+        
+        /* Ajuste de la línea separadora para que esté más pegada al texto del perfil */
+        [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 1rem !important; }
+        
+        /* Sube ligeramente el contenido del panel principal */
         .block-container { padding-top: 1.5rem !important; }
+        
+        /* Reducción proporcional y centrado de la imagen de portada */
+        [data-testid="stImage"] > img {
+            max-width: 60% !important; /* La foto ahora ocupará el 60% del ancho del contenedor */
+            height: auto !important; /* Mantiene la proporción */
+            margin: 0 auto; /* Centra la imagen */
+            display: block; /* Necesario para centrar */
+        }
     </style>
 """, unsafe_allow_html=True)
 
 import usuarios_modulo 
 import operadores_modulo
+# import propietarios_modulo  <--- Sigue apagado hasta que lo creemos
 
 # ==========================================
 # 2. FUNCIONES DE SEGURIDAD
@@ -49,7 +57,9 @@ def encriptar_password(password):
 # ==========================================
 @st.cache_resource 
 def get_supabase_client():
-    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
 supabase = get_supabase_client()
 
@@ -60,7 +70,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 # ==========================================
-# 5. LOGIN BLINDADO
+# 5. PANTALLA DE LOGIN
 # ==========================================
 if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
@@ -77,140 +87,116 @@ if not st.session_state.autenticado:
                 email_limpio = email_input.lower()
                 pass_hash = encriptar_password(pass_input)
                 
+                # Buscamos SOLO por correo
                 res = supabase.table("usuarios").select("*").eq("email", email_limpio).execute()
                 
                 if len(res.data) == 0:
                     st.error(f"❌ No se encontró el correo: '{email_limpio}'")
                 else:
                     usuario_data = res.data[0]
+                    
+                    # BLINDAJE DEFINITIVO: Limpiamos los datos que vienen de la Base de Datos
                     estado_db = str(usuario_data.get('estado', '')).strip().upper()
                     pass_db = str(usuario_data.get('password', '')).strip()
                     
                     if estado_db != 'ACTIVO':
-                        st.error(f"❌ Cuenta inactiva.")
+                        st.error(f"❌ Cuenta encontrada, pero su estado es: '{estado_db}' (Debe ser ACTIVO)")
+                        
                     elif pass_db != pass_hash:
                         st.error("❌ La contraseña no coincide.")
+                        
+                    # SI TODO ESTÁ PERFECTO:
                     else:
-                        id_rol = usuario_data.get('id_rol')
-                        texto_facultades_gigante = ""
-                        nombre_del_rol = "SIN ROL"
-                        
-                        if id_rol:
-                            res_rol = supabase.table("roles").select("*").eq("id", id_rol).execute()
-                            if res_rol.data:
-                                r_data = res_rol.data[0]
-                                texto_facultades_gigante = str(r_data).upper()
-                                nombre_del_rol = str(r_data.get('nombre_rol', r_data.get('nombre', 'ROL CONFIGURADO'))).upper()
-
-                        usuario_data['rol_nombre'] = nombre_del_rol
-                        usuario_data['facultades_texto'] = texto_facultades_gigante
-                        
                         st.session_state.autenticado = True
                         st.session_state.usuario = usuario_data
-                        st.session_state.moneda_usuario = usuario_data.get('moneda', 'ALL')
+                        st.session_state.usuario_actual = usuario_data['nombre'] 
+                        st.session_state.moneda_usuario = usuario_data['moneda'] 
                         
-                        supabase.table("usuarios").update({"ultimo_acceso": datetime.utcnow().isoformat()}).eq("id", usuario_data['id']).execute()
+                        ahora = datetime.utcnow().isoformat()
+                        supabase.table("usuarios").update({"ultimo_acceso": ahora}).eq("id", usuario_data['id']).execute()
+                        
                         st.rerun()
                         
             except Exception as e:
-                st.error(f"Error crítico de conexión: {e}")
+                st.error(f"Error de conexión con la base de datos: {e}")
                 
     st.stop()
 
 # ==========================================
-# 6. MENÚ LATERAL ESTÉTICO Y VISIBLE
+# 6. MENÚ LATERAL Y NAVEGACIÓN
 # ==========================================
+def mostrar_proximamente(modulo):
+    st.warning(f"### 🚧 Módulo en Desarrollo")
+    st.write(f"Muy pronto tendrás aquí toda la **gestión de {modulo.lower()}**.")
+
 with st.sidebar:
     st.title("🏢 INMOLEASING")
+    st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre', 'Usuario')}**")
+    st.caption(f"Región/Moneda: **{st.session_state.get('moneda_usuario', 'ALL')}**")
     st.caption(f"Versión: {APP_VERSION}")
     
-    st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre')}**")
-    st.caption(f"Región/Moneda: **{st.session_state.moneda_usuario}**")
-    
-    rol_actual = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
-    texto_facultades = st.session_state.usuario.get('facultades_texto', '')
-    
-    st.caption(f"Perfil: **{rol_actual}**")
-    
-    st.markdown("<hr style='margin-top: 0.5rem; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
-
-    st.session_state.opciones_permitidas = []
-    for menu_item, facultad_requerida in DICCIONARIO_MENU_FACULTADES.items():
-        if facultad_requerida in texto_facultades:
-            st.session_state.opciones_permitidas.append(menu_item)
-
-    if "ADMINISTRADOR" in texto_facultades or "ADMINISTRADOR" in rol_actual:
-        st.session_state.opciones_permitidas = list(DICCIONARIO_MENU_FACULTADES.keys())
-
-    opciones_todas = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"]
-    iconos_todos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
-
     selected = option_menu(
-        menu_title=None,
-        options=opciones_todas, 
-        icons=iconos_todos,     
+        menu_title="Menú Principal",
+        options=[
+            "Dashboard", 
+            "Usuarios", 
+            "Operadores",
+            "Propietarios", 
+            "Inmuebles", 
+            "Arrendamientos", 
+            "Finanzas", 
+            "Informes"
+        ],
+        icons=[
+            "speedometer2", 
+            "person-gear", 
+            "briefcase",
+            "person-badge", 
+            "house-door", 
+            "file-earmark-check", 
+            "bank", 
+            "graph-up-arrow"
+        ],
         menu_icon="cast",
-        default_index=0, 
+        default_index=0,
     )
     
-    st.markdown("<hr style='margin-top: -1.2rem; margin-bottom: 1rem;'>", unsafe_allow_html=True)
-    
+    st.markdown("---")
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
+        st.session_state.usuario_actual = None
+        st.session_state.moneda_usuario = None
         st.rerun()
 
 # ==========================================
-# 7. ENRUTADOR CON PANTALLA DE BIENVENIDA
+# 7. ENRUTADOR DE MÓDULOS
 # ==========================================
+if selected == "Dashboard":
+    st.header("📈 Dashboard Principal")
+    mostrar_proximamente("Panel de Control")
 
-if selected == "Inicio":
-    st.write("# ") 
-    cols_b = st.columns([1, 6, 1])
-    with cols_b[1]:
-        st.title("🏢 INMOLEASING")
-        st.markdown(f"**Te damos la bienvenida al Sistema Integral de Gestión Inmobiliaria.**")
-        st.caption(f"Versión actual: {APP_VERSION}")
-        
-        # BUSCAMOS EL ARCHIVO EXACTO QUE SUBISTE A GITHUB
-        try:
-            st.image("portada.jpg", use_container_width=True)
-        except:
-            st.warning("No se encontró la imagen 'portada.jpg'. Asegúrate de subirla a GitHub en la misma carpeta que main.py")
-            
-        st.info("👋 Por favor, selecciona una opción en el menú lateral para comenzar a operar.")
+elif selected == "Usuarios":
+    usuarios_modulo.mostrar_modulo_usuarios(supabase)
 
-elif selected not in st.session_state.opciones_permitidas:
-    st.error(f"### 🔒 Acceso Restringido")
-    st.warning(f"Tu perfil actual (**{rol_actual}**) no cuenta con las facultades necesarias para visualizar o gestionar el módulo de **{selected}**.")
-    st.info("Si consideras que esto es un error, por favor contacta con el administrador del sistema para que asigne esta facultad a tu rol.")
+elif selected == "Operadores":
+    operadores_modulo.mostrar_modulo_operadores(supabase)
 
-else:
-    if selected == "Dashboard":
-        st.header("📈 Dashboard Principal")
-        st.info("Aquí irán las gráficas y resúmenes de la operación.")
+elif selected == "Propietarios":
+    st.header("🤝 Propietarios")
+    mostrar_proximamente("Propietarios")
 
-    elif selected == "Usuarios":
-        usuarios_modulo.mostrar_modulo_usuarios(supabase)
+elif selected == "Inmuebles":
+    st.header("🏠 Gestión de Inmuebles")
+    mostrar_proximamente("Inmuebles")
 
-    elif selected == "Operadores":
-        operadores_modulo.mostrar_modulo_operadores(supabase)
+elif selected == "Arrendamientos":
+    st.header("📝 Arrendamientos")
+    mostrar_proximamente("Contratos")
 
-    elif selected == "Propietarios":
-        st.header("🤝 Propietarios")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+elif selected == "Finanzas":
+    st.header("🏦 Finanzas y Contabilidad")
+    mostrar_proximamente("Bancos y Contabilidad")
 
-    elif selected == "Inmuebles":
-        st.header("🏠 Gestión de Inmuebles")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
-
-    elif selected == "Arrendamientos":
-        st.header("📝 Arrendamientos")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
-
-    elif selected == "Finanzas":
-        st.header("🏦 Finanzas y Contabilidad")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
-
-    elif selected == "Informes":
-        st.header("📊 Informes de Gestión")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+elif selected == "Informes":
+    st.header("📊 Informes de Gestión")
+    mostrar_proximamente("Reportes Consolidados")
