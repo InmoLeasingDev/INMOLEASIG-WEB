@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v2.4 PRO" # Ajuste fino de márgenes y separadores
+APP_VERSION = "v2.5 PRO" # Ajuste milimétrico de cabecera y separador
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -25,13 +25,20 @@ DICCIONARIO_MENU_FACULTADES = {
 }
 
 # ==========================================
-# 1.6 AJUSTES VISUALES CSS (MÁRGENES SUAVIZADOS)
+# 1.6 AJUSTES VISUALES CSS (PIXEL PERFECT)
 # ==========================================
 st.markdown("""
     <style>
-        /* Reducimos la agresividad del margen superior para que el título no se salga de la pantalla */
+        /* Ocultar el espacio vacío que Streamlit deja arriba por defecto */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; }
-        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -2rem !important; }
+        
+        /* Bajamos el título: pasamos de -2rem a -0.5rem para darle respiro arriba */
+        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
+        
+        /* Ajuste de la línea separadora para que esté más pegada al texto del perfil */
+        [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 1rem !important; }
+        
+        /* Sube ligeramente el contenido del panel principal */
         .block-container { padding-top: 1.5rem !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -125,7 +132,6 @@ with st.sidebar:
     st.title("🏢 INMOLEASING")
     st.caption(f"Versión: {APP_VERSION}")
     
-    # Quitamos la primera línea separadora para que no se vea tan recargado
     st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre')}**")
     st.caption(f"Región/Moneda: **{st.session_state.moneda_usuario}**")
     
@@ -134,7 +140,7 @@ with st.sidebar:
     
     st.caption(f"Perfil: **{rol_actual}**")
     
-    # Dejamos solo UNA línea separadora justo antes de empezar el menú
+    # Línea separadora ajustada (el CSS la pega más arriba)
     st.markdown("---")
 
     st.session_state.opciones_permitidas = []
@@ -183,4 +189,11 @@ else:
         st.info("Aquí irán las gráficas y resúmenes de la operación.")
 
     elif selected == "Usuarios":
-        usuarios_modulo.mostrar_modulo_
+        usuarios_modulo.mostrar_modulo_usuarios(supabase)
+
+    elif selected == "Operadores":
+        operadores_modulo.mostrar_modulo_operadores(supabase)
+
+    else:
+        st.header(f"Módulo: {selected}")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
