@@ -4,7 +4,7 @@ import re
 from fpdf import FPDF
 
 # ==========================================
-# 1. FUNCIÓN PDF: VERSIÓN PERFECTA (RESTAURADA)
+# 1. FUNCIÓN PDF: VERSIÓN PERFECTA (RESTAURADA Y BLINDADA)
 # ==========================================
 def generar_pdf_usuarios(df, diccionario_roles):
     pdf = FPDF()
@@ -36,19 +36,32 @@ def generar_pdf_usuarios(df, diccionario_roles):
         max_l = max(lineas_por_col)
         h_fila = 7 * max_l 
         
-        # --- DIBUJO DE FILA (POR CAPAS) ---
-        x_ini, y_ini = pdf.get_x(), pdf.get_y()
+        # --- DIBUJO DE FILA (POR CAPAS Y COORDENADAS MANUALES) ---
+        x_ini = pdf.get_x()
+        y_ini = pdf.get_y()
         
+        # Control de salto de página preventivo
         if y_ini + h_fila > 275:
             pdf.add_page()
             y_ini = pdf.get_y()
 
+        x_actual = x_ini # Llevamos el control manual del eje X
+        
         for i, txt in enumerate(textos):
-            pdf.rect(pdf.get_x(), y_ini, cw[i], h_fila)
-            pdf.multi_cell(cw[i], 7, txt, border=0, align='L')
-            pdf.set_xy(pdf.get_x() + cw[i], y_ini)
+            # 1. Forzamos el cursor a la posición exacta de esta celda
+            pdf.set_xy(x_actual, y_ini)
             
-        pdf.ln(h_fila) 
+            # 2. Dibujamos el marco exterior con la altura máxima
+            pdf.rect(x_actual, y_ini, cw[i], h_fila)
+            
+            # 3. Escribimos el texto (border=0 para no duplicar líneas)
+            pdf.multi_cell(cw[i], 7, txt, border=0, align='L')
+            
+            # 4. Sumamos el ancho de la columna actual para la SIGUIENTE celda
+            x_actual += cw[i] 
+            
+        # Al terminar la fila completa, forzamos el cursor justo debajo para la siguiente fila
+        pdf.set_xy(x_ini, y_ini + h_fila)
         
     return pdf.output(dest='S').encode('latin-1')
 
