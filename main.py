@@ -7,18 +7,12 @@ from datetime import datetime
 # ==========================================
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
-st.set_page_config(
-    page_title="INMOLEASING WEB", 
-    layout="wide", 
-    page_icon="🏢"
-)
-
-APP_VERSION = "v2.0 PRO" # Arquitectura de Mapeo de Facultades y Blindaje SQL
+st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
+APP_VERSION = "v2.1 PRO" # Adaptación a lectura de bloque de texto
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
 # ==========================================
-# Relacionamos el botón del menú con el texto EXACTO de tu tabla 'facultades'
 DICCIONARIO_MENU_FACULTADES = {
     "Dashboard": "MODULO DASHBOARD",
     "Usuarios": "MODULO USUARIOS",
@@ -31,7 +25,7 @@ DICCIONARIO_MENU_FACULTADES = {
 }
 
 # ==========================================
-# 1.6 AJUSTES VISUALES CSS (ESPACIO ÓPTIMO)
+# 1.6 AJUSTES VISUALES CSS
 # ==========================================
 st.markdown("""
     <style>
@@ -66,7 +60,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 # ==========================================
-# 5. LOGIN BLINDADO Y MOTOR DE FACULTADES
+# 5. LOGIN BLINDADO
 # ==========================================
 if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
@@ -97,41 +91,26 @@ if not st.session_state.autenticado:
                     elif pass_db != pass_hash:
                         st.error("❌ La contraseña no coincide.")
                     else:
-                        # === LECTURA SEGURA DE ROL ===
                         id_rol = usuario_data.get('id_rol')
-                        rol_nombre = "SIN ROL"
-                        facultades_list = []
-                        debug_msg = ""
+                        texto_facultades_gigante = ""
+                        nombre_del_rol = "SIN ROL"
                         
                         if id_rol:
-                            # Select * evita errores si la columna no se llama 'nombre'
                             res_rol = supabase.table("roles").select("*").eq("id", id_rol).execute()
                             if res_rol.data:
                                 r_data = res_rol.data[0]
-                                # Buscamos la columna correcta automáticamente
-                                rol_nombre = str(r_data.get('rol', r_data.get('descripcion', r_data.get('nombre_rol', 'DESCONOCIDO')))).strip().upper()
+                                # Extraemos TODO el texto que vimos en tu pantalla
+                                texto_facultades_gigante = str(r_data).upper()
+                                # Si tienes una columna específica para el nombre del rol (ej. "ADMINISTRADOR"), la tomamos aquí:
+                                nombre_del_rol = str(r_data.get('nombre_rol', r_data.get('nombre', 'ROL CONFIGURADO'))).upper()
 
-                            # === LECTURA SEGURA DE FACULTADES ===
-                            try:
-                                # Intentamos leer la tabla intermedia (ajusta 'rol_facultad' si la tuya se llama distinto)
-                                res_fac = supabase.table("rol_facultad").select("facultades(nombre_facultad)").eq("id_rol", id_rol).execute()
-                                if res_fac.data:
-                                    for item in res_fac.data:
-                                        if item.get("facultades"):
-                                            f_name = item["facultades"].get("nombre_facultad", "").strip().upper()
-                                            if f_name:
-                                                facultades_list.append(f_name)
-                            except Exception as e:
-                                debug_msg = f"No se pudieron cargar las facultades. Error DB: {e}"
-
-                        # Guardamos todo en la sesión
-                        usuario_data['rol_nombre'] = rol_nombre
-                        usuario_data['facultades_list'] = facultades_list
+                        # Guardamos el texto gigante en la sesión
+                        usuario_data['rol_nombre'] = nombre_del_rol
+                        usuario_data['facultades_texto'] = texto_facultades_gigante
                         
                         st.session_state.autenticado = True
                         st.session_state.usuario = usuario_data
                         st.session_state.moneda_usuario = usuario_data.get('moneda', 'ALL')
-                        st.session_state.debug_msg = debug_msg
                         
                         supabase.table("usuarios").update({"ultimo_acceso": datetime.utcnow().isoformat()}).eq("id", usuario_data['id']).execute()
                         st.rerun()
@@ -149,38 +128,30 @@ with st.sidebar:
     st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre')}**")
     
     rol_actual = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
-    facultades_usuario = st.session_state.usuario.get('facultades_list', [])
+    texto_facultades = st.session_state.usuario.get('facultades_texto', '')
     
-    st.caption(f"Rol: **{rol_actual}**")
-    
-    # Si hubo un error leyendo las facultades, lo mostramos discretamente
-    if st.session_state.get('debug_msg'):
-        st.warning(st.session_state.debug_msg)
+    st.caption(f"Perfil: **{rol_actual}**")
 
-    # Lógica central: Construir el menú basado en las facultades del usuario
     opciones_permitidas = []
     
-    # Si es Administrador, forzamos que vea todo el menú
-    if rol_actual == "ADMINISTRADOR":
-        opciones_permitidas = list(DICCIONARIO_MENU_FACULTADES.keys())
-    else:
-        # Si no es Admin, comprobamos una por una si tiene la facultad requerida
-        for menu_item, facultad_requerida in DICCIONARIO_MENU_FACULTADES.items():
-            if facultad_requerida in facultades_usuario:
-                opciones_permitidas.append(menu_item)
+    # Buscamos las palabras clave dentro de tu texto gigante de la base de datos
+    for menu_item, facultad_requerida in DICCIONARIO_MENU_FACULTADES.items():
+        if facultad_requerida in texto_facultades:
+            opciones_permitidas.append(menu_item)
 
-    # Si por alguna razón no tiene permisos de nada, le dejamos ver al menos el Dashboard
+    # El Administrador Global ve todo
+    if "ADMINISTRADOR" in texto_facultades or "ADMINISTRADOR" in rol_actual:
+        opciones_permitidas = list(DICCIONARIO_MENU_FACULTADES.keys())
+
     if not opciones_permitidas:
         opciones_permitidas = ["Dashboard"]
 
-    # Diccionario maestro de iconos
     menu_map = {
         "Dashboard": "speedometer2", "Usuarios": "person-gear", "Operadores": "briefcase",
         "Propietarios": "person-badge", "Inmuebles": "house-door", "Arrendamientos": "file-earmark-check",
         "Finanzas": "bank", "Informes": "graph-up-arrow"
     }
     
-    # Extraemos las opciones en el orden correcto
     opciones_ordenadas = [opt for opt in menu_map.keys() if opt in opciones_permitidas]
     iconos_ordenados = [menu_map[opt] for opt in opciones_ordenadas]
 
@@ -206,7 +177,6 @@ if selected == "Dashboard":
     st.info("Aquí irán las gráficas y resúmenes de la operación.")
 
 elif selected == "Usuarios":
-    # Le pasamos a la función las facultades para que luego pueda apagar pestañas
     usuarios_modulo.mostrar_modulo_usuarios(supabase)
 
 elif selected == "Operadores":
