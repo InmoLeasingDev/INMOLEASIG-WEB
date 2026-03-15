@@ -13,20 +13,24 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-APP_VERSION = "v1.5.1" # Ajuste Visual CSS y Módulo Operadores
+APP_VERSION = "v1.5.2" # Ajuste Visual CSS Agresivo y Módulo Operadores
 
 # ==========================================
 # 1.5 AJUSTES VISUALES (CSS MODIFICADO)
 # ==========================================
 st.markdown("""
     <style>
-        /* Sube el contenido del menú lateral */
-        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
-            padding-top: 1rem !important;
+        /* Sube el contenido del menú lateral de forma agresiva */
+        [data-testid="stSidebar"] > div:first-child {
+            padding-top: 0rem !important;
         }
-        /* Sube un poco el contenido de la pantalla principal para que se vea más amplio */
+        [data-testid="stSidebarUserContent"] {
+            padding-top: 0rem !important;
+            margin-top: -2rem !important; 
+        }
+        /* Sube el contenido de la pantalla principal para que se vea más amplio */
         .block-container {
-            padding-top: 2rem !important;
+            padding-top: 1.5rem !important;
         }
     </style>
 """, unsafe_allow_html=True)
