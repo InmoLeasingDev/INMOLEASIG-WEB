@@ -20,6 +20,13 @@ def es_correo_valido(correo):
     patron = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     return re.match(patron, correo) is not None
 
+# NUEVO: Filtro anti-crashes para el PDF (Quita Emojis antes de imprimir)
+def limpiar_texto_pdf(texto):
+    if pd.isna(texto):
+        return ""
+    # Ignora los caracteres que FPDF no puede procesar
+    return str(texto).encode('latin-1', 'ignore').decode('latin-1')
+
 LISTA_ICONOS = [
     '🏠', '🏢', '🏬', '🏗️', '🔑', '🚪', '🏘️', '🏭',
     '💰', '🏦', '🧾', '💲', '💳', '📈', '📉', '💸',
@@ -50,7 +57,10 @@ def generar_pdf_usuarios(df, diccionario_roles):
     for _, row in df.iterrows():
         rol_texto = diccionario_roles.get(row['id_rol'], "SIN ROL")
         estado_texto = str(row.get('estado', 'ACTIVO'))
-        textos = [str(row['NOMBRE']), str(row['EMAIL']), str(rol_texto), estado_texto]
+        
+        # Aplicamos el filtro a cada columna
+        textos_raw = [str(row['NOMBRE']), str(row['EMAIL']), str(rol_texto), estado_texto]
+        textos = [limpiar_texto_pdf(t) for t in textos_raw]
         
         lineas_por_col = [len(pdf.multi_cell(cw[i], 7, txt, split_only=True)) for i, txt in enumerate(textos)]
         h_fila = 7 * max(lineas_por_col)
@@ -97,14 +107,13 @@ def generar_pdf_usuarios_detallado(df, diccionario_roles, diccionario_desc):
         else:
             facs_texto = "Sin facultades"
             
-        textos = [str(row['NOMBRE']), str(rol_texto), facs_texto]
+        textos_raw = [str(row['NOMBRE']), str(rol_texto), facs_texto]
+        textos = [limpiar_texto_pdf(t) for t in textos_raw]
         
         lineas_por_col = [len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)]
         h_fila = 5 * max(lineas_por_col)
         
-        # AQUÍ ESTABA EL ERROR SINTÁCTICO. ¡CORREGIDO!
         x_ini, y_ini = pdf.get_x(), pdf.get_y()
-        
         if y_ini + h_fila > 275:
             pdf.add_page()
             y_ini = pdf.get_y()
@@ -144,7 +153,8 @@ def generar_pdf_roles(df_roles):
         else:
             facs_texto = "Sin facultades"
             
-        textos = [str(row['nombre_rol']), facs_texto]
+        textos_raw = [str(row['nombre_rol']), facs_texto]
+        textos = [limpiar_texto_pdf(t) for t in textos_raw]
         
         lineas_por_col = [len(pdf.multi_cell(cw[i], 6, txt, split_only=True)) for i, txt in enumerate(textos)]
         h_fila = 6 * max(lineas_por_col)
@@ -184,7 +194,8 @@ def generar_pdf_logs(df_logs):
     for _, row in df_logs.iterrows():
         fecha_corta = str(row['fecha'])[:16] if pd.notnull(row['fecha']) else ""
         usr = str(row['usuario']) if pd.notnull(row['usuario']) else "SISTEMA"
-        textos = [fecha_corta, usr, str(row['accion']), str(row['detalle'])]
+        textos_raw = [fecha_corta, usr, str(row['accion']), str(row['detalle'])]
+        textos = [limpiar_texto_pdf(t) for t in textos_raw]
         
         lineas_por_col = [len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)]
         h_fila = 5 * max(lineas_por_col)
