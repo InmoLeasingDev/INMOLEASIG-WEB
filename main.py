@@ -13,7 +13,23 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-APP_VERSION = "v1.5.0" # Añadido Módulo de Operadores
+APP_VERSION = "v1.5.1" # Ajuste Visual CSS y Módulo Operadores
+
+# ==========================================
+# 1.5 AJUSTES VISUALES (CSS MODIFICADO)
+# ==========================================
+st.markdown("""
+    <style>
+        /* Sube el contenido del menú lateral */
+        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+            padding-top: 1rem !important;
+        }
+        /* Sube un poco el contenido de la pantalla principal para que se vea más amplio */
+        .block-container {
+            padding-top: 2rem !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 import usuarios_modulo 
 import operadores_modulo
