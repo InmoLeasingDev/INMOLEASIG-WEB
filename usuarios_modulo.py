@@ -71,6 +71,99 @@ def generar_pdf_usuarios(df, diccionario_roles):
         
     return pdf.output(dest='S').encode('latin-1')
 
+def generar_pdf_usuarios_detallado(df, diccionario_roles, diccionario_desc):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - USUARIOS Y FACULTADES", ln=True, align="C")
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [40, 35, 115] # Total 190mm
+    headers = ["NOMBRE", "ROL", "FACULTADES ASIGNADAS"]
+    for i, h_text in enumerate(headers):
+        pdf.cell(cw[i], 8, h_text, border=1, fill=True, align="C")
+    pdf.ln()
+    
+    pdf.set_font("Arial", "", 8)
+    for _, row in df.iterrows():
+        rol_texto = diccionario_roles.get(row['id_rol'], "SIN ROL")
+        facs_raw = diccionario_desc.get(row['id_rol'], "")
+        
+        # Formateamos como lista para el PDF
+        if facs_raw:
+            lista_facs = sorted([f"- {f.strip()}" for f in facs_raw.split(",") if f.strip()])
+            facs_texto = "\n".join(lista_facs)
+        else:
+            facs_texto = "Sin facultades"
+            
+        textos = [str(row['NOMBRE']), str(rol_texto), facs_texto]
+        
+        lineas_por_col = [len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)]
+        h_fila = 5 * max(lineas_por_col)
+        
+        x_ini, y_ini = pdf.get_x(), y_ini = pdf.get_y()
+        if y_ini + h_fila > 275:
+            pdf.add_page()
+            y_ini = pdf.get_y()
+
+        x_actual = x_ini 
+        for i, txt in enumerate(textos):
+            pdf.set_xy(x_actual, y_ini)
+            pdf.rect(x_actual, y_ini, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, border=0, align='L')
+            x_actual += cw[i] 
+            
+        pdf.set_xy(x_ini, y_ini + h_fila)
+        
+    return pdf.output(dest='S').encode('latin-1')
+
+def generar_pdf_roles(df_roles):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - MATRIZ DE ROLES", ln=True, align="C")
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", "B", 10)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [60, 130] # Total 190mm
+    headers = ["ROL", "FACULTADES ASIGNADAS"]
+    for i, h_text in enumerate(headers):
+        pdf.cell(cw[i], 10, h_text, border=1, fill=True, align="C")
+    pdf.ln()
+    
+    pdf.set_font("Arial", "", 9)
+    for _, row in df_roles.iterrows():
+        facs_raw = row['descripcion']
+        if facs_raw:
+            lista_facs = sorted([f"- {f.strip()}" for f in facs_raw.split(",") if f.strip()])
+            facs_texto = "\n".join(lista_facs)
+        else:
+            facs_texto = "Sin facultades"
+            
+        textos = [str(row['nombre_rol']), facs_texto]
+        
+        lineas_por_col = [len(pdf.multi_cell(cw[i], 6, txt, split_only=True)) for i, txt in enumerate(textos)]
+        h_fila = 6 * max(lineas_por_col)
+        
+        x_ini, y_ini = pdf.get_x(), pdf.get_y()
+        if y_ini + h_fila > 275:
+            pdf.add_page()
+            y_ini = pdf.get_y()
+
+        x_actual = x_ini 
+        for i, txt in enumerate(textos):
+            pdf.set_xy(x_actual, y_ini)
+            pdf.rect(x_actual, y_ini, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 6, txt, border=0, align='L')
+            x_actual += cw[i] 
+            
+        pdf.set_xy(x_ini, y_ini + h_fila)
+        
+    return pdf.output(dest='S').encode('latin-1')
+
 def generar_pdf_logs(df_logs):
     pdf = FPDF()
     pdf.add_page()
@@ -164,7 +257,6 @@ def mostrar_modulo_usuarios(supabase):
                 facultades_user = DICCIONARIO_DESC.get(rol_id_user, "")
                 
                 if facultades_user:
-                    # FIX: Ahora se ordenan alfabéticamente antes de mostrarlas (uso de sorted())
                     lista_facs = sorted([f"- {fac.strip()}" for fac in facultades_user.split(",") if fac.strip()])
                     facs_formateadas = "\n".join(lista_facs)
                     st.info(f"**Facultades asignadas al usuario {u_consulta}:**\n\n{facs_formateadas}")
@@ -172,8 +264,14 @@ def mostrar_modulo_usuarios(supabase):
                     st.warning(f"**{u_consulta}** no tiene facultades asignadas en su rol.")
 
             st.markdown("---")
-            pdf_bytes = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
-            st.download_button("📄 Exportar Reporte PDF", pdf_bytes, "usuarios_inmoleasing.pdf", "application/pdf")
+            # NUEVO: Dos botones de descarga en columnas
+            col_pdf1, col_pdf2 = st.columns(2)
+            with col_pdf1:
+                pdf_bytes = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
+                st.download_button("📄 Exportar Reporte Básico (PDF)", pdf_bytes, "usuarios_basico.pdf", "application/pdf", use_container_width=True)
+            with col_pdf2:
+                pdf_det_bytes = generar_pdf_usuarios_detallado(df_display, DICCIONARIO_ROLES, DICCIONARIO_DESC)
+                st.download_button("📄 Exportar Reporte Detallado (PDF)", pdf_det_bytes, "usuarios_detallado.pdf", "application/pdf", use_container_width=True)
 
     # --- TAB 2: REGISTRO ---
     with tab2:
@@ -217,14 +315,17 @@ def mostrar_modulo_usuarios(supabase):
             with st.form("form_edicion"):
                 e_nom = st.text_input("Nombre", u_data['nombre'])
                 e_ema = st.text_input("Email", u_data['email'])
-                e_pas = st.text_input("Nueva Contraseña", type="password", help="Déjalo en blanco si no deseas cambiar la contraseña actual.")
+                
+                # NUEVO: Tamaño del password reducido a media columna
+                col_p1, col_p2 = st.columns(2)
+                with col_p1:
+                    e_pas = st.text_input("Nueva Contraseña", type="password", help="Déjalo en blanco si no deseas cambiar la contraseña actual.")
                 
                 col_m1, col_m2 = st.columns(2)
                 with col_m1:
                     index_rol = list(DICCIONARIO_ROLES.keys()).index(u_data['id_rol']) if u_data['id_rol'] in DICCIONARIO_ROLES else 0
                     e_rol = st.selectbox("Cambiar Rol", options=list(DICCIONARIO_ROLES.items()), index=index_rol, format_func=lambda x: x[1])
                 with col_m2:
-                    # FIX: Ahora se puede editar la moneda / región
                     monedas_disponibles = ["EUR", "COP", "ALL"]
                     moneda_user = str(u_data.get('moneda', 'ALL'))
                     idx_mon = monedas_disponibles.index(moneda_user) if moneda_user in monedas_disponibles else 2
@@ -236,7 +337,7 @@ def mostrar_modulo_usuarios(supabase):
                             "nombre": e_nom.upper(), 
                             "email": e_ema.lower(), 
                             "id_rol": int(e_rol[0]),
-                            "moneda": e_mon  # Guardamos la nueva moneda
+                            "moneda": e_mon  
                         }
                         if e_pas.strip() != "":
                             datos_a_actualizar["password"] = e_pas
@@ -273,7 +374,7 @@ def mostrar_modulo_usuarios(supabase):
                     st.session_state.confirmar_borrado_user = None
                     st.rerun()
 
-    # --- TAB 4 y 5: (Sin cambios, continúan funcionando perfecto) ---
+    # --- TAB 4: ROLES Y FACULTADES ---
     with tab4:
         seccion = st.radio("Seleccione el paso a configurar:", ["1. Catálogo de Facultades", "2. Roles de Usuario"], horizontal=True)
         st.markdown("---")
@@ -282,7 +383,7 @@ def mostrar_modulo_usuarios(supabase):
             col_f1, col_f2 = st.columns(2)
             with col_f1:
                 st.markdown("### ✨ Crear Facultad")
-                st.info("💡 **Sugerencia:** Crea estas facultades para coincidir con tu menú: \nMODULO_DASHBOARD, MODULO_USUARIOS, MODULO_PROPIETARIOS, MODULO_INMUEBLES, MODULO_ARRENDAMIENTOS, MODULO_FINANZAS, MODULO_INFORMES")
+                # SE ELIMINÓ EL st.info() COMO SOLICITASTE
                 with st.form("form_facultad"):
                     f_ico = st.selectbox("Selecciona un Icono", LISTA_ICONOS) 
                     f_nom = st.text_input("Nombre Técnico (Ej: MODULO_FINANZAS)")
@@ -308,112 +409,4 @@ def mostrar_modulo_usuarios(supabase):
                             st.rerun()
                             
                     if "confirmar_borrado_fac" not in st.session_state:
-                        st.session_state.confirmar_borrado_fac = None
-                        
-                    if st.button("🗑️ Eliminar Facultad"):
-                        st.session_state.confirmar_borrado_fac = f_row['id']
-                        st.rerun()
-                        
-                    if st.session_state.confirmar_borrado_fac == f_row['id']:
-                        st.warning(f"⚠️ ¿Eliminar facultad {f_edit_nom}?")
-                        cf_si, cf_no = st.columns(2)
-                        if cf_si.button("✅ Sí, borrar facultad"):
-                            supabase.table("facultades").delete().eq("id", int(f_row['id'])).execute()
-                            log_accion(supabase, usuario_actual, "ELIMINAR FACULTAD", f"Facultad borrada: {f_edit_nom}")
-                            st.session_state.confirmar_borrado_fac = None
-                            st.rerun()
-                        if cf_no.button("❌ Cancelar"):
-                            st.session_state.confirmar_borrado_fac = None
-                            st.rerun()
-
-        elif seccion == "2. Roles de Usuario":
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown("### ✨ Crear Rol")
-                with st.form("n_rol_form"):
-                    nr_nom = st.text_input("Nombre del nuevo Rol (Ej: AUDITOR)")
-                    nr_llaves = st.multiselect("Asignar Facultades:", llaves_iconos)
-                    if st.form_submit_button("Guardar Nuevo Rol"):
-                        if nr_nom:
-                            supabase.table("roles").insert({"nombre_rol": nr_nom.upper(), "descripcion": ", ".join(nr_llaves)}).execute()
-                            log_accion(supabase, usuario_actual, "CREAR ROL", f"Rol registrado: {nr_nom.upper()}")
-                            st.rerun()
-            with c2:
-                st.markdown("### ⚙️ Gestión de Roles")
-                if not df_roles.empty:
-                    roles_ordenados = df_roles.sort_values('nombre_rol')['nombre_rol'].tolist()
-                    r_edit = st.selectbox("Seleccione Rol a editar:", roles_ordenados)
-                    r_row = df_roles[df_roles['nombre_rol'] == r_edit].iloc[0]
-                    previas = [p.strip() for p in r_row['descripcion'].split(",")] if r_row['descripcion'] else []
-                    
-                    with st.form("e_rol_form"):
-                        er_llaves = st.multiselect("Modificar Facultades:", llaves_iconos, default=[p for p in previas if p in llaves_iconos])
-                        if st.form_submit_button("Actualizar Rol"):
-                            supabase.table("roles").update({"descripcion": ", ".join(er_llaves)}).eq("id", int(r_row['id'])).execute()
-                            log_accion(supabase, usuario_actual, "EDITAR ROL", f"Facultades actualizadas para el rol: {r_edit}")
-                            st.success("Permisos actualizados."); st.rerun()
-
-                    if "confirmar_borrado_rol" not in st.session_state:
-                        st.session_state.confirmar_borrado_rol = None
-                        
-                    if st.button("🗑️ Eliminar este Rol"):
-                        st.session_state.confirmar_borrado_rol = r_row['id']
-                        st.rerun()
-                        
-                    if st.session_state.confirmar_borrado_rol == r_row['id']:
-                        st.warning(f"⚠️ ¿Seguro que deseas eliminar el rol {r_edit}?")
-                        c_si_rol, c_no_rol = st.columns(2)
-                        if c_si_rol.button("✅ Sí, eliminar Rol"):
-                            supabase.table("roles").delete().eq("id", int(r_row['id'])).execute()
-                            log_accion(supabase, usuario_actual, "ELIMINAR ROL", f"Rol borrado: {r_edit}")
-                            st.session_state.confirmar_borrado_rol = None
-                            st.rerun()
-                        if c_no_rol.button("❌ Cancelar"):
-                            st.session_state.confirmar_borrado_rol = None
-                            st.rerun()
-
-    # --- TAB 5: LOGS Y AUDITORÍA ---
-    with tab5:
-        st.subheader("📜 Auditoría y Registro de Actividades")
-        try:
-            res_logs = supabase.table("logs_actividad").select("*").order("fecha", desc=True).execute()
-            df_logs = pd.DataFrame(res_logs.data) if res_logs.data else pd.DataFrame()
-        except:
-            df_logs = pd.DataFrame()
-
-        if not df_logs.empty:
-            df_logs['fecha'] = pd.to_datetime(df_logs['fecha']).dt.tz_localize(None)
-
-            col_f1, col_f2, col_f3 = st.columns([1, 1, 1])
-            with col_f1:
-                fecha_rango = st.date_input("Rango de Fechas", value=[])
-            with col_f2:
-                usuarios_unicos = ["Todos"] + sorted(df_logs['usuario'].dropna().unique().tolist())
-                usuario_filtro = st.selectbox("Filtrar por Usuario", usuarios_unicos)
-            with col_f3:
-                txt_filtro = st.text_input("Buscar texto libre:", "").upper()
-
-            df_logs_filtrado = df_logs.copy()
-            if len(fecha_rango) == 2:
-                df_logs_filtrado = df_logs_filtrado[
-                    (df_logs_filtrado['fecha'].dt.date >= fecha_rango[0]) & 
-                    (df_logs_filtrado['fecha'].dt.date <= fecha_rango[1])
-                ]
-            if usuario_filtro != "Todos":
-                df_logs_filtrado = df_logs_filtrado[df_logs_filtrado['usuario'] == usuario_filtro]
-            if txt_filtro:
-                mask_accion = df_logs_filtrado['accion'].str.contains(txt_filtro, case=False, na=False)
-                mask_detalle = df_logs_filtrado['detalle'].str.contains(txt_filtro, case=False, na=False)
-                df_logs_filtrado = df_logs_filtrado[mask_accion | mask_detalle]
-
-            df_visual = df_logs_filtrado.copy()
-            if not df_visual.empty:
-                df_visual['fecha'] = df_visual['fecha'].dt.strftime('%Y-%m-%d %H:%M')
-                st.dataframe(df_visual[['fecha', 'usuario', 'accion', 'detalle']], use_container_width=True, hide_index=True)
-
-                pdf_logs_bytes = generar_pdf_logs(df_visual)
-                st.download_button("📄 Descargar Auditoría PDF", pdf_logs_bytes, "auditoria.pdf", "application/pdf")
-            else:
-                st.info("No hay registros con esos filtros.")
-        else:
-            st.info("El registro de actividades está vacío.")
+                        st.session_
