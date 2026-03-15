@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v2.2 PRO" # Menú siempre visible con bloqueos en pantalla
+APP_VERSION = "v2.3 PRO" # Rediseño estético de la cabecera lateral
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -118,16 +118,25 @@ if not st.session_state.autenticado:
     st.stop()
 
 # ==========================================
-# 6. MENÚ LATERAL SIEMPRE VISIBLE
+# 6. MENÚ LATERAL ESTÉTICO Y VISIBLE
 # ==========================================
 with st.sidebar:
+    # 1. Título
     st.title("🏢 INMOLEASING")
+    # 2. Versión
+    st.caption(f"Versión: {APP_VERSION}")
+    st.markdown("---")
+    # 3. Hola Usuario
     st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre')}**")
+    # 4. Región / Moneda
+    st.caption(f"Región/Moneda: **{st.session_state.moneda_usuario}**")
     
     rol_actual = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
     texto_facultades = st.session_state.usuario.get('facultades_texto', '')
     
+    # 5. Perfil (Mantenemos esto porque es muy útil visualmente)
     st.caption(f"Perfil: **{rol_actual}**")
+    st.markdown("---")
 
     # Calculamos QUÉ módulos tiene permitidos (Pero no los ocultamos)
     st.session_state.opciones_permitidas = []
@@ -152,7 +161,7 @@ with st.sidebar:
     iconos_todos = list(menu_map.values())
 
     selected = option_menu(
-        menu_title="Menú Principal",
+        menu_title=None, # Quitamos el texto "Menú Principal" para que quede más limpio
         options=opciones_todas, 
         icons=iconos_todos,     
         menu_icon="cast",
@@ -160,7 +169,6 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.caption(f"Versión: {APP_VERSION}")
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
@@ -168,13 +176,11 @@ with st.sidebar:
 # ==========================================
 # 7. ENRUTADOR CON CUSTODIO DE ACCESO
 # ==========================================
-# Si el usuario hace clic en algo que no está en su lista de permitidos, le ponemos el candado
 if selected not in st.session_state.opciones_permitidas:
     st.error(f"### 🔒 Acceso Restringido")
     st.warning(f"Tu perfil actual (**{rol_actual}**) no cuenta con las facultades necesarias para visualizar o gestionar el módulo de **{selected}**.")
     st.info("Si consideras que esto es un error, por favor contacta con el administrador del sistema para que asigne esta facultad a tu rol.")
 else:
-    # Si sí tiene permiso, cargamos el módulo correspondiente
     if selected == "Dashboard":
         st.header("📈 Dashboard Principal")
         st.info("Aquí irán las gráficas y resúmenes de la operación.")
