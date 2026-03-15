@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v2.9 PRO" # Botón de Inicio y Portada Corporativa Fix
+APP_VERSION = "v2.9.1 PRO" # Corrección de ruta de imagen portada
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -134,7 +134,6 @@ with st.sidebar:
     
     st.markdown("<hr style='margin-top: 0.5rem; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
 
-    # Calculamos permisos para uso interno del enrutador
     st.session_state.opciones_permitidas = []
     for menu_item, facultad_requerida in DICCIONARIO_MENU_FACULTADES.items():
         if facultad_requerida in texto_facultades:
@@ -143,7 +142,6 @@ with st.sidebar:
     if "ADMINISTRADOR" in texto_facultades or "ADMINISTRADOR" in rol_actual:
         st.session_state.opciones_permitidas = list(DICCIONARIO_MENU_FACULTADES.keys())
 
-    # Agregamos "Inicio" al principio de las opciones siempre
     opciones_todas = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"]
     iconos_todos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
 
@@ -152,7 +150,7 @@ with st.sidebar:
         options=opciones_todas, 
         icons=iconos_todos,     
         menu_icon="cast",
-        default_index=0, # Inicia siempre en "Inicio" (índice 0) evitando el error de Streamlit
+        default_index=0, 
     )
     
     st.markdown("<hr style='margin-top: -1.2rem; margin-bottom: 1rem;'>", unsafe_allow_html=True)
@@ -165,30 +163,27 @@ with st.sidebar:
 # 7. ENRUTADOR CON PANTALLA DE BIENVENIDA
 # ==========================================
 
-# 1. Si seleccionaron Inicio, mostramos la Portada (Acceso libre para todos)
 if selected == "Inicio":
-    st.write("# ") # Espacio
+    st.write("# ") 
     cols_b = st.columns([1, 6, 1])
     with cols_b[1]:
         st.title("🏢 INMOLEASING")
         st.markdown(f"**Te damos la bienvenida al Sistema Integral de Gestión Inmobiliaria.**")
         st.caption(f"Versión actual: {APP_VERSION}")
         
-        # Cargamos tu imagen (Debe estar en la misma carpeta que main.py)
+        # AHORA BUSCAMOS EL ARCHIVO CON EL NOMBRE CORREGIDO
         try:
-            st.image("PORTADA 1.jpg", use_container_width=True)
+            st.image("portada.jpg", use_container_width=True)
         except:
-            st.warning("No se encontró la imagen 'PORTADA 1.jpg'. Asegúrate de que esté en la carpeta del proyecto.")
+            st.warning("No se encontró la imagen 'portada.jpg'. Asegúrate de subirla a GitHub en la misma carpeta que main.py")
             
         st.info("👋 Por favor, selecciona una opción en el menú lateral para comenzar a operar.")
 
-# 2. Si seleccionan algo más, verificamos que tengan permiso
 elif selected not in st.session_state.opciones_permitidas:
     st.error(f"### 🔒 Acceso Restringido")
     st.warning(f"Tu perfil actual (**{rol_actual}**) no cuenta con las facultades necesarias para visualizar o gestionar el módulo de **{selected}**.")
     st.info("Si consideras que esto es un error, por favor contacta con el administrador del sistema para que asigne esta facultad a tu rol.")
 
-# 3. Si tienen permiso, cargamos el módulo
 else:
     if selected == "Dashboard":
         st.header("📈 Dashboard Principal")
