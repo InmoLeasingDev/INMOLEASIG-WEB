@@ -20,12 +20,19 @@ def es_correo_valido(correo):
     patron = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     return re.match(patron, correo) is not None
 
-# NUEVO: Filtro anti-crashes para el PDF (Quita Emojis antes de imprimir)
 def limpiar_texto_pdf(texto):
     if pd.isna(texto):
         return ""
-    # Ignora los caracteres que FPDF no puede procesar
     return str(texto).encode('latin-1', 'ignore').decode('latin-1')
+
+# NUEVO: Función inteligente para ordenar ignorando los emojis
+def ordenar_facultades_alfabeticamente(cadena_facultades):
+    if not cadena_facultades:
+        return []
+    # Separamos las facultades por la coma
+    facs = [f.strip() for f in cadena_facultades.split(",") if f.strip()]
+    # Ordenamos basándonos solo en la palabra que está DESPUÉS del espacio (ignorando el emoji)
+    return sorted(facs, key=lambda x: x.split(" ", 1)[-1] if " " in x else x)
 
 LISTA_ICONOS = [
     '🏠', '🏢', '🏬', '🏗️', '🔑', '🚪', '🏘️', '🏭',
@@ -58,7 +65,6 @@ def generar_pdf_usuarios(df, diccionario_roles):
         rol_texto = diccionario_roles.get(row['id_rol'], "SIN ROL")
         estado_texto = str(row.get('estado', 'ACTIVO'))
         
-        # Aplicamos el filtro a cada columna
         textos_raw = [str(row['NOMBRE']), str(row['EMAIL']), str(rol_texto), estado_texto]
         textos = [limpiar_texto_pdf(t) for t in textos_raw]
         
@@ -90,7 +96,7 @@ def generar_pdf_usuarios_detallado(df, diccionario_roles, diccionario_desc):
     
     pdf.set_font("Arial", "B", 9)
     pdf.set_fill_color(200, 220, 255)
-    cw = [40, 35, 115] # Total 190mm
+    cw = [40, 35, 115] 
     headers = ["NOMBRE", "ROL", "FACULTADES ASIGNADAS"]
     for i, h_text in enumerate(headers):
         pdf.cell(cw[i], 8, h_text, border=1, fill=True, align="C")
@@ -102,7 +108,9 @@ def generar_pdf_usuarios_detallado(df, diccionario_roles, diccionario_desc):
         facs_raw = diccionario_desc.get(row['id_rol'], "")
         
         if facs_raw:
-            lista_facs = sorted([f"- {f.strip()}" for f in facs_raw.split(",") if f.strip()])
+            # FIX: Aplicamos el ordenamiento alfabético real
+            facs_ordenadas = ordenar_facultades_alfabeticamente(facs_raw)
+            lista_facs = [f"- {f}" for f in facs_ordenadas]
             facs_texto = "\n".join(lista_facs)
         else:
             facs_texto = "Sin facultades"
@@ -138,7 +146,7 @@ def generar_pdf_roles(df_roles):
     
     pdf.set_font("Arial", "B", 10)
     pdf.set_fill_color(200, 220, 255)
-    cw = [60, 130] # Total 190mm
+    cw = [60, 130] 
     headers = ["ROL", "FACULTADES ASIGNADAS"]
     for i, h_text in enumerate(headers):
         pdf.cell(cw[i], 10, h_text, border=1, fill=True, align="C")
@@ -148,7 +156,9 @@ def generar_pdf_roles(df_roles):
     for _, row in df_roles.iterrows():
         facs_raw = row['descripcion']
         if facs_raw:
-            lista_facs = sorted([f"- {f.strip()}" for f in facs_raw.split(",") if f.strip()])
+            # FIX: Aplicamos el ordenamiento alfabético real
+            facs_ordenadas = ordenar_facultades_alfabeticamente(facs_raw)
+            lista_facs = [f"- {f}" for f in facs_ordenadas]
             facs_texto = "\n".join(lista_facs)
         else:
             facs_texto = "Sin facultades"
@@ -269,7 +279,9 @@ def mostrar_modulo_usuarios(supabase):
                 facultades_user = DICCIONARIO_DESC.get(rol_id_user, "")
                 
                 if facultades_user:
-                    lista_facs = sorted([f"- {fac.strip()}" for fac in facultades_user.split(",") if fac.strip()])
+                    # FIX: Ordenamiento inteligente ignorando emojis
+                    facs_ordenadas = ordenar_facultades_alfabeticamente(facultades_user)
+                    lista_facs = [f"- {fac}" for fac in facs_ordenadas]
                     facs_formateadas = "\n".join(lista_facs)
                     st.info(f"**Facultades asignadas al usuario {u_consulta}:**\n\n{facs_formateadas}")
                 else:
@@ -324,8 +336,12 @@ def mostrar_modulo_usuarios(supabase):
                 st.success(f"✅ El usuario {u_edit} está ACTIVO.")
             
             with st.form("form_edicion"):
-                e_nom = st.text_input("Nombre", u_data['nombre'])
-                e_ema = st.text_input("Email", u_data['email'])
+                # FIX: Estructura de formulario PRO (Nombre y Email en medias columnas)
+                col_e1, col_e2 = st.columns(2)
+                with col_e1:
+                    e_nom = st.text_input("Nombre", u_data['nombre'])
+                with col_e2:
+                    e_ema = st.text_input("Email", u_data['email'])
                 
                 col_p1, col_p2 = st.columns(2)
                 with col_p1:
