@@ -13,10 +13,10 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-APP_VERSION = "v1.4.2" # Modo Diagnóstico 🔍
+APP_VERSION = "v1.4.3" # Blindaje Definitivo Anti-Espacios DB
 
 import usuarios_modulo 
-# import propietarios_modulo  <--- Sigue apagado hasta reparar el login
+# import propietarios_modulo  <--- Sigue apagado hasta entrar con éxito
 
 # ==========================================
 # 2. FUNCIONES DE SEGURIDAD
@@ -42,7 +42,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 # ==========================================
-# 5. PANTALLA DE LOGIN (CON DIAGNÓSTICO)
+# 5. PANTALLA DE LOGIN
 # ==========================================
 if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
@@ -59,24 +59,23 @@ if not st.session_state.autenticado:
                 email_limpio = email_input.lower()
                 pass_hash = encriptar_password(pass_input)
                 
-                # DIAGNÓSTICO 1: Buscamos SOLO por correo para ver qué nos trae Supabase
+                # Buscamos SOLO por correo
                 res = supabase.table("usuarios").select("*").eq("email", email_limpio).execute()
                 
                 if len(res.data) == 0:
-                    st.error(f"❌ No se encontró ningún usuario con el correo exacto: '{email_limpio}'")
+                    st.error(f"❌ No se encontró el correo: '{email_limpio}'")
                 else:
                     usuario_data = res.data[0]
-                    estado_db = usuario_data.get('estado')
-                    pass_db = usuario_data.get('password')
                     
-                    # DIAGNÓSTICO 2: Verificamos el estado
+                    # BLINDAJE DEFINITIVO: Limpiamos los datos que vienen de la Base de Datos
+                    estado_db = str(usuario_data.get('estado', '')).strip().upper()
+                    pass_db = str(usuario_data.get('password', '')).strip()
+                    
                     if estado_db != 'ACTIVO':
-                        st.error(f"❌ Cuenta encontrada, pero su estado es: '{estado_db}' (Debe ser exactamente 'ACTIVO')")
+                        st.error(f"❌ Cuenta encontrada, pero su estado es: '{estado_db}' (Debe ser ACTIVO)")
                         
-                    # DIAGNÓSTICO 3: Verificamos la contraseña
                     elif pass_db != pass_hash:
                         st.error("❌ La contraseña no coincide.")
-                        st.warning(f"🔍 **DIAGNÓSTICO HASH:**\n\nTu Supabase tiene: `{pass_db}`\nTu Streamlit generó: `{pass_hash}`")
                         
                     # SI TODO ESTÁ PERFECTO:
                     else:
