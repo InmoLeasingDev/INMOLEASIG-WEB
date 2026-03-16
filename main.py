@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v4.5 GOLD" # Ajuste milimétrico de foto (+5%) y código PEP 8
+APP_VERSION = "v4.6 GOLD" # Ajuste de línea inferior y +5% en foto central
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -35,7 +35,7 @@ st.markdown("""
         /* 2. Menú lateral: subimos el contenido para que el título no se corte */
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
         
-        /* 3. Simetría de líneas separadoras */
+        /* 3. Simetría de línea separadora SUPERIOR */
         [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; }
         
         /* 4. Panel principal: respiro superior de 3rem */
@@ -146,6 +146,7 @@ with st.sidebar:
     
     st.caption(f"Perfil: **{rol_actual}**")
     
+    # Línea separadora superior (Controlada por CSS)
     st.markdown("<hr>", unsafe_allow_html=True)
 
     st.session_state.opciones_permitidas = ["Inicio"]
@@ -159,7 +160,8 @@ with st.sidebar:
 
     selected = option_menu(None, opciones, icons=iconos, menu_icon="cast", default_index=0)
     
-    st.markdown("<hr style='margin-top: -1.2rem; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
+    # LÍNEA INFERIOR: Aumentamos la tracción negativa a -2.0rem para acercarla al menú
+    st.markdown("<hr style='margin-top: -2.0rem; margin-bottom: 1.0rem;'>", unsafe_allow_html=True)
     
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
@@ -176,8 +178,8 @@ if selected == "Inicio":
     
     st.write("") 
     
-    # AJUSTE FINAL FOTO: Columnas [0.8, 1, 0.8] para aumentar un 5% respecto a la v4.4
-    img_cols = st.columns([0.8, 1, 0.8]) 
+    # AJUSTE FINAL FOTO: Columnas [0.75, 1, 0.75] para aumentar la imagen un 5%
+    img_cols = st.columns([0.75, 1, 0.75]) 
     
     with img_cols[1]:
         try:
