@@ -3,6 +3,7 @@ from streamlit_option_menu import option_menu
 from supabase import create_client
 import hashlib
 from datetime import datetime
+import propietarios_modulo
 
 # ==========================================
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
@@ -213,9 +214,8 @@ else:
     elif selected == "Operadores":
         operadores_modulo.mostrar_modulo_operadores(supabase)
         
-    elif selected == "Propietarios":
-        st.header("🤝 Gestión de Propietarios")
-        st.info("🚧 Módulo en construcción.")
+    elif selected == "Propietarios":  
+        propietarios_modulo.mostrar_modulo_propietarios(supabase)    
         
     elif selected == "Inmuebles":
         st.header("🏠 Gestión de Inmuebles")
