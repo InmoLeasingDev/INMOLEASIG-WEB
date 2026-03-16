@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v3.0 PRO" # UX Inteligente + UI Pixel Perfect (Foto Reducida)
+APP_VERSION = "v3.1 PRO" # Reducción drástica de margen superior y foto al 40%
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -29,21 +29,21 @@ DICCIONARIO_MENU_FACULTADES = {
 # ==========================================
 st.markdown("""
     <style>
-        /* Ocultar el espacio vacío superior */
+        /* Ocultar el espacio vacío superior del menú lateral */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; }
         
-        /* Bajar un poco el título para que respire (de -4.5rem a -1rem) */
+        /* Ajuste fino del menú lateral */
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -1rem !important; }
         
         /* Pegar la línea separadora al texto del perfil */
         [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 1rem !important; }
         
-        /* Sube el contenido del panel principal */
-        .block-container { padding-top: 1.5rem !important; }
+        /* REDUCCIÓN DRÁSTICA DEL ESPACIO SUPERIOR PRINCIPAL */
+        .block-container { padding-top: 0rem !important; margin-top: 0rem !important; }
         
-        /* Reducción proporcional y centrado de la imagen de portada */
+        /* REDUCCIÓN DE LA IMAGEN DE PORTADA */
         [data-testid="stImage"] > img {
-            max-width: 60% !important; /* La foto ocupará el 60% del ancho */
+            max-width: 40% !important; /* Pasamos de 60% a 40% para que sea más pequeña */
             height: auto !important; 
             margin: 0 auto; 
             display: block; 
@@ -82,6 +82,8 @@ if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
     
     with cols[1]:
+        # Para que el Login también quede bien arriba
+        st.write("") 
         st.title("🏢 INMOLEASING")
         st.markdown(f"**Acceso al Sistema** *(Versión {APP_VERSION})*")
         
@@ -180,7 +182,7 @@ with st.sidebar:
 # ==========================================
 
 if selected == "Inicio":
-    st.write("# ") 
+    # Eliminamos el st.write("# ") que causaba el salto enorme de línea
     cols_b = st.columns([1, 6, 1])
     with cols_b[1]:
         st.title("🏢 INMOLEASING")
@@ -188,8 +190,6 @@ if selected == "Inicio":
         st.caption(f"Versión actual: {APP_VERSION}")
         
         try:
-            # En tu captura vi que el nombre original sí te funcionó en la versión 2.9.2
-            # Usa el nombre exacto que tengas en tu repositorio
             st.image("portada.jpg", use_container_width=True)
         except:
             st.warning("No se encontró la imagen. Asegúrate de que el nombre del archivo sea correcto.")
