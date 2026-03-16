@@ -303,11 +303,13 @@ def mostrar_modulo_usuarios(supabase):
     st.header("👤 Gestión de Usuarios y Accesos")
     MOD_VERSION = "v1.3"
     st.caption(f"⚙️ Módulo Usuarios {MOD_VERSION}")
-    
+    # --- ATRAPAR SOLO EL NOMBRE DEL USUARIO ---
+    var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+    if isinstance(var_sesion, dict):
+        usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR")
+    else:
+        usuario_actual = str(var_sesion)
     # Intento de atrapar el nombre real del usuario desde las variables de sesión comunes
-    usuario_actual = st.session_state.get("usuario_actual", 
-                        st.session_state.get("nombre_usuario", 
-                        st.session_state.get("usuario", "ADMINISTRADOR")))
                         
     moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
     
