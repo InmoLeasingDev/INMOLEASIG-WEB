@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v4.7 GOLD" # Corrección nativa de padding del menú y foto +5%
+APP_VERSION = "v4.8 GOLD" # Forzado de columnas [1,2,1] y eliminación de gap lateral
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -25,24 +25,26 @@ DICCIONARIO_MENU_FACULTADES = {
 }
 
 # ==========================================
-# 1.6 AJUSTES VISUALES CSS (PIXEL PERFECT)
+# 1.6 AJUSTES VISUALES CSS (PIXEL PERFECT EXTREMO)
 # ==========================================
 st.markdown("""
     <style>
         /* 1. Limpieza total de cabecera lateral */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; min-height: 0px !important; }
         
-        /* 2. Menú lateral: subimos el contenido para que el título no se corte */
+        /* 2. Menú lateral: subimos el contenido */
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
         
-        /* 3. Simetría de línea separadora SUPERIOR */
-        [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; }
-        
-        /* 4. Panel principal: respiro superior de 3rem */
+        /* 3. Panel principal: respiro superior */
         .block-container { padding-top: 3rem !important; }
 
-        /* 5. Ajuste del botón Cerrar Sesión (Subida estratégica) */
-        .stButton button { margin-top: -1.5rem !important; }
+        /* 4. NUEVO: Eliminar el espacio "fantasma" entre bloques del Sidebar para acercar la línea */
+        [data-testid="stSidebar"] > div:first-child > div:nth-child(2) > div {
+            gap: 0.5rem !important; 
+        }
+        
+        /* 5. Acercar aún más el botón Cerrar Sesión */
+        .stButton button { margin-top: -1rem !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -85,7 +87,7 @@ if not st.session_state.autenticado:
         
         if st.button("Entrar", use_container_width=True):
             try:
-                # Sanitización de inputs (Regla 2.2 del Documento Maestro)
+                # Sanitización de inputs
                 email_limpio = email_input.lower()
                 pass_hash = encriptar_password(pass_input)
                 
@@ -122,7 +124,6 @@ if not st.session_state.autenticado:
                         st.session_state.usuario = u_data
                         st.session_state.moneda_usuario = u_data.get('moneda', 'ALL')
                         
-                        # Actualizar último acceso (Regla 2.3 del Documento Maestro)
                         supabase.table("usuarios").update({"ultimo_acceso": datetime.utcnow().isoformat()}).eq("id", u_data['id']).execute()
                         st.rerun()
                         
@@ -146,8 +147,8 @@ with st.sidebar:
     
     st.caption(f"Perfil: **{rol_actual}**")
     
-    # Línea separadora superior
-    st.markdown("<hr>", unsafe_allow_html=True)
+    # Línea superior
+    st.markdown("<hr style='margin-top: 0; margin-bottom: 0;'>", unsafe_allow_html=True)
 
     st.session_state.opciones_permitidas = ["Inicio"]
     
@@ -158,7 +159,7 @@ with st.sidebar:
     opciones = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"]
     iconos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
 
-    # AJUSTE NATIVO: Se elimina el padding fantasma directamente en el componente
+    # Reducción de márgenes internos del menú
     selected = option_menu(
         menu_title=None, 
         options=opciones, 
@@ -166,12 +167,12 @@ with st.sidebar:
         menu_icon="cast", 
         default_index=0,
         styles={
-            "container": {"padding-bottom": "0!important", "margin-bottom": "0!important"}
+            "container": {"padding": "0!important", "margin-top": "0!important", "margin-bottom": "0!important"}
         }
     )
     
-    # LÍNEA INFERIOR: Ahora que no hay padding fantasma, este margen funcionará perfecto
-    st.markdown("<hr style='margin-top: -0.5rem; margin-bottom: 1.0rem;'>", unsafe_allow_html=True)
+    # Línea inferior pegada al menú
+    st.markdown("<hr style='margin-top: 0; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
     
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
@@ -188,8 +189,8 @@ if selected == "Inicio":
     
     st.write("") 
     
-    # AJUSTE FINAL FOTO: Columnas [1, 1.4, 1] fuerzan a la imagen a crecer visiblemente
-    img_cols = st.columns([1, 1.4, 1]) 
+    # AJUSTE FINAL FOTO: Columnas [1, 2, 1] fuerzan a la imagen a ocupar el 50% del espacio central
+    img_cols = st.columns([1, 2, 1]) 
     
     with img_cols[1]:
         try:
@@ -205,8 +206,6 @@ elif selected not in st.session_state.opciones_permitidas:
     st.warning(f"Tu perfil (**{rol_actual}**) no tiene acceso a este módulo.")
 
 else:
-    # Bloques separados y con saltos de línea según estándar PEP 8
-    
     if selected == "Dashboard":
         st.header("📈 Dashboard Principal")
         st.info("🚧 Módulo en construcción.")
