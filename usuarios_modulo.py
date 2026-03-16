@@ -5,7 +5,7 @@ import hashlib
 from fpdf import FPDF
 
 # ==========================================
-# 0. FUNCIONES AUXILIARES Y LOGS
+# 0. FUNCIONES AUXILIARES Y LOGS ok
 # ==========================================
 def encriptar_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
