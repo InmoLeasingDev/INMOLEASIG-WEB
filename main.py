@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v3.9 PRO" # Versión Completa con simetría y botón ajustado
+APP_VERSION = "v4.4 GOLD" # Cumplimiento estricto del Documento Maestro (PEP 8)
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -25,20 +25,23 @@ DICCIONARIO_MENU_FACULTADES = {
 }
 
 # ==========================================
-# 1.6 AJUSTES VISUALES CSS (EL CORAZÓN DEL DISEÑO)
+# 1.6 AJUSTES VISUALES CSS (PIXEL PERFECT)
 # ==========================================
 st.markdown("""
     <style>
-        /* 1. LIMPIEZA DEL HEADER LATERAL */
+        /* 1. Limpieza total de cabecera lateral */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; min-height: 0px !important; }
         
-        /* 2. MENÚ LATERAL ARRIBA */
+        /* 2. Menú lateral: subimos el contenido para que el título no se corte */
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
         
-        /* 3. BLOQUE PRINCIPAL POSICIÓN */
+        /* 3. Simetría de líneas separadoras */
+        [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; }
+        
+        /* 4. Panel principal: respiro superior de 3rem */
         .block-container { padding-top: 3rem !important; }
 
-        /* 4. AJUSTE DEL BOTÓN CERRAR SESIÓN: Lo subimos para que no quede en el fondo */
+        /* 5. Ajuste del botón Cerrar Sesión (Subida estratégica) */
         .stButton button { margin-top: -1.5rem !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -68,7 +71,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 # ==========================================
-# 5. LOGIN BLINDADO (RESTAURADO)
+# 5. LOGIN BLINDADO
 # ==========================================
 if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
@@ -82,51 +85,54 @@ if not st.session_state.autenticado:
         
         if st.button("Entrar", use_container_width=True):
             try:
+                # Sanitización de inputs (Regla 2.2 del Documento Maestro)
                 email_limpio = email_input.lower()
                 pass_hash = encriptar_password(pass_input)
                 
                 res = supabase.table("usuarios").select("*").eq("email", email_limpio).execute()
                 
                 if len(res.data) == 0:
-                    st.error(f"❌ No se encontró el correo: '{email_limpio}'")
+                    st.error(f"❌ El correo '{email_limpio}' no existe.")
                 else:
-                    usuario_data = res.data[0]
-                    estado_db = str(usuario_data.get('estado', '')).strip().upper()
-                    pass_db = str(usuario_data.get('password', '')).strip()
+                    u_data = res.data[0]
+                    estado = str(u_data.get('estado', '')).upper()
                     
-                    if estado_db != 'ACTIVO':
-                        st.error(f"❌ Cuenta inactiva.")
-                    elif pass_db != pass_hash:
-                        st.error("❌ La contraseña no coincide.")
+                    if estado != 'ACTIVO':
+                        st.error("❌ Usuario inactivo. Contacte al administrador.")
+                        
+                    elif u_data.get('password') != pass_hash:
+                        st.error("❌ Contraseña incorrecta.")
+                        
                     else:
-                        id_rol = usuario_data.get('id_rol')
-                        texto_facultades_gigante = ""
-                        nombre_del_rol = "SIN ROL"
+                        id_rol = u_data.get('id_rol')
+                        rol_nombre = "SIN ROL"
+                        facs_texto = ""
                         
                         if id_rol:
-                            res_rol = supabase.table("roles").select("*").eq("id", id_rol).execute()
-                            if res_rol.data:
-                                r_data = res_rol.data[0]
-                                texto_facultades_gigante = str(r_data).upper()
-                                nombre_del_rol = str(r_data.get('nombre_rol', r_data.get('nombre', 'ROL CONFIGURADO'))).upper()
+                            res_r = supabase.table("roles").select("*").eq("id", id_rol).execute()
+                            if res_r.data:
+                                r_data = res_r.data[0]
+                                facs_texto = str(r_data).upper()
+                                rol_nombre = str(r_data.get('nombre_rol', r_data.get('nombre', 'ROL'))).upper()
 
-                        usuario_data['rol_nombre'] = nombre_del_rol
-                        usuario_data['facultades_texto'] = texto_facultades_gigante
+                        u_data['rol_nombre'] = rol_nombre
+                        u_data['facultades_texto'] = facs_texto
                         
                         st.session_state.autenticado = True
-                        st.session_state.usuario = usuario_data
-                        st.session_state.moneda_usuario = usuario_data.get('moneda', 'ALL')
+                        st.session_state.usuario = u_data
+                        st.session_state.moneda_usuario = u_data.get('moneda', 'ALL')
                         
-                        supabase.table("usuarios").update({"ultimo_acceso": datetime.utcnow().isoformat()}).eq("id", usuario_data['id']).execute()
+                        # Actualizar último acceso (Regla 2.3 del Documento Maestro)
+                        supabase.table("usuarios").update({"ultimo_acceso": datetime.utcnow().isoformat()}).eq("id", u_data['id']).execute()
                         st.rerun()
                         
             except Exception as e:
-                st.error(f"Error crítico de conexión: {e}")
+                st.error(f"Error de conexión: {e}")
                 
     st.stop()
 
 # ==========================================
-# 6. MENÚ LATERAL CON AJUSTES DE LÍNEAS
+# 6. MENÚ LATERAL (SIDEBAR)
 # ==========================================
 with st.sidebar:
     st.title("🏢 INMOLEASING")
@@ -136,30 +142,23 @@ with st.sidebar:
     st.caption(f"Región/Moneda: **{st.session_state.moneda_usuario}**")
     
     rol_actual = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
-    texto_facultades = st.session_state.usuario.get('facultades_texto', '')
+    texto_facs = st.session_state.usuario.get('facultades_texto', '')
+    
     st.caption(f"Perfil: **{rol_actual}**")
     
-    # Línea superior pegada al perfil
-    st.markdown("<hr style='margin-top: 0.2rem; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
+    st.markdown("<hr>", unsafe_allow_html=True)
 
-    st.session_state.opciones_permitidas = []
-    for menu_item, facultad_requerida in DICCIONARIO_MENU_FACULTADES.items():
-        if facultad_requerida in texto_facultades or "ADMINISTRADOR" in rol_actual:
-            st.session_state.opciones_permitidas.append(menu_item)
-
-    # El botón Inicio siempre es visible para todos
-    opciones_todas = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"]
-    iconos_todos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
-
-    selected = option_menu(
-        menu_title=None,
-        options=opciones_todas, 
-        icons=iconos_todos,     
-        menu_icon="cast",
-        default_index=0, 
-    )
+    st.session_state.opciones_permitidas = ["Inicio"]
     
-    # LÍNEA INFERIOR: Ajustada para simetría (-1.2rem)
+    for item, fac in DICCIONARIO_MENU_FACULTADES.items():
+        if fac in texto_facs or "ADMINISTRADOR" in rol_actual:
+            st.session_state.opciones_permitidas.append(item)
+
+    opciones = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"]
+    iconos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
+
+    selected = option_menu(None, opciones, icons=iconos, menu_icon="cast", default_index=0)
+    
     st.markdown("<hr style='margin-top: -1.2rem; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
     
     if st.button("Cerrar Sesión", use_container_width=True):
@@ -167,60 +166,61 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 7. ENRUTADOR CON ICONOS Y SEGURIDAD (RESTAURADO)
+# 7. ENRUTADOR PRINCIPAL
 # ==========================================
 
 if selected == "Inicio":
     st.title("🏢 INMOLEASING")
-    st.markdown(f"**Te damos la bienvenida al Sistema Integral de Gestión Inmobiliaria.**")
+    st.markdown("**Bienvenido al Sistema Integral de Gestión Inmobiliaria.**")
     st.caption(f"Versión actual: {APP_VERSION}")
     
     st.write("") 
     
-    # Foto central con tamaño ajustado
-    img_cols = st.columns([0.6, 1.2, 0.6]) 
+    # AJUSTE FINAL FOTO: Columnas [0.85, 1, 0.85] reducen la imagen un 10% adicional
+    img_cols = st.columns([0.85, 1, 0.85]) 
+    
     with img_cols[1]:
         try:
             st.image("portada.jpg", use_container_width=True)
         except:
-            st.warning("No se encontró la imagen 'portada.jpg'.")
+            st.warning("Imagen 'portada.jpg' no encontrada.")
             
     st.write("") 
-    st.info("👋 Por favor, selecciona una opción en el menú lateral para comenzar a operar.")
+    st.info("👋 Selecciona una opción en el menú lateral para comenzar.")
 
-elif selected not in st.session_state.opciones_permitidas and selected != "Inicio":
-    st.error(f"### 🔒 Acceso Restringido")
-    st.warning(f"Tu perfil actual (**{rol_actual}**) no cuenta con las facultades necesarias para **{selected}**.")
-    st.info("Contacta con el administrador para solicitar acceso.")
+elif selected not in st.session_state.opciones_permitidas:
+    st.error("### 🔒 Acceso Restringido")
+    st.warning(f"Tu perfil (**{rol_actual}**) no tiene acceso a este módulo.")
 
 else:
-    # CARGA DE MÓDULOS CON ICONOS RESTAURADOS
+    # Bloques separados y con saltos de línea según estándar PEP 8
+    
     if selected == "Dashboard":
         st.header("📈 Dashboard Principal")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
-
+        st.info("🚧 Módulo en construcción.")
+        
     elif selected == "Usuarios":
         usuarios_modulo.mostrar_modulo_usuarios(supabase)
-
+        
     elif selected == "Operadores":
         operadores_modulo.mostrar_modulo_operadores(supabase)
-
+        
     elif selected == "Propietarios":
-        st.header("🤝 Propietarios")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
-
+        st.header("🤝 Gestión de Propietarios")
+        st.info("🚧 Módulo en construcción.")
+        
     elif selected == "Inmuebles":
         st.header("🏠 Gestión de Inmuebles")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
-
+        st.info("🚧 Módulo en construcción.")
+        
     elif selected == "Arrendamientos":
         st.header("📝 Arrendamientos")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
-
+        st.info("🚧 Módulo en construcción.")
+        
     elif selected == "Finanzas":
         st.header("🏦 Finanzas y Contabilidad")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
-
+        st.info("🚧 Módulo en construcción.")
+        
     elif selected == "Informes":
         st.header("📊 Informes de Gestión")
-        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
+        st.info("🚧 Módulo en construcción.")
