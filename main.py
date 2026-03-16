@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v4.8 GOLD" # Forzado de columnas [1,2,1] y eliminación de gap lateral
+APP_VERSION = "v4.9 GOLD" # Foto perfecta y línea inferior forzada con píxeles absolutos
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -37,14 +37,9 @@ st.markdown("""
         
         /* 3. Panel principal: respiro superior */
         .block-container { padding-top: 3rem !important; }
-
-        /* 4. NUEVO: Eliminar el espacio "fantasma" entre bloques del Sidebar para acercar la línea */
-        [data-testid="stSidebar"] > div:first-child > div:nth-child(2) > div {
-            gap: 0.5rem !important; 
-        }
         
-        /* 5. Acercar aún más el botón Cerrar Sesión */
-        .stButton button { margin-top: -1rem !important; }
+        /* 4. Acercar el botón Cerrar Sesión para que acompañe a la línea */
+        .stButton button { margin-top: -0.5rem !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -147,7 +142,7 @@ with st.sidebar:
     
     st.caption(f"Perfil: **{rol_actual}**")
     
-    # Línea superior
+    # Línea superior (manteniendo la simetría base)
     st.markdown("<hr style='margin-top: 0; margin-bottom: 0;'>", unsafe_allow_html=True)
 
     st.session_state.opciones_permitidas = ["Inicio"]
@@ -159,7 +154,7 @@ with st.sidebar:
     opciones = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"]
     iconos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
 
-    # Reducción de márgenes internos del menú
+    # Menú sin paddings internos extraños
     selected = option_menu(
         menu_title=None, 
         options=opciones, 
@@ -171,8 +166,8 @@ with st.sidebar:
         }
     )
     
-    # Línea inferior pegada al menú
-    st.markdown("<hr style='margin-top: 0; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
+    # LÍNEA INFERIOR REBELDE: Uso de píxeles absolutos negativos y posición relativa
+    st.markdown("<hr style='position: relative; top: -30px; margin-bottom: 0px;'>", unsafe_allow_html=True)
     
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
@@ -189,7 +184,7 @@ if selected == "Inicio":
     
     st.write("") 
     
-    # AJUSTE FINAL FOTO: Columnas [1, 2, 1] fuerzan a la imagen a ocupar el 50% del espacio central
+    # FOTO PERFECTA MANTENIDA: Proporciones 1 - 2 - 1
     img_cols = st.columns([1, 2, 1]) 
     
     with img_cols[1]:
@@ -206,6 +201,8 @@ elif selected not in st.session_state.opciones_permitidas:
     st.warning(f"Tu perfil (**{rol_actual}**) no tiene acceso a este módulo.")
 
 else:
+    # Bloques separados y con saltos de línea según estándar PEP 8
+    
     if selected == "Dashboard":
         st.header("📈 Dashboard Principal")
         st.info("🚧 Módulo en construcción.")
