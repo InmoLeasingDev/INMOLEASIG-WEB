@@ -73,7 +73,6 @@ LISTA_ICONOS = [
 # ==========================================
 def enviar_reporte_correo(destinatario, pdf_bytes, nombre_archivo, tipo_reporte="Usuarios"):
     try:
-        # Credenciales desde secrets.toml
         remitente = st.secrets.get("EMAIL_USER", "")
         password = st.secrets.get("EMAIL_PASS", "") 
 
@@ -97,12 +96,10 @@ def enviar_reporte_correo(destinatario, pdf_bytes, nombre_archivo, tipo_reporte=
         """
         msg.set_content(cuerpo_mensaje)
 
-        # Adjuntamos el archivo usando los bytes directamente
         msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=nombre_archivo)
 
-        # Configuración específica para GMAIL (SSL en el puerto 465)
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(remitente, password.replace(" ", "")) # Limpiamos espacios por si acaso
+            smtp.login(remitente, password.replace(" ", "")) 
             smtp.send_message(msg)
             
         return True
@@ -331,7 +328,6 @@ def mostrar_modulo_usuarios(supabase):
     res_u = supabase.table("usuarios").select("*").execute()
     df_raw = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
     
-    # --- FILTRO MULTINACIONAL PRO ---
     if not df_raw.empty:
         if moneda_sesion != "ALL":
             df_raw = df_raw[df_raw['moneda'] == moneda_sesion]
@@ -347,7 +343,6 @@ def mostrar_modulo_usuarios(supabase):
             df_display['ROL'] = df_display['id_rol'].map(DICCIONARIO_ROLES)
             df_display['ESTADO'] = df_display['estado'].fillna('ACTIVO')
             
-            # Formateamos el último acceso para la vista
             df_display['ultimo_acceso'] = pd.to_datetime(df_display['ultimo_acceso']).dt.strftime('%Y-%m-%d %H:%M')
             df_display['ultimo_acceso'] = df_display['ultimo_acceso'].fillna('Nunca')
             
@@ -377,14 +372,14 @@ def mostrar_modulo_usuarios(supabase):
             
             c_pdf1, c_pdf2 = st.columns(2)
             
-            # Generamos los bytes del PDF de antemano para poder mandarlos por correo o descargarlos
             pdf_bytes_basico = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
             pdf_bytes_detallado = generar_pdf_usuarios_detallado(df_display, DICCIONARIO_ROLES, DICCIONARIO_DESC)
             
+            # AQUÍ CORREGIMOS EL BOTÓN GIGANTE (quitando use_container_width=True)
             with c_pdf1:
-                st.download_button("📄 Descargar Reporte Básico", pdf_bytes_basico, "usuarios_basico.pdf", use_container_width=True)
+                st.download_button("📄 Descargar Reporte Básico", pdf_bytes_basico, "usuarios_basico.pdf")
             with c_pdf2:
-                st.download_button("📄 Descargar Reporte Detallado", pdf_bytes_detallado, "usuarios_detallado.pdf", use_container_width=True)
+                st.download_button("📄 Descargar Reporte Detallado", pdf_bytes_detallado, "usuarios_detallado.pdf")
 
             # ==========================================
             # SECCIÓN COMPARTIR: CORREO Y WHATSAPP
@@ -395,7 +390,6 @@ def mostrar_modulo_usuarios(supabase):
             
             cols_envio = st.columns(2)
             
-            # --- Enviar por Correo ---
             with cols_envio[0]:
                 st.info("📧 Envío por Email (Vía Gmail)")
                 email_destinatario = st.text_input("Correo electrónico del destinatario", placeholder="ejemplo@proveedor.com")
@@ -410,12 +404,10 @@ def mostrar_modulo_usuarios(supabase):
                     else:
                         st.warning("Por favor, ingresa un correo electrónico válido.")
 
-            # --- Enviar por WhatsApp (Truco Ninja) ---
             with cols_envio[1]:
                 st.success("💬 Envío por WhatsApp")
                 telefono_wa = st.text_input("Número de teléfono", placeholder="Ej: 34600000000 (Incluir código de país sin '+')")
                 
-                # Mensaje adaptado para el módulo Usuarios
                 mensaje_wa = "¡Hola! Te comparto que el reporte del Directorio de Usuarios de InmoLeasing ya fue generado. Te adjunto el PDF por este medio. 🏢📄"
                 
                 if telefono_wa:
