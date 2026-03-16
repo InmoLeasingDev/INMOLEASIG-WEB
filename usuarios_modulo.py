@@ -2,10 +2,14 @@ import streamlit as st
 import pandas as pd
 import re
 import hashlib
+import os
 from fpdf import FPDF
+import smtplib
+from email.message import EmailMessage
+import urllib.parse
 
 # ==========================================
-# 0. FUNCIONES AUXILIARES Y LOGS ok
+# 0. FUNCIONES AUXILIARES Y LOGS
 # ==========================================
 def encriptar_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -63,6 +67,48 @@ LISTA_ICONOS = [
     '⚙️', '🛠️', '🔧', '🔒', '🔓', '🛡️', '✅', '❌', '🗑️', '✏️', '🔍',
     '🚰', '💡', '🔥', '⚡', '📊', '📑', '📄', '📅', '🚀', '🔔', '🌐', '📌', '📝'
 ]
+
+# ==========================================
+# 0.5 FUNCIÓN MOTOR DE CORREO (GMAIL SERVER)
+# ==========================================
+def enviar_reporte_correo(destinatario, pdf_bytes, nombre_archivo, tipo_reporte="Usuarios"):
+    try:
+        # Credenciales desde secrets.toml
+        remitente = st.secrets.get("EMAIL_USER", "")
+        password = st.secrets.get("EMAIL_PASS", "") 
+
+        if not remitente or not password:
+            st.error("❌ Falla técnica: Faltan credenciales (EMAIL_USER / EMAIL_PASS) en los secretos.")
+            return False
+
+        msg = EmailMessage()
+        msg['Subject'] = f'📊 Reporte de {tipo_reporte} - InmoLeasing ERP'
+        msg['From'] = remitente
+        msg['To'] = destinatario
+        
+        cuerpo_mensaje = f"""
+        Hola,
+        
+        Se ha generado un nuevo reporte de {tipo_reporte} desde la plataforma InmoLeasing.
+        Encontrarás el documento PDF adjunto a este correo.
+        
+        Saludos cordiales,
+        El equipo de InmoLeasing.
+        """
+        msg.set_content(cuerpo_mensaje)
+
+        # Adjuntamos el archivo usando los bytes directamente
+        msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=nombre_archivo)
+
+        # Configuración específica para GMAIL (SSL en el puerto 465)
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(remitente, password.replace(" ", "")) # Limpiamos espacios por si acaso
+            smtp.send_message(msg)
+            
+        return True
+    except Exception as e:
+        st.error(f"Error crítico al enviar el correo: {e}")
+        return False
 
 # ==========================================
 # 1. GENERADORES PDF (MÉTODO MILIMÉTRICO)
@@ -292,7 +338,7 @@ def mostrar_modulo_usuarios(supabase):
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Directorio", "➕ Nuevo Usuario", "⚙️ Gestionar", "🛡️ Facultades y Roles", "📜 Logs de Actividad"])
 
-    # --- TAB 1: DIRECTORIO ---
+    # --- TAB 1: DIRECTORIO E INFORMES ---
     with tab1:
         if not df_raw.empty:
             busqueda = st.text_input("🔍 Buscar usuario...", "").upper().strip()
@@ -327,13 +373,66 @@ def mostrar_modulo_usuarios(supabase):
                     st.warning(f"**{u_consulta}** no tiene facultades asignadas.")
                     
             st.markdown("---")
+            st.markdown("### 📄 Exportar y Compartir Reportes")
+            
             c_pdf1, c_pdf2 = st.columns(2)
+            
+            # Generamos los bytes del PDF de antemano para poder mandarlos por correo o descargarlos
+            pdf_bytes_basico = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
+            pdf_bytes_detallado = generar_pdf_usuarios_detallado(df_display, DICCIONARIO_ROLES, DICCIONARIO_DESC)
+            
             with c_pdf1:
-                pdf_bytes = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
-                st.download_button("📄 Reporte Básico", pdf_bytes, "usuarios_basico.pdf", use_container_width=True)
+                st.download_button("📄 Descargar Reporte Básico", pdf_bytes_basico, "usuarios_basico.pdf", use_container_width=True)
             with c_pdf2:
-                pdf_det_bytes = generar_pdf_usuarios_detallado(df_display, DICCIONARIO_ROLES, DICCIONARIO_DESC)
-                st.download_button("📄 Reporte Detallado", pdf_det_bytes, "usuarios_detallado.pdf", use_container_width=True)
+                st.download_button("📄 Descargar Reporte Detallado", pdf_bytes_detallado, "usuarios_detallado.pdf", use_container_width=True)
+
+            # ==========================================
+            # SECCIÓN COMPARTIR: CORREO Y WHATSAPP
+            # ==========================================
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("#### 📤 Compartir Reporte Básico")
+            st.caption("Los reportes de este módulo suelen enviarse a Proveedores o equipo administrativo.")
+            
+            cols_envio = st.columns(2)
+            
+            # --- Enviar por Correo ---
+            with cols_envio[0]:
+                st.info("📧 Envío por Email (Vía Gmail)")
+                email_destinatario = st.text_input("Correo electrónico del destinatario", placeholder="ejemplo@proveedor.com")
+                
+                if st.button("Enviar PDF por Correo", use_container_width=True):
+                    if email_destinatario and es_correo_valido(email_destinatario):
+                        with st.spinner("Conectando con el servidor de Gmail..."):
+                            exito = enviar_reporte_correo(email_destinatario, pdf_bytes_basico, "usuarios_inmoleasing.pdf", "Usuarios")
+                            if exito:
+                                st.success(f"Reporte enviado a {email_destinatario}")
+                                log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Reporte Usuarios enviado a {email_destinatario}")
+                    else:
+                        st.warning("Por favor, ingresa un correo electrónico válido.")
+
+            # --- Enviar por WhatsApp (Truco Ninja) ---
+            with cols_envio[1]:
+                st.success("💬 Envío por WhatsApp")
+                telefono_wa = st.text_input("Número de teléfono", placeholder="Ej: 34600000000 (Incluir código de país sin '+')")
+                
+                # Mensaje adaptado para el módulo Usuarios
+                mensaje_wa = "¡Hola! Te comparto que el reporte del Directorio de Usuarios de InmoLeasing ya fue generado. Te adjunto el PDF por este medio. 🏢📄"
+                
+                if telefono_wa:
+                    texto_codificado = urllib.parse.quote(mensaje_wa)
+                    link_wa = f"https://wa.me/{telefono_wa}?text={texto_codificado}"
+                    
+                    boton_html = f"""
+                    <a href="{link_wa}" target="_blank" style="text-decoration: none;">
+                        <button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:16px;">
+                            Abrir chat de WhatsApp
+                        </button>
+                    </a>
+                    """
+                    st.markdown(boton_html, unsafe_allow_html=True)
+                    st.caption("*Haz clic arriba. WhatsApp se abrirá con el texto listo, solo debes arrastrar el PDF que descargaste.*")
+                else:
+                    st.button("Abrir chat de WhatsApp", disabled=True, use_container_width=True)
 
     # --- TAB 2: REGISTRO ---
     with tab2:
