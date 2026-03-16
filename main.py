@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v3.7 PRO" # Simetría absoluta en las líneas del menú lateral
+APP_VERSION = "v3.9 PRO" # Versión Completa con simetría y botón ajustado
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -25,7 +25,7 @@ DICCIONARIO_MENU_FACULTADES = {
 }
 
 # ==========================================
-# 1.6 AJUSTES VISUALES CSS
+# 1.6 AJUSTES VISUALES CSS (EL CORAZÓN DEL DISEÑO)
 # ==========================================
 st.markdown("""
     <style>
@@ -35,8 +35,11 @@ st.markdown("""
         /* 2. MENÚ LATERAL ARRIBA */
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
         
-        /* 3. BLOQUE PRINCIPAL ABAJO (Para que el título no se corte) */
+        /* 3. BLOQUE PRINCIPAL POSICIÓN */
         .block-container { padding-top: 3rem !important; }
+
+        /* 4. AJUSTE DEL BOTÓN CERRAR SESIÓN: Lo subimos para que no quede en el fondo */
+        .stButton button { margin-top: -1.5rem !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -65,7 +68,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 # ==========================================
-# 5. LOGIN BLINDADO
+# 5. LOGIN BLINDADO (RESTAURADO)
 # ==========================================
 if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
@@ -123,7 +126,7 @@ if not st.session_state.autenticado:
     st.stop()
 
 # ==========================================
-# 6. MENÚ LATERAL ESTÉTICO Y VISIBLE
+# 6. MENÚ LATERAL CON AJUSTES DE LÍNEAS
 # ==========================================
 with st.sidebar:
     st.title("🏢 INMOLEASING")
@@ -134,20 +137,17 @@ with st.sidebar:
     
     rol_actual = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
     texto_facultades = st.session_state.usuario.get('facultades_texto', '')
-    
     st.caption(f"Perfil: **{rol_actual}**")
     
-    # LÍNEA SUPERIOR: Pegada al perfil
+    # Línea superior pegada al perfil
     st.markdown("<hr style='margin-top: 0.2rem; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
 
     st.session_state.opciones_permitidas = []
     for menu_item, facultad_requerida in DICCIONARIO_MENU_FACULTADES.items():
-        if facultad_requerida in texto_facultades:
+        if facultad_requerida in texto_facultades or "ADMINISTRADOR" in rol_actual:
             st.session_state.opciones_permitidas.append(menu_item)
 
-    if "ADMINISTRADOR" in texto_facultades or "ADMINISTRADOR" in rol_actual:
-        st.session_state.opciones_permitidas = list(DICCIONARIO_MENU_FACULTADES.keys())
-
+    # El botón Inicio siempre es visible para todos
     opciones_todas = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"]
     iconos_todos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
 
@@ -159,15 +159,15 @@ with st.sidebar:
         default_index=0, 
     )
     
-    # LÍNEA INFERIOR: Margen negativo más agresivo (-2.5rem) para tirar de ella hacia arriba
-    st.markdown("<hr style='margin-top: -2.5rem; margin-bottom: 1rem;'>", unsafe_allow_html=True)
+    # LÍNEA INFERIOR: Ajustada para simetría (-1.2rem)
+    st.markdown("<hr style='margin-top: -1.2rem; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
     
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
 
 # ==========================================
-# 7. ENRUTADOR CON PANTALLA DE BIENVENIDA
+# 7. ENRUTADOR CON ICONOS Y SEGURIDAD (RESTAURADO)
 # ==========================================
 
 if selected == "Inicio":
@@ -177,25 +177,27 @@ if selected == "Inicio":
     
     st.write("") 
     
+    # Foto central con tamaño ajustado
     img_cols = st.columns([0.6, 1.2, 0.6]) 
     with img_cols[1]:
         try:
             st.image("portada.jpg", use_container_width=True)
         except:
-            st.warning("No se encontró la imagen 'portada.jpg'. Asegúrate de que esté en GitHub.")
+            st.warning("No se encontró la imagen 'portada.jpg'.")
             
     st.write("") 
     st.info("👋 Por favor, selecciona una opción en el menú lateral para comenzar a operar.")
 
-elif selected not in st.session_state.opciones_permitidas:
+elif selected not in st.session_state.opciones_permitidas and selected != "Inicio":
     st.error(f"### 🔒 Acceso Restringido")
-    st.warning(f"Tu perfil actual (**{rol_actual}**) no cuenta con las facultades necesarias para visualizar o gestionar el módulo de **{selected}**.")
-    st.info("Si consideras que esto es un error, por favor contacta con el administrador del sistema para que asigne esta facultad a tu rol.")
+    st.warning(f"Tu perfil actual (**{rol_actual}**) no cuenta con las facultades necesarias para **{selected}**.")
+    st.info("Contacta con el administrador para solicitar acceso.")
 
 else:
+    # CARGA DE MÓDULOS CON ICONOS RESTAURADOS
     if selected == "Dashboard":
         st.header("📈 Dashboard Principal")
-        st.info("Aquí irán las gráficas y resúmenes de la operación.")
+        st.info("🚧 Módulo en construcción. Pronto estará disponible.")
 
     elif selected == "Usuarios":
         usuarios_modulo.mostrar_modulo_usuarios(supabase)
