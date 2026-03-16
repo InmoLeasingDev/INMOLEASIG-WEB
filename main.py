@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v4.6 GOLD" # Ajuste de línea inferior y +5% en foto central
+APP_VERSION = "v4.7 GOLD" # Corrección nativa de padding del menú y foto +5%
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -146,7 +146,7 @@ with st.sidebar:
     
     st.caption(f"Perfil: **{rol_actual}**")
     
-    # Línea separadora superior (Controlada por CSS)
+    # Línea separadora superior
     st.markdown("<hr>", unsafe_allow_html=True)
 
     st.session_state.opciones_permitidas = ["Inicio"]
@@ -158,10 +158,20 @@ with st.sidebar:
     opciones = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Finanzas", "Informes"]
     iconos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
 
-    selected = option_menu(None, opciones, icons=iconos, menu_icon="cast", default_index=0)
+    # AJUSTE NATIVO: Se elimina el padding fantasma directamente en el componente
+    selected = option_menu(
+        menu_title=None, 
+        options=opciones, 
+        icons=iconos, 
+        menu_icon="cast", 
+        default_index=0,
+        styles={
+            "container": {"padding-bottom": "0!important", "margin-bottom": "0!important"}
+        }
+    )
     
-    # LÍNEA INFERIOR: Aumentamos la tracción negativa a -2.0rem para acercarla al menú
-    st.markdown("<hr style='margin-top: -2.0rem; margin-bottom: 1.0rem;'>", unsafe_allow_html=True)
+    # LÍNEA INFERIOR: Ahora que no hay padding fantasma, este margen funcionará perfecto
+    st.markdown("<hr style='margin-top: -0.5rem; margin-bottom: 1.0rem;'>", unsafe_allow_html=True)
     
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
@@ -178,8 +188,8 @@ if selected == "Inicio":
     
     st.write("") 
     
-    # AJUSTE FINAL FOTO: Columnas [0.75, 1, 0.75] para aumentar la imagen un 5%
-    img_cols = st.columns([0.75, 1, 0.75]) 
+    # AJUSTE FINAL FOTO: Columnas [1, 1.4, 1] fuerzan a la imagen a crecer visiblemente
+    img_cols = st.columns([1, 1.4, 1]) 
     
     with img_cols[1]:
         try:
