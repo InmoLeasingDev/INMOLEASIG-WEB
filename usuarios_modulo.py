@@ -9,236 +9,665 @@ import smtplib
 from email.message import EmailMessage
 import urllib.parse
 
+# ==========================================
+# 0. FUNCIONES AUXILIARES Y LOGS
+# ==========================================
 def encriptar_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def log_accion(supabase, usuario, accion, detalle):
     try:
-        supabase.table("logs_actividad").insert({"usuario": usuario, "accion": accion, "detalle": detalle}).execute()
-    except: pass 
+        supabase.table("logs_actividad").insert({
+            "usuario": usuario, 
+            "accion": accion, 
+            "detalle": detalle
+        }).execute()
+    except Exception:
+        pass 
 
 def es_correo_valido(correo):
-    return re.match(r"^[\w\.-]+@[\w\.-]+\.\w+$", correo) is not None
+    patron = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    return re.match(patron, correo) is not None
 
 def limpiar_texto_pdf(texto):
-    return str(texto).encode('latin-1', 'ignore').decode('latin-1') if pd.notna(texto) else ""
+    if pd.isna(texto):
+        return ""
+    return str(texto).encode('latin-1', 'ignore').decode('latin-1')
 
-def ordenar_facultades_alfabeticamente(cadena):
-    if not cadena: return []
-    facs = [f.strip() for f in cadena.split(",") if f.strip()]
+def ordenar_facultades_alfabeticamente(cadena_facultades):
+    if not cadena_facultades:
+        return []
+    facs = [f.strip() for f in cadena_facultades.split(",") if f.strip()]
     return sorted(facs, key=lambda x: x.split(" ", 1)[-1] if " " in x else x)
 
 def sincronizar_roles_facultad(supabase, df_roles, fac_vieja, fac_nueva=None):
-    if df_roles.empty: return
+    if df_roles.empty:
+        return
+        
     for _, row in df_roles.iterrows():
-        desc = row.get('descripcion', '')
-        if desc and fac_vieja in desc:
-            lista = [f.strip() for f in desc.split(",") if f.strip()]
-            if fac_vieja in lista:
-                if fac_nueva: lista[lista.index(fac_vieja)] = fac_nueva
-                else: lista.remove(fac_vieja)
-                supabase.table("roles").update({"descripcion": ", ".join(lista)}).eq("id", int(row['id'])).execute()
+        desc_actual = row.get('descripcion', '')
+        if desc_actual and fac_vieja in desc_actual:
+            lista_facs = [f.strip() for f in desc_actual.split(",") if f.strip()]
+            if fac_vieja in lista_facs:
+                if fac_nueva:
+                    idx = lista_facs.index(fac_vieja)
+                    lista_facs[idx] = fac_nueva
+                else:
+                    lista_facs.remove(fac_vieja)
+                
+                nueva_desc = ", ".join(lista_facs)
+                try:
+                    supabase.table("roles").update({"descripcion": nueva_desc}).eq("id", int(row['id'])).execute()
+                except Exception:
+                    pass
 
-LISTA_ICONOS = ['🏠','🏢','🏬','🏗️','🔑','🚪','🏘️','🏭','💰','🏦','🧾','💲','💳','📈','📉','💸','👥','👤','🤝','👨‍💼','👩‍💼','👷','🕵️','🧑‍💻','⚙️','🛠️','🔧','🔒','🔓','🛡️','✅','❌','🗑️','✏️','🔍','🚰','💡','🔥','⚡','📊','📑','📄','📅','🚀','🔔','🌐','📌','📝']
+LISTA_ICONOS = [
+    '🏠', '🏢', '🏬', '🏗️', '🔑', '🚪', '🏘️', '🏭',
+    '💰', '🏦', '🧾', '💲', '💳', '📈', '📉', '💸',
+    '👥', '👤', '🤝', '👨‍💼', '👩‍💼', '👷', '🕵️', '🧑‍💻',
+    '⚙️', '🛠️', '🔧', '🔒', '🔓', '🛡️', '✅', '❌', '🗑️', '✏️', '🔍',
+    '🚰', '💡', '🔥', '⚡', '📊', '📑', '📄', '📅', '🚀', '🔔', '🌐', '📌', '📝'
+]
 
-def enviar_reporte_correo(destinatario, pdf_bytes, nombre_archivo, tipo="Usuarios"):
+# ==========================================
+# 0.5 FUNCIÓN MOTOR DE CORREO (GMAIL SERVER)
+# ==========================================
+def enviar_reporte_correo(destinatario, pdf_bytes, nombre_archivo, tipo_reporte="Usuarios"):
     try:
-        remitente = st.secrets["EMAIL_USER"]
-        password = st.secrets["EMAIL_PASS"]
+        remitente = st.secrets.get("EMAIL_USER", "")
+        password = st.secrets.get("EMAIL_PASS", "") 
+
+        if not remitente or not password:
+            st.error("❌ Falla técnica: Faltan credenciales (EMAIL_USER / EMAIL_PASS) en los secretos.")
+            return False
+
         msg = EmailMessage()
-        msg['Subject'] = f'Reporte de {tipo} - InmoLeasing'
+        msg['Subject'] = f'Reporte de {tipo_reporte} - InmoLeasing ERP'
         msg['From'] = remitente
         msg['To'] = destinatario
-        msg.set_content(f"Hola,\n\nSe adjunta reporte de {tipo}.\n\nSaludos.")
+        
+        cuerpo_mensaje = f"""
+        Hola,
+        
+        Se ha generado un nuevo reporte de {tipo_reporte} desde la plataforma InmoLeasing.
+        Encontrarás el documento PDF adjunto a este correo.
+        
+        Saludos cordiales,
+        El equipo de InmoLeasing.
+        """
+        msg.set_content(cuerpo_mensaje)
+
         msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=nombre_archivo)
+
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(remitente, password.replace(" ", ""))
+            smtp.login(remitente, password.replace(" ", "")) 
             smtp.send_message(msg)
+            
         return True
     except Exception as e:
-        st.error(f"Error Email: {e}"); return False
+        st.error(f"Error crítico al enviar el correo: {e}")
+        return False
 
-def generar_pdf_usuarios(df, dict_roles):
-    pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "INMOLEASING - REPORTE DE USUARIOS", ln=True, align="C"); pdf.ln(5)
-    pdf.set_font("Arial", "B", 8); pdf.set_fill_color(200, 220, 255)
-    cw = [45, 60, 20, 40, 25]
+# ==========================================
+# 1. GENERADORES PDF (MÉTODO MILIMÉTRICO)
+# ==========================================
+def generar_pdf_usuarios(df, diccionario_roles):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - REPORTE DE USUARIOS", ln=True, align="C")
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", "B", 8)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [45, 60, 20, 40, 25] 
     headers = ["NOMBRE", "EMAIL", "ROL", "ULTIMO ACCESO", "ESTADO"]
-    for i, h in enumerate(headers): pdf.cell(cw[i], 10, h, 1, 0, "C", True)
-    pdf.ln(); pdf.set_font("Arial", "", 7)
+    for i, h_text in enumerate(headers):
+        pdf.cell(cw[i], 10, h_text, border=1, fill=True, align="C")
+    pdf.ln()
+    
+    pdf.set_font("Arial", "", 7)
     for _, row in df.iterrows():
-        textos = [limpiar_texto_pdf(t) for t in [row['NOMBRE'], row['EMAIL'], dict_roles.get(row['id_rol'], "S/R"), row.get('ULTIMO ACCESO', ''), row.get('estado', 'ACTIVO')]]
-        h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
-        if pdf.get_y() + h_fila > 275: pdf.add_page()
-        x, y = pdf.get_x(), pdf.get_y()
+        rol_texto = diccionario_roles.get(row['id_rol'], "SIN ROL")
+        estado_texto = str(row.get('estado', 'ACTIVO'))
+        
+        textos_raw = [
+            str(row['NOMBRE']), 
+            str(row['EMAIL']), 
+            str(rol_texto), 
+            str(row.get('ULTIMO ACCESO', '')), 
+            estado_texto
+        ]
+        textos = [limpiar_texto_pdf(t) for t in textos_raw]
+        
+        lineas_por_col = [len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)]
+        h_fila = 5 * max(lineas_por_col)
+        
+        x_ini, y_ini = pdf.get_x(), pdf.get_y()
+        if y_ini + h_fila > 275:
+            pdf.add_page()
+            y_ini = pdf.get_y()
+
+        x_actual = x_ini 
         for i, txt in enumerate(textos):
-            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
-            pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
-        pdf.set_xy(10, y + h_fila)
+            pdf.set_xy(x_actual, y_ini)
+            pdf.rect(x_actual, y_ini, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, border=0, align='L')
+            x_actual += cw[i] 
+            
+        pdf.set_xy(x_ini, y_ini + h_fila)
+        
     return pdf.output(dest='S').encode('latin-1')
 
-def generar_pdf_usuarios_detallado(df, dict_roles, dict_desc):
-    pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "INMOLEASING - USUARIOS Y FACULTADES", ln=True, align="C"); pdf.ln(5)
-    pdf.set_font("Arial", "B", 9); pdf.set_fill_color(200, 220, 255)
-    cw = [40, 35, 115]; headers = ["NOMBRE", "ROL", "FACULTADES ASIGNADAS"]
-    for i, h in enumerate(headers): pdf.cell(cw[i], 8, h, 1, 0, "C", True)
-    pdf.ln(); pdf.set_font("Arial", "", 8)
+def generar_pdf_usuarios_detallado(df, diccionario_roles, diccionario_desc):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - USUARIOS Y FACULTADES", ln=True, align="C")
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [40, 35, 115] 
+    headers = ["NOMBRE", "ROL", "FACULTADES ASIGNADAS"]
+    for i, h_text in enumerate(headers):
+        pdf.cell(cw[i], 8, h_text, border=1, fill=True, align="C")
+    pdf.ln()
+    
+    pdf.set_font("Arial", "", 8)
     for _, row in df.iterrows():
-        f_raw = dict_desc.get(row['id_rol'], "")
-        f_txt = "\n".join([f"- {f}" for f in ordenar_facultades_alfabeticamente(f_raw)]) if f_raw else "Sin facultades"
-        textos = [limpiar_texto_pdf(t) for t in [row['NOMBRE'], dict_roles.get(row['id_rol'], "S/R"), f_txt]]
-        h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
-        if pdf.get_y() + h_fila > 275: pdf.add_page()
-        x, y = pdf.get_x(), pdf.get_y()
+        rol_texto = diccionario_roles.get(row['id_rol'], "SIN ROL")
+        facs_raw = diccionario_desc.get(row['id_rol'], "")
+        
+        if facs_raw:
+            facs_ordenadas = ordenar_facultades_alfabeticamente(facs_raw)
+            lista_facs = [f"- {f}" for f in facs_ordenadas]
+            facs_texto = "\n".join(lista_facs)
+        else:
+            facs_texto = "Sin facultades"
+            
+        textos_raw = [str(row['NOMBRE']), str(rol_texto), facs_texto]
+        textos = [limpiar_texto_pdf(t) for t in textos_raw]
+        
+        lineas_por_col = [len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)]
+        h_fila = 5 * max(lineas_por_col)
+        
+        x_ini, y_ini = pdf.get_x(), pdf.get_y()
+        if y_ini + h_fila > 275:
+            pdf.add_page()
+            y_ini = pdf.get_y()
+
+        x_actual = x_ini 
         for i, txt in enumerate(textos):
-            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
-            pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
-        pdf.set_xy(10, y + h_fila)
+            pdf.set_xy(x_actual, y_ini)
+            pdf.rect(x_actual, y_ini, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, border=0, align='L')
+            x_actual += cw[i] 
+            
+        pdf.set_xy(x_ini, y_ini + h_fila)
+        
     return pdf.output(dest='S').encode('latin-1')
 
 def generar_pdf_roles(df_roles):
-    pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "INMOLEASING - MATRIZ DE ROLES", ln=True, align="C"); pdf.ln(5)
-    pdf.set_font("Arial", "B", 10); pdf.set_fill_color(200, 220, 255)
-    cw = [60, 130]; headers = ["ROL", "FACULTADES ASIGNADAS"]
-    for i, h in enumerate(headers): pdf.cell(cw[i], 10, h, 1, 0, "C", True)
-    pdf.ln(); pdf.set_font("Arial", "", 9)
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - MATRIZ DE ROLES", ln=True, align="C")
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", "B", 10)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [60, 130] 
+    headers = ["ROL", "FACULTADES ASIGNADAS"]
+    for i, h_text in enumerate(headers):
+        pdf.cell(cw[i], 10, h_text, border=1, fill=True, align="C")
+    pdf.ln()
+    
+    pdf.set_font("Arial", "", 9)
     for _, row in df_roles.iterrows():
-        f_raw = row['descripcion']
-        f_txt = "\n".join([f"- {f}" for f in ordenar_facultades_alfabeticamente(f_raw)]) if f_raw else "Sin facultades"
-        textos = [limpiar_texto_pdf(t) for t in [row['nombre_rol'], f_txt]]
-        h_fila = 6 * max([len(pdf.multi_cell(cw[i], 6, txt, split_only=True)) for i, txt in enumerate(textos)])
-        if pdf.get_y() + h_fila > 275: pdf.add_page()
-        x, y = pdf.get_x(), pdf.get_y()
+        facs_raw = row['descripcion']
+        
+        if facs_raw:
+            facs_ordenadas = ordenar_facultades_alfabeticamente(facs_raw)
+            lista_facs = [f"- {f}" for f in facs_ordenadas]
+            facs_texto = "\n".join(lista_facs)
+        else:
+            facs_texto = "Sin facultades"
+            
+        textos_raw = [str(row['nombre_rol']), facs_texto]
+        textos = [limpiar_texto_pdf(t) for t in textos_raw]
+        
+        lineas_por_col = [len(pdf.multi_cell(cw[i], 6, txt, split_only=True)) for i, txt in enumerate(textos)]
+        h_fila = 6 * max(lineas_por_col)
+        
+        x_ini, y_ini = pdf.get_x(), pdf.get_y()
+        if y_ini + h_fila > 275:
+            pdf.add_page()
+            y_ini = pdf.get_y()
+
+        x_actual = x_ini 
         for i, txt in enumerate(textos):
-            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
-            pdf.multi_cell(cw[i], 6, txt, align='L'); x += cw[i]
-        pdf.set_xy(10, y + h_fila)
+            pdf.set_xy(x_actual, y_ini)
+            pdf.rect(x_actual, y_ini, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 6, txt, border=0, align='L')
+            x_actual += cw[i] 
+            
+        pdf.set_xy(x_ini, y_ini + h_fila)
+        
     return pdf.output(dest='S').encode('latin-1')
 
 def generar_pdf_logs(df_logs):
-    pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "INMOLEASING - AUDITORIA DE SISTEMA", ln=True, align="C"); pdf.ln(5)
-    pdf.set_font("Arial", "B", 8); pdf.set_fill_color(220, 220, 220)
-    cw = [25, 30, 30, 105]; headers = ["FECHA", "USUARIO", "ACCION", "DETALLE"]
-    for i, h in enumerate(headers): pdf.cell(cw[i], 8, h, 1, 0, "C", True)
-    pdf.ln(); pdf.set_font("Arial", "", 7)
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - AUDITORIA DE SISTEMA", ln=True, align="C")
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", "B", 8)
+    pdf.set_fill_color(220, 220, 220)
+    cw = [25, 30, 30, 105] 
+    headers = ["FECHA", "USUARIO", "ACCION", "DETALLE"]
+    for i, h_text in enumerate(headers):
+        pdf.cell(cw[i], 8, h_text, border=1, fill=True, align="C")
+    pdf.ln()
+    
+    pdf.set_font("Arial", "", 7)
     for _, row in df_logs.iterrows():
-        textos = [limpiar_texto_pdf(t) for t in [str(row['fecha'])[:16], str(row['usuario']), str(row['accion']), str(row['detalle'])]]
-        h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
-        if pdf.get_y() + h_fila > 275: pdf.add_page()
-        x, y = pdf.get_x(), pdf.get_y()
-        for i, txt in enumerate(textos):
-            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
-            pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
-        pdf.set_xy(10, y + h_fila)
-    return pdf.output(dest='S').encode('latin-1')
+        fecha_corta = str(row['fecha'])[:16] if pd.notnull(row['fecha']) else ""
+        usr = str(row['usuario']) if pd.notnull(row['usuario']) else "SISTEMA"
+        textos_raw = [fecha_corta, usr, str(row['accion']), str(row['detalle'])]
+        textos = [limpiar_texto_pdf(t) for t in textos_raw]
+        
+        lineas_por_col = [len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)]
+        h_fila = 5 * max(lineas_por_col)
+        
+        x_ini, y_ini = pdf.get_x(), pdf.get_y()
+        if y_ini + h_fila > 275:
+            pdf.add_page()
+            y_ini = pdf.get_y()
 
+        x_actual = x_ini 
+        for i, txt in enumerate(textos):
+            pdf.set_xy(x_actual, y_ini)
+            pdf.rect(x_actual, y_ini, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, border=0, align='L')
+            x_actual += cw[i] 
+            
+        pdf.set_xy(x_ini, y_ini + h_fila)
+        
+    return pdf.output(dest='S').encode('latin-1')
+# ==========================================
+# 2. MÓDULO PRINCIPAL
+# ==========================================
 def mostrar_modulo_usuarios(supabase):
     st.header("👤 Gestión de Usuarios y Accesos")
-    st.caption("v1.3.2 | Motor Cloud Link Activo")
-    v_ses = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
-    usuario_actual = v_ses.get("nombre", "ADMINISTRADOR") if isinstance(v_ses, dict) else str(v_ses)
+    MOD_VERSION = "v1.3"
+    st.caption(f"⚙️ Módulo Usuarios {MOD_VERSION}")
+    # --- ATRAPAR SOLO EL NOMBRE DEL USUARIO ---
+    var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+    if isinstance(var_sesion, dict):
+        usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR")
+    else:
+        usuario_actual = str(var_sesion)
+    # Intento de atrapar el nombre real del usuario desde las variables de sesión comunes
+                        
     moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
+    
+    # 1. Carga de datos base
     try:
-        r_r = supabase.table("roles").select("*").execute()
-        df_roles = pd.DataFrame(r_r.data)
-        dict_roles = {r['id']: r['nombre_rol'] for r in r_r.data}
-        dict_desc = {r['id']: r['descripcion'] for r in r_r.data}
-        r_f = supabase.table("facultades").select("*").execute()
-        df_fac = pd.DataFrame(r_f.data).sort_values('nombre_facultad')
-        llaves = [f"{r['icono']} {r['nombre_facultad']}" for _, r in df_fac.iterrows()]
-    except: df_roles, df_fac, dict_roles, dict_desc, llaves = pd.DataFrame(), pd.DataFrame(), {}, {}, []
-    r_u = supabase.table("usuarios").select("*").execute()
-    df_raw = pd.DataFrame(r_u.data)
-    r_o = supabase.table("operadores").select("nombre, correo, telefono, estado").execute()
-    df_ops = pd.DataFrame(r_o.data)
-    df_ops = df_ops[df_ops['estado'] == 'ACTIVO'] if not df_ops.empty else df_ops
-    if not df_raw.empty and moneda_sesion != "ALL": df_raw = df_raw[df_raw['moneda'] == moneda_sesion]
-    t1, t2, t3, t4, t5 = st.tabs(["📋 Directorio", "➕ Nuevo", "⚙️ Gestionar", "🛡️ Roles", "📜 Logs"])
-    with t1:
+        res_roles = supabase.table("roles").select("*").execute()
+        df_roles = pd.DataFrame(res_roles.data) if res_roles.data else pd.DataFrame()
+        DICCIONARIO_ROLES = {rol['id']: rol['nombre_rol'] for rol in res_roles.data}
+        DICCIONARIO_DESC = {rol['id']: rol['descripcion'] for rol in res_roles.data}
+        
+        res_fac = supabase.table("facultades").select("*").execute()
+        df_fac = pd.DataFrame(res_fac.data) if res_fac.data else pd.DataFrame()
+        
+        if not df_fac.empty: 
+            df_fac = df_fac.sort_values('nombre_facultad')
+            
+        llaves_iconos = [f"{row['icono']} {row['nombre_facultad']}" for _, row in df_fac.iterrows()] if not df_fac.empty else []
+    except Exception:
+        df_roles = pd.DataFrame()
+        df_fac = pd.DataFrame()
+        DICCIONARIO_ROLES = {}
+        DICCIONARIO_DESC = {}
+        llaves_iconos = []
+        
+    # 2. Carga de Usuarios
+    res_u = supabase.table("usuarios").select("*").execute()
+    df_raw = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
+    
+    # 3. Carga de Operadores (Para listas desplegables de envíos)
+    try:
+        res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").execute()
+        df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+        if not df_ops.empty and 'estado' in df_ops.columns:
+            df_ops = df_ops[df_ops['estado'] == 'ACTIVO']
+    except Exception:
+        df_ops = pd.DataFrame()
+    
+    if not df_raw.empty:
+        if moneda_sesion != "ALL":
+            df_raw = df_raw[df_raw['moneda'] == moneda_sesion]
+
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Directorio", "➕ Nuevo Usuario", "⚙️ Gestionar", "🛡️ Facultades y Roles", "📜 Logs de Actividad"])
+
+    # --- TAB 1: DIRECTORIO E INFORMES ---
+    with tab1:
         if not df_raw.empty:
-            bus = st.text_input("🔍 Buscar...").upper()
-            df_d = df_raw.copy().sort_values('nombre')
-            df_d['ROL'] = df_d['id_rol'].map(dict_roles)
-            df_d['ESTADO'] = df_d['estado'].fillna('ACTIVO')
-            df_d.rename(columns={'nombre':'NOMBRE','email':'EMAIL','moneda':'MONEDA'}, inplace=True)
-            if bus: df_d = df_d[df_d['NOMBRE'].str.contains(bus)]
-            st.dataframe(df_d[["NOMBRE","EMAIL","MONEDA","ROL","ESTADO"]], use_container_width=True, hide_index=True)
+            busqueda = st.text_input("🔍 Buscar usuario...", "").upper().strip()
+            df_display = df_raw.copy().sort_values('nombre')
+            
+            df_display['ROL'] = df_display['id_rol'].map(DICCIONARIO_ROLES)
+            df_display['ESTADO'] = df_display['estado'].fillna('ACTIVO')
+            
+            df_display['ultimo_acceso'] = pd.to_datetime(df_display['ultimo_acceso']).dt.strftime('%Y-%m-%d %H:%M')
+            df_display['ultimo_acceso'] = df_display['ultimo_acceso'].fillna('Nunca')
+            
+            df_display.rename(columns={'nombre': 'NOMBRE', 'email': 'EMAIL', 'moneda': 'MONEDA', 'ultimo_acceso': 'ULTIMO ACCESO'}, inplace=True)
+            
+            if busqueda: 
+                df_display = df_display[df_display['NOMBRE'].str.contains(busqueda)]
+                
+            st.dataframe(df_display[["NOMBRE", "EMAIL", "MONEDA", "ROL", "ULTIMO ACCESO", "ESTADO"]], use_container_width=True, hide_index=True)
+            
             st.markdown("---")
-            pdf_b = generar_pdf_usuarios(df_d, dict_roles)
-            pdf_d = generar_pdf_usuarios_detallado(df_d, dict_roles, dict_desc)
-            c1, c2 = st.columns(2)
-            c1.download_button("📄 PDF Básico", pdf_b, "u_basico.pdf")
-            c2.download_button("📄 PDF Detallado", pdf_d, "u_detallado.pdf")
-            st.markdown("#### 📤 Compartir")
-            tipo_r = st.radio("Reporte:", ["Básico", "Detallado"], horizontal=True)
-            pdf_sel = pdf_b if tipo_r == "Básico" else pdf_d
-            col_e = st.columns(2)
-            with col_e[0]:
-                l_c = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if r['correo']]
-                op_c = st.selectbox("Operador (Email)", ["-- Seleccione --"] + l_c)
-                if st.button("Enviar Email"):
-                    if op_c != "-- Seleccione --":
-                        if enviar_reporte_correo(op_c.split(" - ")[-1], pdf_sel, "reporte.pdf"):
-                            st.success("Enviado"); log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Email a {op_c}")
-            with col_e[1]:
-                l_t = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if r['telefono']]
-                op_t = st.selectbox("Operador (WA)", ["-- Seleccione --"] + l_t)
-                if st.button("Link WhatsApp"):
-                    if op_t != "-- Seleccione --":
-                        tel = re.sub(r'\D', '', op_t.split(" - ")[-1])
-                        ruta = f"u_{int(time.time())}.pdf"
-                        try:
-                            supabase.storage.from_("reportes").upload(path=ruta, file=pdf_sel, file_options={"content-type":"application/pdf"})
-                            url = supabase.storage.from_("reportes").get_public_url(ruta)
-                            st.markdown(f'<a href="https://wa.me/{tel}?text={urllib.parse.quote(url)}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;border:none;padding:10px;border-radius:5px;">Abrir WA</button></a>', unsafe_allow_html=True)
-                            log_accion(supabase, usuario_actual, "ENVIO WA", f"Link a {op_t}")
-                        except Exception as e: st.error(f"Error: {e}")
-    with t2:
-        with st.form("f_n"):
-            n, e, p = st.text_input("Nombre"), st.text_input("Email"), st.text_input("Pass", type="password")
-            r = st.selectbox("Rol", options=list(dict_roles.items()), format_func=lambda x: x[1])
-            m = st.selectbox("Moneda", ["EUR", "COP", "ALL"])
-            if st.form_submit_button("Crear"):
-                if n and e and p:
-                    supabase.table("usuarios").insert({"nombre":n.upper(),"email":e.lower(),"password":encriptar_password(p),"id_rol":int(r[0]),"moneda":m,"estado":"ACTIVO"}).execute()
-                    log_accion(supabase, usuario_actual, "CREAR USUARIO", n.upper()); st.success("Creado"); st.rerun()
-    with t3:
+            st.markdown("### 🔍 Consultar Facultades por Usuario")
+            u_consulta = st.selectbox("Selecciona un usuario para ver sus permisos:", ["-- Selecciona --"] + df_display['NOMBRE'].tolist())
+            
+            if u_consulta != "-- Selecciona --":
+                rol_id_user = df_display[df_display['NOMBRE'] == u_consulta]['id_rol'].values[0]
+                facultades_user = DICCIONARIO_DESC.get(rol_id_user, "")
+                
+                if facultades_user:
+                    facs_ordenadas = ordenar_facultades_alfabeticamente(facultades_user)
+                    st.info(f"**Facultades de {u_consulta}:**\n\n" + "\n".join([f"- {f}" for f in facs_ordenadas]))
+                else: 
+                    st.warning(f"**{u_consulta}** no tiene facultades asignadas.")
+                    
+            st.markdown("---")
+            st.markdown("### 📄 Exportar y Compartir Reportes")
+            
+            c_pdf1, c_pdf2 = st.columns(2)
+            
+            pdf_bytes_basico = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
+            pdf_bytes_detallado = generar_pdf_usuarios_detallado(df_display, DICCIONARIO_ROLES, DICCIONARIO_DESC)
+            
+            with c_pdf1:
+                st.download_button("📄 Descargar Reporte Básico", pdf_bytes_basico, "usuarios_basico.pdf")
+            with c_pdf2:
+                st.download_button("📄 Descargar Reporte Detallado", pdf_bytes_detallado, "usuarios_detallado.pdf")
+
+            # ==========================================
+            # SECCIÓN COMPARTIR (A OPERADORES)
+            # ==========================================
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("#### 📤 Compartir Reporte a Operadores")
+            
+            tipo_envio = st.radio("1. ¿Qué reporte deseas compartir?", ["Reporte Básico", "Reporte Detallado"], horizontal=True)
+            pdf_a_enviar = pdf_bytes_basico if tipo_envio == "Reporte Básico" else pdf_bytes_detallado
+            nombre_pdf_enviar = "usuarios_basico.pdf" if tipo_envio == "Reporte Básico" else "usuarios_detallado.pdf"
+            
+            st.write("2. Selecciona el medio y el operador destinatario:")
+            cols_envio = st.columns(2)
+            
+            lista_correos = []
+            lista_telefonos = []
+            if not df_ops.empty:
+                for _, row in df_ops.iterrows():
+                    if pd.notna(row.get('correo')) and str(row['correo']).strip():
+                        lista_correos.append(f"{row.get('nombre', 'Sin Nombre')} - {row['correo']}")
+                    if pd.notna(row.get('telefono')) and str(row['telefono']).strip():
+                        lista_telefonos.append(f"{row.get('nombre', 'Sin Nombre')} - {row['telefono']}")
+            
+            # --- Enviar por Correo ---
+            with cols_envio[0]:
+                st.info("📧 Envío por Email")
+                if lista_correos:
+                    operador_email_sel = st.selectbox("Seleccionar Operador (Correo)", ["-- Seleccione --"] + lista_correos)
+                    if st.button("Enviar PDF por Correo", use_container_width=True):
+                        if operador_email_sel != "-- Seleccione --":
+                            email_destinatario = operador_email_sel.split(" - ")[-1].strip()
+                            with st.spinner("Conectando con el servidor de Gmail..."):
+                                exito = enviar_reporte_correo(email_destinatario, pdf_a_enviar, nombre_pdf_enviar, "Usuarios")
+                                if exito:
+                                    st.success(f"Reporte enviado a {email_destinatario}")
+                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Reporte Usuarios enviado a {email_destinatario}")
+                        else:
+                            st.warning("Selecciona un operador de la lista.")
+                else:
+                    st.warning("No hay operadores registrados con correo electrónico.")
+
+            # --- Enviar por WhatsApp con Link a la Nube ---
+            with cols_envio[1]:
+                st.success("💬 Envío por WhatsApp")
+                if lista_telefonos:
+                    operador_tel_sel = st.selectbox("Seleccionar Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos)
+                    mensaje_base = f"Hola, te comparto el {tipo_envio} del modulo de Usuarios de InmoLeasing."
+                    
+                    if operador_tel_sel != "-- Seleccione --":
+                        if st.button("Generar Link y Abrir WhatsApp", use_container_width=True):
+                            with st.spinner("Generando link seguro en la nube..."):
+                                telefono_wa = operador_tel_sel.split(" - ")[-1].strip()
+                                telefono_wa = re.sub(r'\D', '', telefono_wa) 
+                                
+                                try:
+                                    # Crear nombre único para no sobreescribir en el bucket
+                                    timestamp_actual = int(time.time())
+                                    ruta_nube = f"{nombre_pdf_enviar.replace('.pdf', '')}_{timestamp_actual}.pdf"
+                                    
+                                    # Subir el archivo a Supabase Storage
+                                    supabase.storage.from_("reportes").upload(
+                                        path=ruta_nube,
+                                        file=pdf_a_enviar,
+                                        file_options={"content-type": "application/pdf"}
+                                    )
+                                    
+                                    # Obtener el link público
+                                    link_pdf = supabase.storage.from_("reportes").get_public_url(ruta_nube)
+                                    
+                                    # Armar el mensaje final
+                                    mensaje_final = f"{mensaje_base} Puedes descargarlo de forma segura aquí: {link_pdf}"
+                                    texto_codificado = urllib.parse.quote(mensaje_final)
+                                    link_wa = f"https://wa.me/{telefono_wa}?text={texto_codificado}"
+                                    
+                                    # Mostrar el botón verde al operador
+                                    boton_html = f"""
+                                    <a href="{link_wa}" target="_blank" style="text-decoration: none;">
+                                        <button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:16px; margin-top:10px;">
+                                            Abrir chat de WhatsApp
+                                        </button>
+                                    </a>
+                                    """
+                                    st.markdown(boton_html, unsafe_allow_html=True)
+                                    
+                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Enviado por WA a {operador_tel_sel}")
+                                    st.success("¡Link generado! Haz clic en el botón verde de arriba.")
+                                    
+                                except Exception as e:
+                                    st.error(f"Error al subir el archivo: {e}")
+                                    st.info("⚠️ Asegúrate de haber creado el bucket público llamado 'reportes' en Supabase.")
+                    else:
+                        st.button("Generar Link y Abrir WhatsApp", disabled=True, use_container_width=True)
+                else:
+                    st.warning("No hay operadores registrados con teléfono.")
+
+    # --- TAB 2: REGISTRO ---
+    with tab2:
+        st.subheader("Registrar Colaborador")
+        with st.form("form_registro_estable"):
+            col1, col2 = st.columns(2)
+            n_nom = col1.text_input("Nombre Completo")
+            n_ema = col1.text_input("Correo Institucional")
+            
+            n_pas = col2.text_input("Password", type="password")
+            n_mon = col2.selectbox("Moneda Base", ["EUR", "COP", "ALL"])
+            
+            n_rol = st.selectbox("Rol Asignado", options=list(DICCIONARIO_ROLES.items()), format_func=lambda x: x[1])
+            
+            if st.form_submit_button("✅ Crear Usuario"):
+                if n_nom and n_ema and n_pas:
+                    if not es_correo_valido(n_ema): 
+                        st.error("❌ Correo inválido.")
+                    else:
+                        pass_hash = encriptar_password(n_pas)
+                        supabase.table("usuarios").insert({
+                            "nombre": n_nom.upper(), 
+                            "email": n_ema.lower(), 
+                            "password": pass_hash, 
+                            "moneda": n_mon, 
+                            "id_rol": int(n_rol[0]), 
+                            "estado": "ACTIVO"
+                        }).execute()
+                        
+                        log_accion(supabase, usuario_actual, "CREAR USUARIO", f"Registrado: {n_nom.upper()}")
+                        st.success("Usuario creado!")
+                        st.rerun()
+                else: 
+                    st.warning("⚠️ Todos los campos son obligatorios.")
+
+    # --- TAB 3: GESTIONAR ---
+    with tab3:
         if not df_raw.empty:
-            u_s = st.selectbox("Usuario a editar", df_raw['nombre'].tolist())
-            u_d = df_raw[df_raw['nombre'] == u_s].iloc[0]
-            with st.form("f_e"):
-                e_n, e_e = st.text_input("Nombre", u_d['nombre']), st.text_input("Email", u_d['email'])
-                e_p = st.text_input("Nueva Pass (blanco = misma)", type="password")
-                e_r = st.selectbox("Rol", options=list(dict_roles.items()), format_func=lambda x: x[1])
-                e_m = st.selectbox("Moneda", ["EUR", "COP", "ALL"])
-                if st.form_submit_button("Actualizar"):
-                    upd = {"nombre":e_n.upper(), "email":e_e.lower(), "id_rol":int(e_r[0]), "moneda":e_m}
-                    if e_p: upd["password"] = encriptar_password(e_p)
-                    supabase.table("usuarios").update(upd).eq("id", int(u_d['id'])).execute()
-                    log_accion(supabase, usuario_actual, "EDITAR USUARIO", e_n.upper()); st.success("OK"); st.rerun()
-    with t4:
-        c_r1, c_r2 = st.columns(2)
-        with c_r1:
-            with st.form("f_fac"):
-                f_i, f_n = st.selectbox("Icono", LISTA_ICONOS), st.text_input("Nombre Facultad")
-                if st.form_submit_button("Añadir Facultad"):
-                    supabase.table("facultades").insert({"icono":f_i, "nombre_facultad":f_n.upper()}).execute()
+            u_edit = st.selectbox("Seleccione un usuario:", df_raw.sort_values('nombre')['nombre'].tolist())
+            u_data = df_raw[df_raw['nombre'] == u_edit].iloc[0]
+            
+            with st.form("form_edicion"):
+                c_e1, c_e2 = st.columns(2)
+                e_nom = c_e1.text_input("Nombre", u_data['nombre'])
+                e_ema = c_e2.text_input("Email", u_data['email'])
+                
+                c_p1, _ = st.columns(2)
+                e_pas = c_p1.text_input("Nueva Contraseña", type="password", help="Dejar en blanco para mantener la actual.")
+                
+                c_m1, c_m2 = st.columns(2)
+                
+                idx_rol = list(DICCIONARIO_ROLES.keys()).index(u_data['id_rol']) if u_data['id_rol'] in DICCIONARIO_ROLES else 0
+                e_rol = c_m1.selectbox("Cambiar Rol", options=list(DICCIONARIO_ROLES.items()), index=idx_rol, format_func=lambda x: x[1])
+                
+                idx_mon = ["EUR", "COP", "ALL"].index(u_data['moneda']) if u_data['moneda'] in ["EUR", "COP", "ALL"] else 2
+                e_mon = c_m2.selectbox("Cambiar Moneda", ["EUR", "COP", "ALL"], index=idx_mon)
+                
+                if st.form_submit_button("💾 Guardar"):
+                    if es_correo_valido(e_ema):
+                        upd = {
+                            "nombre": e_nom.upper(), 
+                            "email": e_ema.lower(), 
+                            "id_rol": int(e_rol[0]), 
+                            "moneda": e_mon
+                        }
+                        if e_pas.strip(): 
+                            upd["password"] = encriptar_password(e_pas)
+                            
+                        supabase.table("usuarios").update(upd).eq("id", int(u_data['id'])).execute()
+                        log_accion(supabase, usuario_actual, "EDITAR USUARIO", f"Actualizado: {e_nom.upper()}")
+                        st.success("Cambios aplicados!")
+                        st.rerun()
+                        
+            st.markdown("---")
+            if u_data.get('estado') == 'ACTIVO':
+                if st.button("🚫 Desactivar Usuario", type="primary"):
+                    supabase.table("usuarios").update({"estado": "INACTIVO"}).eq("id", int(u_data['id'])).execute()
+                    log_accion(supabase, usuario_actual, "INACTIVAR USUARIO", f"Bloqueado: {u_edit}")
                     st.rerun()
-        with c_r2:
-            with st.form("f_rol"):
-                rn, rf = st.text_input("Nombre Rol"), st.multiselect("Facultades", llaves)
-                if st.form_submit_button("Crear Rol"):
-                    supabase.table("roles").insert({"nombre_rol":rn.upper(), "descripcion":", ".join(rf)}).execute()
+            else:
+                if st.button("♻️ Reactivar Usuario"):
+                    supabase.table("usuarios").update({"estado": "ACTIVO"}).eq("id", int(u_data['id'])).execute()
+                    log_accion(supabase, usuario_actual, "REACTIVAR USUARIO", f"Acceso restaurado: {u_edit}")
                     st.rerun()
-    with t5:
+
+    # --- TAB 4: ROLES Y FACULTADES ---
+    with tab4:
+        sec = st.radio("Gestionar:", ["1. Facultades", "2. Roles"], horizontal=True)
+        
+        if sec == "1. Facultades":
+            c_f1, c_f2 = st.columns(2)
+            with c_f1:
+                with st.form("form_facultad"):
+                    f_ico = st.selectbox("Icono", LISTA_ICONOS)
+                    f_nom = st.text_input("Nombre Técnico")
+                    if st.form_submit_button("Añadir"):
+                        if f_nom:
+                            supabase.table("facultades").insert({"icono": f_ico, "nombre_facultad": f_nom.upper()}).execute()
+                            log_accion(supabase, usuario_actual, "CREAR FACULTAD", f_nom.upper())
+                            st.rerun()
+            with c_f2:
+                if not df_fac.empty:
+                    f_edit_nom = st.selectbox("Seleccione:", df_fac['nombre_facultad'].tolist())
+                    f_row = df_fac[df_fac['nombre_facultad'] == f_edit_nom].iloc[0]
+                    v_str = f"{f_row['icono']} {f_row['nombre_facultad']}"
+                    
+                    with st.form("edit_fac"):
+                        idx_ico = LISTA_ICONOS.index(f_row['icono']) if f_row['icono'] in LISTA_ICONOS else 0
+                        ef_ico = st.selectbox("Icono", LISTA_ICONOS, index=idx_ico)
+                        ef_nom = st.text_input("Nombre", f_row['nombre_facultad'])
+                        
+                        if st.form_submit_button("Actualizar"):
+                            n_str = f"{ef_ico} {ef_nom.upper()}"
+                            supabase.table("facultades").update({"icono": ef_ico, "nombre_facultad": ef_nom.upper()}).eq("id", int(f_row['id'])).execute()
+                            sincronizar_roles_facultad(supabase, df_roles, v_str, n_str)
+                            st.rerun()
+                            
+                    if st.button("🗑️ Eliminar Facultad"):
+                        supabase.table("facultades").delete().eq("id", int(f_row['id'])).execute()
+                        sincronizar_roles_facultad(supabase, df_roles, v_str, None)
+                        st.rerun()
+
+        else:
+            c1, c2 = st.columns(2)
+            with c1:
+                with st.form("n_rol_form"):
+                    nr_nom = st.text_input("Nombre Rol")
+                    nr_llaves = st.multiselect("Facultades:", llaves_iconos)
+                    if st.form_submit_button("Crear Rol"):
+                        if nr_nom:
+                            supabase.table("roles").insert({"nombre_rol": nr_nom.upper(), "descripcion": ", ".join(nr_llaves)}).execute()
+                            st.rerun()
+            with c2:
+                if not df_roles.empty:
+                    r_edit = st.selectbox("Editar Rol:", df_roles.sort_values('nombre_rol')['nombre_rol'].tolist())
+                    r_row = df_roles[df_roles['nombre_rol'] == r_edit].iloc[0]
+                    
+                    with st.form("e_rol_form"):
+                        def_facs = [p.strip() for p in r_row['descripcion'].split(",")] if r_row['descripcion'] else []
+                        er_llaves = st.multiselect("Facultades:", llaves_iconos, default=def_facs)
+                        if st.form_submit_button("Actualizar"):
+                            supabase.table("roles").update({"descripcion": ", ".join(er_llaves)}).eq("id", int(r_row['id'])).execute()
+                            st.rerun()
+                            
+                    if st.button("🗑️ Eliminar Rol"):
+                        supabase.table("roles").delete().eq("id", int(r_row['id'])).execute()
+                        st.rerun()
+                        
+            st.markdown("---")
+            st.download_button("Descargar Matriz de Roles", generar_pdf_roles(df_roles), "matriz_roles.pdf")
+
+    # --- TAB 5: LOGS Y AUDITORÍA ---
+    with tab5:
         try:
-            r_l = supabase.table("logs_actividad").select("*").order("fecha", desc=True).limit(100).execute()
-            df_l = pd.DataFrame(r_l.data)
+            res_l = supabase.table("logs_actividad").select("*").order("fecha", desc=True).execute()
+            df_l = pd.DataFrame(res_l.data) if res_l.data else pd.DataFrame()
+            
             if not df_l.empty:
-                df_l['fecha'] = pd.to_datetime(df_l['fecha']).dt.strftime('%Y-%m-%d %H:%M')
-                st.dataframe(df_l[["fecha", "usuario", "accion", "detalle"]], use_container_width=True, hide_index=True)
-                st.download_button("Descargar Logs", generar_pdf_logs(df_l), "auditoria.pdf")
-        except: st.info("Sin registros.")
+                df_l['fecha'] = pd.to_datetime(df_l['fecha']).dt.tz_localize(None)
+                
+                c_f1, c_f2, c_f3 = st.columns(3)
+                f_r = c_f1.date_input("Rango", [])
+                u_f = c_f2.selectbox("Usuario", ["Todos"] + sorted(df_l['usuario'].unique().tolist()))
+                t_f = c_f3.text_input("Buscar").upper()
+                
+                if len(f_r) == 2: 
+                    df_l = df_l[(df_l['fecha'].dt.date >= f_r[0]) & (df_l['fecha'].dt.date <= f_r[1])]
+                if u_f != "Todos": 
+                    df_l = df_l[df_l['usuario'] == u_f]
+                if t_f: 
+                    df_l = df_l[df_l['accion'].str.contains(t_f) | df_l['detalle'].str.contains(t_f)]
+                    
+                df_visual = df_l[['fecha', 'usuario', 'accion', 'detalle']].copy()
+                df_visual['fecha'] = df_visual['fecha'].dt.strftime('%Y-%m-%d %H:%M')
+                
+                st.dataframe(df_visual, use_container_width=True, hide_index=True)
+                st.download_button("Descargar Auditoría", generar_pdf_logs(df_l), "auditoria.pdf")
+        except Exception: 
+            st.info("Sin registros.")
