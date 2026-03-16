@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v3.6 PRO" # Sidebar ajustado e imagen central +20% notable
+APP_VERSION = "v3.7 PRO" # Simetría absoluta en las líneas del menú lateral
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -25,20 +25,17 @@ DICCIONARIO_MENU_FACULTADES = {
 }
 
 # ==========================================
-# 1.6 AJUSTES VISUALES CSS (DESACOPLADOS Y AJUSTADOS)
+# 1.6 AJUSTES VISUALES CSS
 # ==========================================
 st.markdown("""
     <style>
         /* 1. LIMPIEZA DEL HEADER LATERAL */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; min-height: 0px !important; }
         
-        /* 2. MENÚ LATERAL ARRIBA: Margen negativo para que el título lateral suba a tope */
+        /* 2. MENÚ LATERAL ARRIBA */
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
         
-        /* 3. AJUSTE DE LÍNEAS SEPARADORAS: Margen superior mínimo (0.2rem) para pegarla al perfil */
-        [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; }
-        
-        /* 4. BLOQUE PRINCIPAL ABAJO: 3rem para que el título central "INMOLEASING" NO se corte con el techo */
+        /* 3. BLOQUE PRINCIPAL ABAJO (Para que el título no se corte) */
         .block-container { padding-top: 3rem !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -140,7 +137,7 @@ with st.sidebar:
     
     st.caption(f"Perfil: **{rol_actual}**")
     
-    # Línea separadora superior (El CSS la pega al perfil)
+    # LÍNEA SUPERIOR: Pegada al perfil
     st.markdown("<hr style='margin-top: 0.2rem; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
 
     st.session_state.opciones_permitidas = []
@@ -162,7 +159,8 @@ with st.sidebar:
         default_index=0, 
     )
     
-    st.markdown("<hr style='margin-top: -1.2rem; margin-bottom: 1rem;'>", unsafe_allow_html=True)
+    # LÍNEA INFERIOR: Margen negativo más agresivo (-2.5rem) para tirar de ella hacia arriba
+    st.markdown("<hr style='margin-top: -2.5rem; margin-bottom: 1rem;'>", unsafe_allow_html=True)
     
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
@@ -177,18 +175,16 @@ if selected == "Inicio":
     st.markdown(f"**Te damos la bienvenida al Sistema Integral de Gestión Inmobiliaria.**")
     st.caption(f"Versión actual: {APP_VERSION}")
     
-    st.write("") # Espacio en blanco
+    st.write("") 
     
-    # IMAGEN CENTRAL: Aumentada nativamente usando columnas [0.6, 1.2, 0.6] (+20%)
     img_cols = st.columns([0.6, 1.2, 0.6]) 
     with img_cols[1]:
         try:
-            # use_container_width=True asegura que llene la columna central ensanchada a 1.2
             st.image("portada.jpg", use_container_width=True)
         except:
             st.warning("No se encontró la imagen 'portada.jpg'. Asegúrate de que esté en GitHub.")
             
-    st.write("") # Espacio en blanco
+    st.write("") 
     st.info("👋 Por favor, selecciona una opción en el menú lateral para comenzar a operar.")
 
 elif selected not in st.session_state.opciones_permitidas:
