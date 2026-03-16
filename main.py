@@ -21,7 +21,7 @@ DICCIONARIO_MENU_FACULTADES = {
     "Inmuebles": "MODULO INMUEBLES",
     "Arrendamientos": "MODULO ARRENDAMIENTOS",
     "Finanzas": "MODULO FINANZAS",
-    "Informes": "MODULO INFORMES"s
+    "Informes": "MODULO INFORMES"
 }
 
 # ==========================================
