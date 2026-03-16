@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import hashlib
 import os
+import time
 from fpdf import FPDF
 import smtplib
 from email.message import EmailMessage
@@ -295,14 +296,19 @@ def generar_pdf_logs(df_logs):
         pdf.set_xy(x_ini, y_ini + h_fila)
         
     return pdf.output(dest='S').encode('latin-1')
-
-
 # ==========================================
 # 2. MÓDULO PRINCIPAL
 # ==========================================
 def mostrar_modulo_usuarios(supabase):
     st.header("👤 Gestión de Usuarios y Accesos")
-    usuario_actual = st.session_state.get("usuario_actual", "ADMINISTRADOR")
+    MOD_VERSION = "v1.3"
+    st.caption(f"⚙️ Módulo Usuarios {MOD_VERSION}")
+    
+    # Intento de atrapar el nombre real del usuario desde las variables de sesión comunes
+    usuario_actual = st.session_state.get("usuario_actual", 
+                        st.session_state.get("nombre_usuario", 
+                        st.session_state.get("usuario", "ADMINISTRADOR")))
+                        
     moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
     
     # 1. Carga de datos base
@@ -330,7 +336,7 @@ def mostrar_modulo_usuarios(supabase):
     res_u = supabase.table("usuarios").select("*").execute()
     df_raw = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
     
-    # 3. Carga de Operadores (Para listas desplegables de envíos) - AQUÍ ESTÁ EL FIX
+    # 3. Carga de Operadores (Para listas desplegables de envíos)
     try:
         res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").execute()
         df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
@@ -404,7 +410,6 @@ def mostrar_modulo_usuarios(supabase):
             st.write("2. Selecciona el medio y el operador destinatario:")
             cols_envio = st.columns(2)
             
-            # Generar listas desde Operadores (ahora busca 'correo' y 'telefono')
             lista_correos = []
             lista_telefonos = []
             if not df_ops.empty:
@@ -416,7 +421,7 @@ def mostrar_modulo_usuarios(supabase):
             
             # --- Enviar por Correo ---
             with cols_envio[0]:
-                st.info("📧 Envío por Email (Vía Gmail)")
+                st.info("📧 Envío por Email")
                 if lista_correos:
                     operador_email_sel = st.selectbox("Seleccionar Operador (Correo)", ["-- Seleccione --"] + lista_correos)
                     if st.button("Enviar PDF por Correo", use_container_width=True):
@@ -432,32 +437,57 @@ def mostrar_modulo_usuarios(supabase):
                 else:
                     st.warning("No hay operadores registrados con correo electrónico.")
 
-            # --- Enviar por WhatsApp (Truco Ninja) ---
+            # --- Enviar por WhatsApp con Link a la Nube ---
             with cols_envio[1]:
                 st.success("💬 Envío por WhatsApp")
                 if lista_telefonos:
                     operador_tel_sel = st.selectbox("Seleccionar Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos)
-                    
-                    mensaje_wa = f"Hola, te comparto el {tipo_envio} del modulo de Usuarios de InmoLeasing."
+                    mensaje_base = f"Hola, te comparto el {tipo_envio} del modulo de Usuarios de InmoLeasing."
                     
                     if operador_tel_sel != "-- Seleccione --":
-                        telefono_wa = operador_tel_sel.split(" - ")[-1].strip()
-                        telefono_wa = re.sub(r'\D', '', telefono_wa) 
-                        
-                        texto_codificado = urllib.parse.quote(mensaje_wa)
-                        link_wa = f"https://wa.me/{telefono_wa}?text={texto_codificado}"
-                        
-                        boton_html = f"""
-                        <a href="{link_wa}" target="_blank" style="text-decoration: none;">
-                            <button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:16px;">
-                                Abrir chat de WhatsApp
-                            </button>
-                        </a>
-                        """
-                        st.markdown(boton_html, unsafe_allow_html=True)
-                        st.caption("Instrucción: Haz clic arriba para abrir el chat. Luego, **arrastra el PDF que descargaste** a la ventana de WhatsApp para enviarlo.")
+                        if st.button("Generar Link y Abrir WhatsApp", use_container_width=True):
+                            with st.spinner("Generando link seguro en la nube..."):
+                                telefono_wa = operador_tel_sel.split(" - ")[-1].strip()
+                                telefono_wa = re.sub(r'\D', '', telefono_wa) 
+                                
+                                try:
+                                    # Crear nombre único para no sobreescribir en el bucket
+                                    timestamp_actual = int(time.time())
+                                    ruta_nube = f"{nombre_pdf_enviar.replace('.pdf', '')}_{timestamp_actual}.pdf"
+                                    
+                                    # Subir el archivo a Supabase Storage
+                                    supabase.storage.from_("reportes").upload(
+                                        path=ruta_nube,
+                                        file=pdf_a_enviar,
+                                        file_options={"content-type": "application/pdf"}
+                                    )
+                                    
+                                    # Obtener el link público
+                                    link_pdf = supabase.storage.from_("reportes").get_public_url(ruta_nube)
+                                    
+                                    # Armar el mensaje final
+                                    mensaje_final = f"{mensaje_base} Puedes descargarlo de forma segura aquí: {link_pdf}"
+                                    texto_codificado = urllib.parse.quote(mensaje_final)
+                                    link_wa = f"https://wa.me/{telefono_wa}?text={texto_codificado}"
+                                    
+                                    # Mostrar el botón verde al operador
+                                    boton_html = f"""
+                                    <a href="{link_wa}" target="_blank" style="text-decoration: none;">
+                                        <button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:16px; margin-top:10px;">
+                                            Abrir chat de WhatsApp
+                                        </button>
+                                    </a>
+                                    """
+                                    st.markdown(boton_html, unsafe_allow_html=True)
+                                    
+                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Enviado por WA a {operador_tel_sel}")
+                                    st.success("¡Link generado! Haz clic en el botón verde de arriba.")
+                                    
+                                except Exception as e:
+                                    st.error(f"Error al subir el archivo: {e}")
+                                    st.info("⚠️ Asegúrate de haber creado el bucket público llamado 'reportes' en Supabase.")
                     else:
-                        st.button("Abrir chat de WhatsApp", disabled=True, use_container_width=True)
+                        st.button("Generar Link y Abrir WhatsApp", disabled=True, use_container_width=True)
                 else:
                     st.warning("No hay operadores registrados con teléfono.")
 
