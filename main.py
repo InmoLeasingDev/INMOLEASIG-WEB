@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v4.9 GOLD" # Foto perfecta y línea inferior forzada con píxeles absolutos
+APP_VERSION = "v5.0 GOLD" # Simetría absoluta en menú y foto perfecta
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -38,8 +38,8 @@ st.markdown("""
         /* 3. Panel principal: respiro superior */
         .block-container { padding-top: 3rem !important; }
         
-        /* 4. Acercar el botón Cerrar Sesión para que acompañe a la línea */
-        .stButton button { margin-top: -0.5rem !important; }
+        /* 4. Acompañar la subida de la línea acercando el botón Cerrar Sesión */
+        .stButton button { margin-top: -1.5rem !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -166,8 +166,8 @@ with st.sidebar:
         }
     )
     
-    # LÍNEA INFERIOR REBELDE: Uso de píxeles absolutos negativos y posición relativa
-    st.markdown("<hr style='position: relative; top: -30px; margin-bottom: 0px;'>", unsafe_allow_html=True)
+    # LÍNEA INFERIOR REBELDE: Aumentamos la tracción a -45px y compensamos el espacio abajo con -20px
+    st.markdown("<hr style='position: relative; top: -45px; margin-bottom: -20px;'>", unsafe_allow_html=True)
     
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
@@ -184,7 +184,7 @@ if selected == "Inicio":
     
     st.write("") 
     
-    # FOTO PERFECTA MANTENIDA: Proporciones 1 - 2 - 1
+    # FOTO PERFECTA: Proporciones 1 - 2 - 1
     img_cols = st.columns([1, 2, 1]) 
     
     with img_cols[1]:
