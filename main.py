@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v4.4 GOLD" # Cumplimiento estricto del Documento Maestro (PEP 8)
+APP_VERSION = "v4.5 GOLD" # Ajuste milimétrico de foto (+5%) y código PEP 8
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -176,8 +176,8 @@ if selected == "Inicio":
     
     st.write("") 
     
-    # AJUSTE FINAL FOTO: Columnas [0.85, 1, 0.85] reducen la imagen un 10% adicional
-    img_cols = st.columns([0.85, 1, 0.85]) 
+    # AJUSTE FINAL FOTO: Columnas [0.8, 1, 0.8] para aumentar un 5% respecto a la v4.4
+    img_cols = st.columns([0.8, 1, 0.8]) 
     
     with img_cols[1]:
         try:
