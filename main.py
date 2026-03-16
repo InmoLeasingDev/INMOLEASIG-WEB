@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v3.1 PRO" # Reducción drástica de margen superior y foto al 40%
+APP_VERSION = "v3.2 PRO" # Ajuste de título cortado y foto al 30%
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -32,18 +32,18 @@ st.markdown("""
         /* Ocultar el espacio vacío superior del menú lateral */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; }
         
-        /* Ajuste fino del menú lateral */
-        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -1rem !important; }
+        /* SOLUCIÓN AL TÍTULO: Margen positivo (0.5rem) para que baje y no se corte */
+        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: 0.5rem !important; }
         
         /* Pegar la línea separadora al texto del perfil */
         [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 1rem !important; }
         
-        /* REDUCCIÓN DRÁSTICA DEL ESPACIO SUPERIOR PRINCIPAL */
+        /* Mantenemos el panel principal bien arriba */
         .block-container { padding-top: 0rem !important; margin-top: 0rem !important; }
         
-        /* REDUCCIÓN DE LA IMAGEN DE PORTADA */
+        /* REDUCCIÓN DE LA IMAGEN DE PORTADA AL 30% */
         [data-testid="stImage"] > img {
-            max-width: 40% !important; /* Pasamos de 60% a 40% para que sea más pequeña */
+            max-width: 30% !important; 
             height: auto !important; 
             margin: 0 auto; 
             display: block; 
@@ -82,7 +82,8 @@ if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
     
     with cols[1]:
-        # Para que el Login también quede bien arriba
+        # Un pequeño espacio para que el login no quede pegado arriba
+        st.write("") 
         st.write("") 
         st.title("🏢 INMOLEASING")
         st.markdown(f"**Acceso al Sistema** *(Versión {APP_VERSION})*")
@@ -182,7 +183,6 @@ with st.sidebar:
 # ==========================================
 
 if selected == "Inicio":
-    # Eliminamos el st.write("# ") que causaba el salto enorme de línea
     cols_b = st.columns([1, 6, 1])
     with cols_b[1]:
         st.title("🏢 INMOLEASING")
@@ -192,7 +192,7 @@ if selected == "Inicio":
         try:
             st.image("portada.jpg", use_container_width=True)
         except:
-            st.warning("No se encontró la imagen. Asegúrate de que el nombre del archivo sea correcto.")
+            st.warning("No se encontró la imagen 'portada.jpg'. Asegúrate de que esté en GitHub.")
             
         st.info("👋 Por favor, selecciona una opción en el menú lateral para comenzar a operar.")
 
