@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v3.5 PRO" # Menú ajustado (pegado a línea) e imagen central +15%
+APP_VERSION = "v3.6 PRO" # Sidebar ajustado e imagen central +20% notable
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -35,8 +35,8 @@ st.markdown("""
         /* 2. MENÚ LATERAL ARRIBA: Margen negativo para que el título lateral suba a tope */
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
         
-        /* 3. AJUSTE DE LÍNEAS SEPARADORAS: Quitamos el margen superior (0rem) para pegar la línea al perfil */
-        [data-testid="stSidebar"] hr { margin-top: 0rem !important; margin-bottom: 0.5rem !important; }
+        /* 3. AJUSTE DE LÍNEAS SEPARADORAS: Margen superior mínimo (0.2rem) para pegarla al perfil */
+        [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; }
         
         /* 4. BLOQUE PRINCIPAL ABAJO: 3rem para que el título central "INMOLEASING" NO se corte con el techo */
         .block-container { padding-top: 3rem !important; }
@@ -141,7 +141,7 @@ with st.sidebar:
     st.caption(f"Perfil: **{rol_actual}**")
     
     # Línea separadora superior (El CSS la pega al perfil)
-    st.markdown("<hr style='margin-top: 0rem; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin-top: 0.2rem; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
 
     st.session_state.opciones_permitidas = []
     for menu_item, facultad_requerida in DICCIONARIO_MENU_FACULTADES.items():
@@ -179,11 +179,11 @@ if selected == "Inicio":
     
     st.write("") # Espacio en blanco
     
-    # IMAGEN CENTRAL: Aumentada nativamente usando columnas [0.8, 1, 0.8] (+~15%)
-    img_cols = st.columns([0.8, 1, 0.8]) 
+    # IMAGEN CENTRAL: Aumentada nativamente usando columnas [0.6, 1.2, 0.6] (+20%)
+    img_cols = st.columns([0.6, 1.2, 0.6]) 
     with img_cols[1]:
         try:
-            # use_container_width=True asegura que llene la columna central ensanchada
+            # use_container_width=True asegura que llene la columna central ensanchada a 1.2
             st.image("portada.jpg", use_container_width=True)
         except:
             st.warning("No se encontró la imagen 'portada.jpg'. Asegúrate de que esté en GitHub.")
