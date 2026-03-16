@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
-APP_VERSION = "v3.2 PRO" # Ajuste de título cortado y foto al 30%
+APP_VERSION = "v3.4 PRO" # Desacoplamiento de márgenes (Sidebar arriba, Main centro)
 
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
@@ -25,29 +25,21 @@ DICCIONARIO_MENU_FACULTADES = {
 }
 
 # ==========================================
-# 1.6 AJUSTES VISUALES CSS
+# 1.6 AJUSTES VISUALES CSS (DESACOPLADOS)
 # ==========================================
 st.markdown("""
     <style>
-        /* Ocultar el espacio vacío superior del menú lateral */
-        [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; }
+        /* 1. LIMPIEZA DEL HEADER LATERAL */
+        [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; min-height: 0px !important; }
         
-        /* SOLUCIÓN AL TÍTULO: Margen positivo (0.5rem) para que baje y no se corte */
-        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: 0.5rem !important; }
+        /* 2. MENÚ LATERAL ARRIBA: Margen negativo para que el título lateral vuelva a subir */
+        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
         
-        /* Pegar la línea separadora al texto del perfil */
-        [data-testid="stSidebar"] hr { margin-top: 0.2rem !important; margin-bottom: 1rem !important; }
+        /* 3. LÍNEAS SEPARADORAS: Ajuste fino */
+        [data-testid="stSidebar"] hr { margin-top: 0.5rem !important; margin-bottom: 0.5rem !important; }
         
-        /* Mantenemos el panel principal bien arriba */
-        .block-container { padding-top: 0rem !important; margin-top: 0rem !important; }
-        
-        /* REDUCCIÓN DE LA IMAGEN DE PORTADA AL 30% */
-        [data-testid="stImage"] > img {
-            max-width: 30% !important; 
-            height: auto !important; 
-            margin: 0 auto; 
-            display: block; 
-        }
+        /* 4. BLOQUE PRINCIPAL ABAJO: 3rem para que el título central "INMOLEASING" NO se corte con el techo */
+        .block-container { padding-top: 3rem !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -82,9 +74,6 @@ if not st.session_state.autenticado:
     cols = st.columns([1, 2, 1])
     
     with cols[1]:
-        # Un pequeño espacio para que el login no quede pegado arriba
-        st.write("") 
-        st.write("") 
         st.title("🏢 INMOLEASING")
         st.markdown(f"**Acceso al Sistema** *(Versión {APP_VERSION})*")
         
@@ -183,18 +172,22 @@ with st.sidebar:
 # ==========================================
 
 if selected == "Inicio":
-    cols_b = st.columns([1, 6, 1])
-    with cols_b[1]:
-        st.title("🏢 INMOLEASING")
-        st.markdown(f"**Te damos la bienvenida al Sistema Integral de Gestión Inmobiliaria.**")
-        st.caption(f"Versión actual: {APP_VERSION}")
-        
+    st.title("🏢 INMOLEASING")
+    st.markdown(f"**Te damos la bienvenida al Sistema Integral de Gestión Inmobiliaria.**")
+    st.caption(f"Versión actual: {APP_VERSION}")
+    
+    st.write("") # Espacio en blanco
+    
+    # IMAGEN PEQUEÑA Y CENTRADA NATIVAMENTE (En la columna del medio)
+    img_cols = st.columns([1, 1, 1]) 
+    with img_cols[1]:
         try:
             st.image("portada.jpg", use_container_width=True)
         except:
             st.warning("No se encontró la imagen 'portada.jpg'. Asegúrate de que esté en GitHub.")
             
-        st.info("👋 Por favor, selecciona una opción en el menú lateral para comenzar a operar.")
+    st.write("") # Espacio en blanco
+    st.info("👋 Por favor, selecciona una opción en el menú lateral para comenzar a operar.")
 
 elif selected not in st.session_state.opciones_permitidas:
     st.error(f"### 🔒 Acceso Restringido")
