@@ -98,7 +98,6 @@ def enviar_reporte_correo(destinatario, pdf_bytes, nombre_archivo, tipo_reporte=
 
         msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=nombre_archivo)
 
-        # Solo funcionará si EMAIL_USER es @gmail.com
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(remitente, password.replace(" ", "")) 
             smtp.send_message(msg)
@@ -331,9 +330,9 @@ def mostrar_modulo_usuarios(supabase):
     res_u = supabase.table("usuarios").select("*").execute()
     df_raw = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
     
-    # 3. Carga de Operadores (Para listas desplegables de envíos)
+    # 3. Carga de Operadores (Para listas desplegables de envíos) - AQUÍ ESTÁ EL FIX
     try:
-        res_ops = supabase.table("operadores").select("nombre, email, telefono, estado").execute()
+        res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").execute()
         df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
         if not df_ops.empty and 'estado' in df_ops.columns:
             df_ops = df_ops[df_ops['estado'] == 'ACTIVO']
@@ -387,19 +386,17 @@ def mostrar_modulo_usuarios(supabase):
             pdf_bytes_basico = generar_pdf_usuarios(df_display, DICCIONARIO_ROLES)
             pdf_bytes_detallado = generar_pdf_usuarios_detallado(df_display, DICCIONARIO_ROLES, DICCIONARIO_DESC)
             
-            # Botones de tamaño estándar para descargar
             with c_pdf1:
                 st.download_button("📄 Descargar Reporte Básico", pdf_bytes_basico, "usuarios_basico.pdf")
             with c_pdf2:
                 st.download_button("📄 Descargar Reporte Detallado", pdf_bytes_detallado, "usuarios_detallado.pdf")
 
             # ==========================================
-            # SECCIÓN COMPARTIR (CORREGIDA)
+            # SECCIÓN COMPARTIR (A OPERADORES)
             # ==========================================
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("#### 📤 Compartir Reporte a Operadores")
             
-            # Selector de Reporte a enviar
             tipo_envio = st.radio("1. ¿Qué reporte deseas compartir?", ["Reporte Básico", "Reporte Detallado"], horizontal=True)
             pdf_a_enviar = pdf_bytes_basico if tipo_envio == "Reporte Básico" else pdf_bytes_detallado
             nombre_pdf_enviar = "usuarios_basico.pdf" if tipo_envio == "Reporte Básico" else "usuarios_detallado.pdf"
@@ -407,21 +404,21 @@ def mostrar_modulo_usuarios(supabase):
             st.write("2. Selecciona el medio y el operador destinatario:")
             cols_envio = st.columns(2)
             
-            # Generar listas desde Operadores
-            lista_emails = []
+            # Generar listas desde Operadores (ahora busca 'correo' y 'telefono')
+            lista_correos = []
             lista_telefonos = []
             if not df_ops.empty:
                 for _, row in df_ops.iterrows():
-                    if pd.notna(row.get('email')) and str(row['email']).strip():
-                        lista_emails.append(f"{row.get('nombre', 'Sin Nombre')} - {row['email']}")
+                    if pd.notna(row.get('correo')) and str(row['correo']).strip():
+                        lista_correos.append(f"{row.get('nombre', 'Sin Nombre')} - {row['correo']}")
                     if pd.notna(row.get('telefono')) and str(row['telefono']).strip():
                         lista_telefonos.append(f"{row.get('nombre', 'Sin Nombre')} - {row['telefono']}")
             
             # --- Enviar por Correo ---
             with cols_envio[0]:
                 st.info("📧 Envío por Email (Vía Gmail)")
-                if lista_emails:
-                    operador_email_sel = st.selectbox("Seleccionar Operador (Correo)", ["-- Seleccione --"] + lista_emails)
+                if lista_correos:
+                    operador_email_sel = st.selectbox("Seleccionar Operador (Correo)", ["-- Seleccione --"] + lista_correos)
                     if st.button("Enviar PDF por Correo", use_container_width=True):
                         if operador_email_sel != "-- Seleccione --":
                             email_destinatario = operador_email_sel.split(" - ")[-1].strip()
@@ -441,12 +438,10 @@ def mostrar_modulo_usuarios(supabase):
                 if lista_telefonos:
                     operador_tel_sel = st.selectbox("Seleccionar Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos)
                     
-                    # Mensaje SIN emojis para evitar caracteres raros () en WhatsApp Web
                     mensaje_wa = f"Hola, te comparto el {tipo_envio} del modulo de Usuarios de InmoLeasing."
                     
                     if operador_tel_sel != "-- Seleccione --":
                         telefono_wa = operador_tel_sel.split(" - ")[-1].strip()
-                        # Limpiar teléfono de espacios o símbolos extraños
                         telefono_wa = re.sub(r'\D', '', telefono_wa) 
                         
                         texto_codificado = urllib.parse.quote(mensaje_wa)
