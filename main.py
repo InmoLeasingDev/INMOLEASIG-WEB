@@ -6,6 +6,24 @@ from datetime import datetime
 import propietarios_modulo
 
 # ==========================================
+# FUNCIONES DE INTERFAZ Y SONIDO
+# ==========================================
+def emitir_beep_alerta():
+    # Genera un pitido de alerta en el navegador del usuario
+    beep_js = """
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        osc.type = 'triangle'; // Tono tipo alerta
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime); // Frecuencia más grave
+        osc.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2); // Dura 0.2 segundos
+    </script>
+    """
+    st.components.v1.html(beep_js, height=0)
+
+# ==========================================
 # 1. CONFIGURACIÓN DE PÁGINA Y VERSIÓN
 # ==========================================
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
@@ -198,6 +216,7 @@ if selected == "Inicio":
     st.info("👋 Selecciona una opción en el menú lateral para comenzar.")
 
 elif selected not in st.session_state.opciones_permitidas:
+    emitir_beep_alerta()
     st.error("### 🔒 Acceso Restringido")
     st.warning(f"Tu perfil (**{rol_actual}**) no tiene acceso a este módulo.")
 
