@@ -47,9 +47,9 @@ DICCIONARIO_MENU_FACULTADES = {
     "Informes": "MODULO INFORMES"
 }
 
-# =============================================
+# ================================================
 # 1.6 AJUSTES VISUALES CSS (PIXEL PERFECT EXTREMO)
-# =============================================
+# ===============================================
 st.markdown("""
     <style>
         /* 1. Limpieza total de cabecera lateral */
