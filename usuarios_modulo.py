@@ -33,7 +33,8 @@ def log_accion(supabase, usuario, accion, detalle):
     try:
         # 1. Calculamos la hora exacta de Madrid
         zona_madrid = zoneinfo.ZoneInfo("Europe/Madrid")
-        hora_exacta = datetime.now(zona_madrid).isoformat()
+        #hora_exacta = datetime.now(zona_madrid).isoformat()
+        hora_exacta = datetime.now(zona_madrid).strftime("%Y-%m-%d %H:%M:%S")
         
         # 2. Insertamos en tu columna 'fecha'
         supabase.table("logs_actividad").insert({
