@@ -689,5 +689,8 @@ def mostrar_modulo_usuarios(supabase):
                 
                 st.dataframe(df_visual, use_container_width=True, hide_index=True)
                 st.download_button("Descargar Auditoría", generar_pdf_logs(df_l), "auditoria.pdf")
-        except Exception: 
-            st.info("Sin registros.")
+        #except Exception: 
+        #    st.info("Sin registros.")
+        except Exception as e:
+        st.error(f"🚨 Error detectado: {e}")
+        st.info("Sin registros.")
