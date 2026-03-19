@@ -4,7 +4,7 @@ from streamlit_option_menu import option_menu
 from supabase import create_client
 import hashlib
 from datetime import datetime
-import propietarios_modulo
+import propietarios_modulo 
 
 
 # ==========================================
