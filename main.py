@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 from streamlit_option_menu import option_menu
 from supabase import create_client
@@ -5,20 +6,23 @@ import hashlib
 from datetime import datetime
 import propietarios_modulo
 
+
 # ==========================================
 # FUNCIONES DE INTERFAZ Y SONIDO
 # ==========================================
 def emitir_beep_alerta():
-    # Genera un pitido de alerta en el navegador del usuario
-    beep_js = """
+    # Usamos time.time() para que Streamlit crea que es un código nuevo cada vez y SIEMPRE suene
+    marca_tiempo = time.time() 
+    beep_js = f"""
     <script>
+        // Ejecución única: {marca_tiempo}
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
-        osc.type = 'triangle'; // Tono tipo alerta
-        osc.frequency.setValueAtTime(400, audioCtx.currentTime); // Frecuencia más grave
+        osc.type = 'triangle'; 
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime); 
         osc.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.2); // Dura 0.2 segundos
+        osc.stop(audioCtx.currentTime + 0.2); 
     </script>
     """
     st.components.v1.html(beep_js, height=0)
