@@ -671,8 +671,7 @@ def mostrar_modulo_usuarios(supabase):
             df_l = pd.DataFrame(res_l.data) if res_l.data else pd.DataFrame()
             
             if not df_l.empty:
-                df_l['fecha'] = pd.to_datetime(df_l['fecha']).dt.tz_localize(None)
-                
+                df_l['fecha'] = pd.to_datetime(df_l['fecha'])
                 c_f1, c_f2, c_f3 = st.columns(3)
                 f_r = c_f1.date_input("Rango", [])
                 u_f = c_f2.selectbox("Usuario", ["Todos"] + sorted(df_l['usuario'].unique().tolist()))
