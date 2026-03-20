@@ -129,14 +129,18 @@ def mostrar_modulo_inmuebles(supabase):
         if moneda_sesion != "ALL":
             query = query.eq("moneda", moneda_sesion)
             
-        res_inm = query.order("id", desc=True).execute()
+      
+        # Ejecutamos la consulta sin el orden por ID, dejaremos que Pandas haga la magia
+        res_inm = query.execute()
         df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
         
         if not df_inm.empty:
+            # --- NUEVO: ORDENAR POR MONEDA Y LUEGO POR NOMBRE ---
+            df_inm = df_inm.sort_values(by=['moneda', 'nombre'], ascending=[True, True])
+            
             # Mostrar la tabla incluyendo la columna moneda
             df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'moneda', 'aseguradora', 'numero_poliza']].copy()
             df_display.rename(columns={'id': 'ID', 'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'moneda': 'MONEDA', 'aseguradora': 'ASEGURADORA'}, inplace=True)
-            
             st.dataframe(df_display[['ID', 'NOMBRE', 'TIPO', 'CIUDAD', 'MONEDA', 'ASEGURADORA']], use_container_width=True, hide_index=True)
             
             # --- 3. GESTIONAR PROPIEDAD (UPDATE / DELETE) ---
