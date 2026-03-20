@@ -196,14 +196,19 @@ def mostrar_modulo_inmuebles(supabase):
                             st.success("✅ Actualizado correctamente.")
                             time.sleep(1)
                             st.rerun()
-                            
-                    if st.button("🚫 Dar de Baja (Eliminar)"):
+                    # --- SEGURO DE ELIMINACIÓN TAB 1 ---
+                    st.markdown("---")
+                    st.warning("⚠️ **Zona de Peligro:** Dar de baja esta propiedad la ocultará del sistema.")
+                    confirmar_baja_prop = st.checkbox("Confirmo que deseo dar de baja esta propiedad.", key=f"conf_prop_{datos_p['id']}")
+                    
+                    if st.button("🚫 Dar de Baja (Eliminar)", disabled=not confirmar_baja_prop):
                         supabase.table("inmuebles").update({"estado": "INACTIVO"}).eq("id", int(datos_p['id'])).execute()
                         log_accion(supabase, usuario_actual, "ELIMINAR PROPIEDAD", datos_p['nombre'])
                         st.success("✅ Propiedad dada de baja.")
                         time.sleep(1)
                         st.rerun()
-
+                            
+                    
             # --- EXPORTAR ---
             st.markdown("---")
             st.markdown("### 📄 Exportar Listado")
