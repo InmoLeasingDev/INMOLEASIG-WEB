@@ -33,11 +33,14 @@ def mostrar_modulo_inmuebles(supabase):
         # --- Lógica dinámica de tipos según la región ---
         moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
         if moneda_sesion == "EUR":
+            # En España se usa Piso, pero también hay locales y naves
             opciones_tipo = ["PISO"]
         elif moneda_sesion == "COP":
+            # En Colombia se usa Apartamento
             opciones_tipo = ["APARTAMENTO", "OFICINA", "LOCAL"]
         else:
-            opciones_tipo = ["APARTAMENTO", "OFICINA"]
+            # El Director General (ALL) ve el catálogo completo
+            opciones_tipo = ["PISO","APARTAMENTO", "OFICINA", "LOCAL"]
 
         # --- 1. FORMULARIO NUEVA PROPIEDAD ---
         with st.expander("➕ Añadir Nueva Propiedad", expanded=False):
