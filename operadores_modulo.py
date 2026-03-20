@@ -32,44 +32,6 @@ def es_correo_valido(correo):
     patron = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     return re.match(patron, correo) is not None
 
-# ==========================================
-# 0.5 FUNCIÓN MOTOR DE CORREO (GMAIL SERVER)
-# ==========================================
-def enviar_reporte_correo(destinatario, pdf_bytes, nombre_archivo, tipo_reporte="Operadores"):
-    try:
-        remitente = st.secrets.get("EMAIL_USER", "")
-        password = st.secrets.get("EMAIL_PASS", "") 
-
-        if not remitente or not password:
-            st.error("❌ Falla técnica: Faltan credenciales (EMAIL_USER / EMAIL_PASS) en los secretos.")
-            return False
-
-        msg = EmailMessage()
-        msg['Subject'] = f'Reporte de {tipo_reporte} - InmoLeasing ERP'
-        msg['From'] = remitente
-        msg['To'] = destinatario
-        
-        cuerpo_mensaje = f"""
-        Hola,
-        
-        Se ha generado un nuevo reporte del Directorio de {tipo_reporte} desde la plataforma InmoLeasing.
-        Encontrarás el documento PDF adjunto a este correo.
-        
-        Saludos cordiales,
-        El equipo de InmoLeasing.
-        """
-        msg.set_content(cuerpo_mensaje)
-
-        msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=nombre_archivo)
-
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(remitente, password.replace(" ", "")) 
-            smtp.send_message(msg)
-            
-        return True
-    except Exception as e:
-        st.error(f"Error crítico al enviar el correo: {e}")
-        return False
 
 # ==========================================
 # 1. GENERADOR DE PDF BÁSICO (Ajustado)
