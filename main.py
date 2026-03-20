@@ -4,9 +4,10 @@ from streamlit_option_menu import option_menu
 from supabase import create_client
 import hashlib
 from datetime import datetime
-import propietarios_modulo 
-import operadores_modulo
 import usuarios_modulo
+import operadores_modulo
+import propietarios_modulo 
+import inmuebles_modulo
 
 # ==========================================
 # FUNCIONES DE INTERFAZ Y SONIDO
@@ -239,8 +240,7 @@ else:
         propietarios_modulo.mostrar_modulo_propietarios(supabase)    
         
     elif selected == "Inmuebles":
-        st.header("🏠 Gestión de Inmuebles")
-        st.info("🚧 Módulo en construcción.")
+        inmuebles_modulo.mostrar_modulo_inmuebles(supabase)
         
     elif selected == "Arrendamientos":
         st.header("📝 Arrendamientos")
