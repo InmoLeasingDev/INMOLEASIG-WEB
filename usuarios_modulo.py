@@ -19,32 +19,32 @@ def encriptar_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # old log_accion
-#def log_accion(supabase, usuario, accion, detalle):
-#    try:
-#        supabase.table("logs_actividad").insert({
-#            "usuario": usuario, 
-#            "accion": accion, 
-#            "detalle": detalle
-#        }).execute()
-#    except Exception:
-#        pass 
-
 def log_accion(supabase, usuario, accion, detalle):
     try:
-        # 1. Calculamos la hora exacta de Madrid
-        zona_madrid = zoneinfo.ZoneInfo("Europe/Madrid")
-        #hora_exacta = datetime.now(zona_madrid).isoformat()
-        hora_exacta = datetime.now(zona_madrid).strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 2. Insertamos en tu columna 'fecha'
         supabase.table("logs_actividad").insert({
             "usuario": usuario, 
             "accion": accion, 
-            "detalle": detalle,
-            "fecha": hora_exacta  # <--- Adaptado exactamente a tu base de datos
+            "detalle": detalle
         }).execute()
-    except Exception as e:
-        print(f"Error al registrar log: {e}")
+    except Exception:
+        pass 
+
+#def log_accion(supabase, usuario, accion, detalle):
+#    try:
+#        # 1. Calculamos la hora exacta de Madrid
+#        zona_madrid = zoneinfo.ZoneInfo("Europe/Madrid")
+#        #hora_exacta = datetime.now(zona_madrid).isoformat()
+#        hora_exacta = datetime.now(zona_madrid).strftime("%Y-%m-%d %H:%M:%S")
+#        
+#        # 2. Insertamos en tu columna 'fecha'
+#        supabase.table("logs_actividad").insert({
+#            "usuario": usuario, 
+#            "accion": accion, 
+#            "detalle": detalle,
+#            "fecha": hora_exacta  # <--- Adaptado exactamente a tu base de datos
+#        }).execute()
+#    except Exception as e:
+#print(f"Error al registrar log: {e}")
 
 def es_correo_valido(correo):
     patron = r"^[\w\.-]+@[\w\.-]+\.\w+$"
