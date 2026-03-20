@@ -76,33 +76,43 @@ def mostrar_modulo_inmuebles(supabase):
         except:
             df_ops = pd.DataFrame()
 
-        # --- Lógica dinámica de tipos ---
+        # --- Lógica dinámica de tipos y moneda según la región ---
         moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
-        if moneda_sesion == "EUR": opciones_tipo = ["PISO"]
-        elif moneda_sesion == "COP": opciones_tipo = ["APARTAMENTO", "OFICINA", "LOCAL"]
-        else: opciones_tipo = ["PISO", "APARTAMENTO", "OFICINA", "LOCAL" ]
+        if moneda_sesion == "EUR": 
+            opciones_tipo = ["PISO", "OFICINA", "LOCAL", "NAVE", "BODEGA"]
+            opciones_moneda = ["EUR"]
+        elif moneda_sesion == "COP": 
+            opciones_tipo = ["APARTAMENTO", "OFICINA", "LOCAL", "NAVE", "BODEGA"]
+            opciones_moneda = ["COP"]
+        else: 
+            opciones_tipo = ["PISO", "APARTAMENTO", "OFICINA", "LOCAL", "NAVE", "BODEGA"]
+            opciones_moneda = ["EUR", "COP"]
 
         # --- 1. FORMULARIO NUEVA PROPIEDAD (CREATE) ---
         with st.expander("➕ Añadir Nueva Propiedad", expanded=False):
             with st.form("form_nueva_propiedad"):
                 st.write("Datos Generales del Inmueble")
-                c1, c2, c3 = st.columns(3)
+                c1, c2 = st.columns(2)
                 n_nom = c1.text_input("Nombre / Dirección Principal *", placeholder="Ej: Edificio Central o Piso 5A")
                 n_tip = c2.selectbox("Tipo de Propiedad *", opciones_tipo)
+                
+                c3, c4 = st.columns(2)
                 n_ciu = c3.text_input("Ciudad *")
+                n_mon = c4.selectbox("Región / Moneda *", opciones_moneda)
                 
                 st.write("Datos del Seguro (Opcional)")
-                c4, c5, c6 = st.columns(3)
-                n_ase = c4.text_input("Aseguradora")
-                n_pol = c5.text_input("Número de Póliza")
-                n_tel_ase = c6.text_input("Teléfono Aseguradora")
+                c5, c6, c7 = st.columns(3)
+                n_ase = c5.text_input("Aseguradora")
+                n_pol = c6.text_input("Número de Póliza")
+                n_tel_ase = c7.text_input("Teléfono Aseguradora")
                 
                 if st.form_submit_button("💾 Guardar Propiedad"):
                     if n_nom and n_ciu:
                         datos_insert = {
                             "nombre": n_nom.strip().upper(), "tipo": n_tip, "ciudad": n_ciu.strip().upper(),
-                            "aseguradora": n_ase.strip().upper(), "numero_poliza": n_pol.strip().upper(),
-                            "telefono_aseguradora": n_tel_ase.strip(), "estado": "ACTIVO"
+                            "moneda": n_mon, "aseguradora": n_ase.strip().upper(), 
+                            "numero_poliza": n_pol.strip().upper(), "telefono_aseguradora": n_tel_ase.strip(), 
+                            "estado": "ACTIVO"
                         }
                         supabase.table("inmuebles").insert(datos_insert).execute()
                         log_accion(supabase, usuario_actual, "CREAR PROPIEDAD", n_nom.strip().upper())
@@ -112,14 +122,22 @@ def mostrar_modulo_inmuebles(supabase):
                     else:
                         st.warning("⚠️ Los campos con asterisco (*) son obligatorios.")
 
-        # --- 2. LECTURA DE DATOS (READ) ---
-        res_inm = supabase.table("inmuebles").select("*").eq("estado", "ACTIVO").order("id", desc=True).execute()
+        # --- 2. LECTURA DE DATOS (READ) CON FILTRO ---
+        query = supabase.table("inmuebles").select("*").eq("estado", "ACTIVO")
+        
+        # ¡LA MAGIA DEL FILTRO! Si no es ALL, filtramos por la moneda del operador
+        if moneda_sesion != "ALL":
+            query = query.eq("moneda", moneda_sesion)
+            
+        res_inm = query.order("id", desc=True).execute()
         df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
         
         if not df_inm.empty:
-            df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'aseguradora', 'numero_poliza']].copy()
-            df_display.rename(columns={'id': 'ID', 'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'aseguradora': 'ASEGURADORA'}, inplace=True)
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            # Mostrar la tabla incluyendo la columna moneda
+            df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'moneda', 'aseguradora', 'numero_poliza']].copy()
+            df_display.rename(columns={'id': 'ID', 'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'moneda': 'MONEDA', 'aseguradora': 'ASEGURADORA'}, inplace=True)
+            
+            st.dataframe(df_display[['ID', 'NOMBRE', 'TIPO', 'CIUDAD', 'MONEDA', 'ASEGURADORA']], use_container_width=True, hide_index=True)
             
             # --- 3. GESTIONAR PROPIEDAD (UPDATE / DELETE) ---
             with st.expander("⚙️ Gestionar / Editar Propiedad", expanded=False):
@@ -127,16 +145,25 @@ def mostrar_modulo_inmuebles(supabase):
                 if prop_sel:
                     datos_p = df_inm[df_inm['nombre'] == prop_sel].iloc[0]
                     with st.form("form_editar_prop"):
-                        e_nom = st.text_input("Nombre", datos_p['nombre'])
-                        e_ciu = st.text_input("Ciudad", datos_p['ciudad'])
-                        e_ase = st.text_input("Aseguradora", str(datos_p.get('aseguradora', '')))
+                        st.write("Actualizar Datos")
+                        e_c1, e_c2 = st.columns(2)
+                        e_nom = e_c1.text_input("Nombre", datos_p['nombre'])
+                        e_ciu = e_c2.text_input("Ciudad", datos_p['ciudad'])
+                        
+                        e_c3, e_c4 = st.columns(2)
+                        idx_mon = 0 if datos_p.get('moneda') == 'EUR' else (1 if datos_p.get('moneda') == 'COP' else 0)
+                        # Solo el Director General (ALL) puede cambiar un edificio de país/moneda
+                        e_mon = e_c3.selectbox("Moneda", ["EUR", "COP"] if moneda_sesion == "ALL" else [moneda_sesion], index=idx_mon if moneda_sesion == "ALL" else 0)
+                        e_ase = e_c4.text_input("Aseguradora", str(datos_p.get('aseguradora', '')))
+                        
                         e_pol = st.text_input("Número Póliza", str(datos_p.get('numero_poliza', '')))
                         
                         col_btn1, col_btn2 = st.columns(2)
                         if col_btn1.form_submit_button("📝 Guardar Cambios"):
                             datos_upd = {
                                 "nombre": e_nom.strip().upper(), "ciudad": e_ciu.strip().upper(),
-                                "aseguradora": e_ase.strip().upper(), "numero_poliza": e_pol.strip().upper()
+                                "moneda": e_mon, "aseguradora": e_ase.strip().upper(), 
+                                "numero_poliza": e_pol.strip().upper()
                             }
                             supabase.table("inmuebles").update(datos_upd).eq("id", int(datos_p['id'])).execute()
                             log_accion(supabase, usuario_actual, "EDITAR PROPIEDAD", e_nom.strip().upper())
@@ -161,7 +188,7 @@ def mostrar_modulo_inmuebles(supabase):
                 archivo_bytes = generar_pdf_propiedades(df_display)
                 ext, mime = "pdf", "application/pdf"
             else:
-                archivo_bytes = generar_excel_bytes(df_display, "Propiedades")
+                archivo_bytes = generar_excel_bytes(df_display[['ID', 'NOMBRE', 'TIPO', 'CIUDAD', 'MONEDA', 'ASEGURADORA']], "Propiedades")
                 ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 
             nombre_final_archivo = f"directorio_propiedades.{ext}"
@@ -202,7 +229,7 @@ def mostrar_modulo_inmuebles(supabase):
                 else: st.button("Generar Link WA", disabled=True, use_container_width=True)
 
         else:
-            st.info("ℹ️ Aún no hay propiedades registradas o activas.")
+            st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
     # ==========================================
     # TAB 2: UNIDADES (Las Divisiones)
     # ==========================================
