@@ -350,80 +350,108 @@ def mostrar_modulo_usuarios(supabase):
                 else: 
                     st.warning(f"**{u_consulta}** no tiene facultades asignadas.")
                     
-            #st.markdown("---")
-            #st.markdown("### 📄 Exportar y Compartir Reportes")
+            
             # ==========================================
-            # NUEVO PANEL DE EXPORTACIÓN TAB 1
+            # NUEVO PANEL DE EXPORTACIÓN TAB 1 (FLEXIBLE)
             # ==========================================
             st.markdown("---")
             st.markdown("### 📄 Exportar y Compartir Reportes")
             
-            # Preparar archivos
-            pdf_basico = generar_pdf_usuarios(df_display_renamed if 'df_display_renamed' in locals() else df_display, DICCIONARIO_ROLES)
-            pdf_detallado = generar_pdf_usuarios_detallado(df_display_renamed if 'df_display_renamed' in locals() else df_display, DICCIONARIO_ROLES, DICCIONARIO_DESC)
+            # --- 1. Opciones de Generación ---
+            st.write("**1. Selecciona el contenido del reporte:**")
+            tipo_contenido = st.radio(
+                "Contenido:", 
+                ["Reporte Básico (Listado General)", "Reporte Detallado (Con Facultades)"], 
+                horizontal=True, 
+                label_visibility="collapsed"
+            )
             
-            # El Excel usa el df filtrado
-            df_para_excel = df_display_renamed if 'df_display_renamed' in locals() else df_display
-            df_para_excel = df_para_excel[["NOMBRE", "EMAIL", "MONEDA", "ROL", "ULTIMO ACCESO", "ESTADO"]].copy()
-            excel_directorio = generar_excel_bytes(df_para_excel, "Usuarios")
-            
-            c_desc_t1_1, c_desc_t1_2, c_desc_t1_3 = st.columns(3)
-            with c_desc_t1_1:
-                st.download_button("📄 PDF Básico", pdf_basico, "usuarios_basico.pdf", use_container_width=True)
-            with c_desc_t1_2:
-                st.download_button("📄 PDF Detallado", pdf_detallado, "usuarios_detallado.pdf", use_container_width=True)
-            with c_desc_t1_3:
-                st.download_button("📊 Directorio Excel", excel_directorio, "directorio_usuarios.xlsx", use_container_width=True)
+            st.write("**2. Selecciona el formato:**")
+            formato_archivo = st.radio(
+                "Formato:", 
+                ["PDF", "Excel"], 
+                horizontal=True, 
+                label_visibility="collapsed"
+            )
 
+            # --- 2. Preparar los datos según la elección ---
+            df_base = df_display_renamed if 'df_display_renamed' in locals() else df_display
+            
+            if tipo_contenido == "Reporte Básico (Listado General)":
+                nombre_base = "usuarios_basico"
+                if formato_archivo == "PDF":
+                    archivo_bytes = generar_pdf_usuarios(df_base, DICCIONARIO_ROLES)
+                    ext, mime = "pdf", "application/pdf"
+                else: # Excel
+                    df_excel = df_base[["NOMBRE", "EMAIL", "MONEDA", "ROL", "ULTIMO ACCESO", "ESTADO"]].copy()
+                    archivo_bytes = generar_excel_bytes(df_excel, "Usuarios_Basico")
+                    ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            else: # Detallado
+                nombre_base = "usuarios_detallado"
+                if formato_archivo == "PDF":
+                    archivo_bytes = generar_pdf_usuarios_detallado(df_base, DICCIONARIO_ROLES, DICCIONARIO_DESC)
+                    ext, mime = "pdf", "application/pdf"
+                else: # Excel (Creamos el df detallado al vuelo)
+                    df_excel_det = df_base[["NOMBRE", "ROL"]].copy()
+                    df_excel_det['FACULTADES ASIGNADAS'] = df_base['id_rol'].apply(
+                        lambda r: "\n".join([f"- {f}" for f in ordenar_facultades_alfabeticamente(DICCIONARIO_DESC.get(r, ""))]) if DICCIONARIO_DESC.get(r, "") else "Sin facultades"
+                    )
+                    archivo_bytes = generar_excel_bytes(df_excel_det, "Usuarios_Detallado")
+                    ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+            nombre_final_archivo = f"{nombre_base}.{ext}"
+
+            # --- 3. Botón de Descarga Directa ---
+            st.write("**3. Descargar al equipo:**")
+            st.download_button(
+                label=f"⬇️ Descargar {tipo_contenido.split(' ')[1]} en {formato_archivo}",
+                data=archivo_bytes,
+                file_name=nombre_final_archivo,
+                mime=mime,
+                use_container_width=True
+            )
+
+            # --- 4. Compartir ---
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("#### 📤 Compartir a Operadores")
+            st.write(f"*(Se enviará el archivo: **{nombre_final_archivo}**)*")
             
-            tipo_rep_t1 = st.radio("1. Reporte:", ["Básico (PDF)", "Detallado (PDF)", "Directorio (Excel)"], horizontal=True, key="rad_t1")
-            
-            # Mapeo de archivo a enviar
-            if tipo_rep_t1 == "Básico (PDF)":
-                archivo_t1, nombre_t1, ext_t1, mime_t1 = pdf_basico, "usuarios_basico.pdf", "pdf", "application/pdf"
-            elif tipo_rep_t1 == "Detallado (PDF)":
-                archivo_t1, nombre_t1, ext_t1, mime_t1 = pdf_detallado, "usuarios_detallado.pdf", "pdf", "application/pdf"
-            else:
-                archivo_t1, nombre_t1, ext_t1, mime_t1 = excel_directorio, "directorio_usuarios.xlsx", "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            
-            st.write("2. Selecciona medio y destinatario:")
             cols_env_t1 = st.columns(2)
             
+            # Correo
             with cols_env_t1[0]:
                 st.info("📧 Email")
                 sel_em_t1 = st.selectbox("Operador (Correo)", ["-- Seleccione --"] + lista_correos, key="em_t1")
                 if st.button("Enviar por Correo", use_container_width=True, key="btn_em_t1"):
                     if sel_em_t1 != "-- Seleccione --":
                         dest = sel_em_t1.split(" - ")[-1].strip()
-                        with st.spinner("Enviando..."):
-                            if enviar_reporte_correo(dest, archivo_t1, nombre_t1, "Directorio Usuarios", ext_t1):
+                        with st.spinner(f"Enviando {formato_archivo}..."):
+                            if enviar_reporte_correo(dest, archivo_bytes, nombre_final_archivo, tipo_contenido, ext):
                                 st.success("¡Enviado!")
-                                log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Directorio enviado a {dest}")
+                                log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"{tipo_contenido} enviado a {dest}")
                     else: 
                         st.warning("Elige un operador.")
 
+            # WhatsApp
             with cols_env_t1[1]:
                 st.success("💬 WhatsApp")
                 sel_wa_t1 = st.selectbox("Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos, key="wa_t1")
                 if sel_wa_t1 != "-- Seleccione --":
                     if st.button("Generar Link WhatsApp", use_container_width=True, key="btn_wa_t1"):
-                        with st.spinner("Subiendo..."):
+                        with st.spinner("Subiendo a la nube..."):
                             tel = re.sub(r'\D', '', sel_wa_t1.split(" - ")[-1].strip())
                             try:
                                 ts = int(time.time())
-                                path = f"directorio_{ts}.{ext_t1}"
-                                supabase.storage.from_("reportes").upload(path=path, file=archivo_t1, file_options={"content-type": mime_t1})
+                                path = f"{nombre_base}_{ts}.{ext}"
+                                supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes, file_options={"content-type": mime})
                                 link = supabase.storage.from_("reportes").get_public_url(path)
-                                msg = urllib.parse.quote(f"Hola, te comparto el {tipo_rep_t1} de Usuarios. Descarga aquí: {link}")
+                                msg = urllib.parse.quote(f"Hola, te comparto el {tipo_contenido} de Usuarios. Puedes descargarlo aquí: {link}")
                                 st.markdown(f'''<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold;">Abrir WhatsApp</button></a>''', unsafe_allow_html=True)
-                                log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Directorio WA a {sel_wa_t1}")
+                                log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"{tipo_contenido} WA a {sel_wa_t1}")
                             except Exception as e: 
-                                st.error(f"Error: {e}")
+                                st.error(f"Error al subir el archivo: {e}")
                 else: 
                     st.button("Generar Link WhatsApp", disabled=True, use_container_width=True, key="btn_wa_t1_dis")
-            
     # --- TAB 2: REGISTRO ---
     with tab2:
         st.subheader("Registrar Colaborador")
