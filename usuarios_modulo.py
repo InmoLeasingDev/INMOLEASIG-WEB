@@ -7,14 +7,13 @@ import time
 from fpdf import FPDF
 from datetime import datetime
 import zoneinfo
-import smtplib
-from email.message import EmailMessage
 import urllib.parse
-from herramientas import log_accion
+# --- NUESTRA NUEVA LIBRERÍA MAESTRA ---
+from herramientas import log_accion, enviar_reporte_correo, generar_excel_bytes
 
 
 # ==========================================
-# 0. FUNCIONES AUXILIARES Y LOGS
+# 0. FUNCIONES AUXILIARES
 # ==========================================
 def encriptar_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -62,45 +61,6 @@ LISTA_ICONOS = [
     '⚙️', '🛠️', '🔧', '🔒', '🔓', '🛡️', '✅', '❌', '🗑️', '✏️', '🔍',
     '🚰', '💡', '🔥', '⚡', '📊', '📑', '📄', '📅', '🚀', '🔔', '🌐', '📌', '📝'
 ]
-
-# ==========================================
-# 0.5 FUNCIÓN MOTOR DE CORREO (GMAIL SERVER)
-# ==========================================
-def enviar_reporte_correo(destinatario, pdf_bytes, nombre_archivo, tipo_reporte="Usuarios"):
-    try:
-        remitente = st.secrets.get("EMAIL_USER", "")
-        password = st.secrets.get("EMAIL_PASS", "") 
-
-        if not remitente or not password:
-            st.error("❌ Falla técnica: Faltan credenciales (EMAIL_USER / EMAIL_PASS) en los secretos.")
-            return False
-
-        msg = EmailMessage()
-        msg['Subject'] = f'Reporte de {tipo_reporte} - InmoLeasing ERP'
-        msg['From'] = remitente
-        msg['To'] = destinatario
-        
-        cuerpo_mensaje = f"""
-        Hola,
-        
-        Se ha generado un nuevo reporte de {tipo_reporte} desde la plataforma InmoLeasing.
-        Encontrarás el documento PDF adjunto a este correo.
-        
-        Saludos cordiales,
-        El equipo de InmoLeasing.
-        """
-        msg.set_content(cuerpo_mensaje)
-
-        msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=nombre_archivo)
-
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(remitente, password.replace(" ", "")) 
-            smtp.send_message(msg)
-            
-        return True
-    except Exception as e:
-        st.error(f"Error crítico al enviar el correo: {e}")
-        return False
 
 # ==========================================
 # 1. GENERADORES PDF (MÉTODO MILIMÉTRICO)
@@ -290,20 +250,20 @@ def generar_pdf_logs(df_logs):
         pdf.set_xy(x_ini, y_ini + h_fila)
         
     return pdf.output(dest='S').encode('latin-1')
+
 # ==========================================
 # 2. MÓDULO PRINCIPAL
 # ==========================================
 def mostrar_modulo_usuarios(supabase):
     st.header("👤 Gestión de Usuarios y Accesos")
-    MOD_VERSION = "v1.3"
+    MOD_VERSION = "v1.4"
     st.caption(f"⚙️ Módulo Usuarios {MOD_VERSION}")
-    # --- ATRAPAR SOLO EL NOMBRE DEL USUARIO ---
+    
     var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
     if isinstance(var_sesion, dict):
         usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR")
     else:
         usuario_actual = str(var_sesion)
-    # Intento de atrapar el nombre real del usuario desde las variables de sesión comunes
                         
     moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
     
@@ -340,6 +300,16 @@ def mostrar_modulo_usuarios(supabase):
             df_ops = df_ops[df_ops['estado'] == 'ACTIVO']
     except Exception:
         df_ops = pd.DataFrame()
+        
+    # --- LISTAS DE CONTACTOS GLOBALES PARA TODAS LAS PESTAÑAS ---
+    lista_correos = []
+    lista_telefonos = []
+    if not df_ops.empty:
+        for _, row in df_ops.iterrows():
+            if pd.notna(row.get('correo')) and str(row['correo']).strip():
+                lista_correos.append(f"{row.get('nombre', 'Sin Nombre')} - {row['correo']}")
+            if pd.notna(row.get('telefono')) and str(row['telefono']).strip():
+                lista_telefonos.append(f"{row.get('nombre', 'Sin Nombre')} - {row['telefono']}")
     
     if not df_raw.empty:
         if moneda_sesion != "ALL":
@@ -399,28 +369,19 @@ def mostrar_modulo_usuarios(supabase):
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("#### 📤 Compartir Reporte a Operadores")
             
-            tipo_envio = st.radio("1. ¿Qué reporte deseas compartir?", ["Reporte Básico", "Reporte Detallado"], horizontal=True)
+            tipo_envio = st.radio("1. ¿Qué reporte deseas compartir?", ["Reporte Básico", "Reporte Detallado"], horizontal=True, key="radio_tipo_rep")
             pdf_a_enviar = pdf_bytes_basico if tipo_envio == "Reporte Básico" else pdf_bytes_detallado
             nombre_pdf_enviar = "usuarios_basico.pdf" if tipo_envio == "Reporte Básico" else "usuarios_detallado.pdf"
             
             st.write("2. Selecciona el medio y el operador destinatario:")
             cols_envio = st.columns(2)
             
-            lista_correos = []
-            lista_telefonos = []
-            if not df_ops.empty:
-                for _, row in df_ops.iterrows():
-                    if pd.notna(row.get('correo')) and str(row['correo']).strip():
-                        lista_correos.append(f"{row.get('nombre', 'Sin Nombre')} - {row['correo']}")
-                    if pd.notna(row.get('telefono')) and str(row['telefono']).strip():
-                        lista_telefonos.append(f"{row.get('nombre', 'Sin Nombre')} - {row['telefono']}")
-            
             # --- Enviar por Correo ---
             with cols_envio[0]:
                 st.info("📧 Envío por Email")
                 if lista_correos:
-                    operador_email_sel = st.selectbox("Seleccionar Operador (Correo)", ["-- Seleccione --"] + lista_correos)
-                    if st.button("Enviar PDF por Correo", use_container_width=True):
+                    operador_email_sel = st.selectbox("Seleccionar Operador (Correo)", ["-- Seleccione --"] + lista_correos, key="sel_correo_t1")
+                    if st.button("Enviar PDF por Correo", use_container_width=True, key="btn_correo_t1"):
                         if operador_email_sel != "-- Seleccione --":
                             email_destinatario = operador_email_sel.split(" - ")[-1].strip()
                             with st.spinner("Conectando con el servidor de Gmail..."):
@@ -437,36 +398,31 @@ def mostrar_modulo_usuarios(supabase):
             with cols_envio[1]:
                 st.success("💬 Envío por WhatsApp")
                 if lista_telefonos:
-                    operador_tel_sel = st.selectbox("Seleccionar Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos)
+                    operador_tel_sel = st.selectbox("Seleccionar Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos, key="sel_wa_t1")
                     mensaje_base = f"Hola, te comparto el {tipo_envio} del modulo de Usuarios de InmoLeasing."
                     
                     if operador_tel_sel != "-- Seleccione --":
-                        if st.button("Generar Link y Abrir WhatsApp", use_container_width=True):
+                        if st.button("Generar Link y Abrir WhatsApp", use_container_width=True, key="btn_wa_t1"):
                             with st.spinner("Generando link seguro en la nube..."):
                                 telefono_wa = operador_tel_sel.split(" - ")[-1].strip()
                                 telefono_wa = re.sub(r'\D', '', telefono_wa) 
                                 
                                 try:
-                                    # Crear nombre único para no sobreescribir en el bucket
                                     timestamp_actual = int(time.time())
                                     ruta_nube = f"{nombre_pdf_enviar.replace('.pdf', '')}_{timestamp_actual}.pdf"
                                     
-                                    # Subir el archivo a Supabase Storage
                                     supabase.storage.from_("reportes").upload(
                                         path=ruta_nube,
                                         file=pdf_a_enviar,
                                         file_options={"content-type": "application/pdf"}
                                     )
                                     
-                                    # Obtener el link público
                                     link_pdf = supabase.storage.from_("reportes").get_public_url(ruta_nube)
                                     
-                                    # Armar el mensaje final
                                     mensaje_final = f"{mensaje_base} Puedes descargarlo de forma segura aquí: {link_pdf}"
                                     texto_codificado = urllib.parse.quote(mensaje_final)
                                     link_wa = f"https://wa.me/{telefono_wa}?text={texto_codificado}"
                                     
-                                    # Mostrar el botón verde al operador
                                     boton_html = f"""
                                     <a href="{link_wa}" target="_blank" style="text-decoration: none;">
                                         <button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:16px; margin-top:10px;">
@@ -481,9 +437,8 @@ def mostrar_modulo_usuarios(supabase):
                                     
                                 except Exception as e:
                                     st.error(f"Error al subir el archivo: {e}")
-                                    st.info("⚠️ Asegúrate de haber creado el bucket público llamado 'reportes' en Supabase.")
                     else:
-                        st.button("Generar Link y Abrir WhatsApp", disabled=True, use_container_width=True)
+                        st.button("Generar Link y Abrir WhatsApp", disabled=True, use_container_width=True, key="btn_wa_t1_dis")
                 else:
                     st.warning("No hay operadores registrados con teléfono.")
 
@@ -634,8 +589,92 @@ def mostrar_modulo_usuarios(supabase):
                         supabase.table("roles").delete().eq("id", int(r_row['id'])).execute()
                         st.rerun()
                         
+            # ==========================================
+            # EL NUEVO PANEL DE EXPORTACIÓN Y ENVÍO (ROLES)
+            # ==========================================
             st.markdown("---")
-            st.download_button("Descargar Matriz de Roles", generar_pdf_roles(df_roles), "matriz_roles.pdf")
+            st.markdown("### 📄 Exportar y Compartir Matriz de Roles")
+            
+            # Preparamos los archivos (PDF y Excel)
+            pdf_bytes_roles = generar_pdf_roles(df_roles)
+            
+            df_excel_roles = df_roles[['nombre_rol', 'descripcion']].copy()
+            df_excel_roles.rename(columns={'nombre_rol': 'ROL', 'descripcion': 'FACULTADES ASIGNADAS'}, inplace=True)
+            excel_bytes_roles = generar_excel_bytes(df_excel_roles, "Matriz_Roles")
+            
+            # Botones de descarga directa
+            c_desc_r1, c_desc_r2 = st.columns(2)
+            with c_desc_r1:
+                st.download_button("📄 Descargar en PDF", pdf_bytes_roles, "matriz_roles.pdf", use_container_width=True)
+            with c_desc_r2:
+                st.download_button("📊 Descargar en Excel", excel_bytes_roles, "matriz_roles.xlsx", use_container_width=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("#### 📤 Compartir Matriz a Operadores")
+            
+            tipo_archivo_rol = st.radio("1. Formato a enviar:", ["PDF", "Excel"], horizontal=True, key="radio_formato_roles")
+            
+            archivo_enviar_rol = pdf_bytes_roles if tipo_archivo_rol == "PDF" else excel_bytes_roles
+            nombre_archivo_rol = "matriz_roles.pdf" if tipo_archivo_rol == "PDF" else "matriz_roles.xlsx"
+            ext_real = "pdf" if tipo_archivo_rol == "PDF" else "xlsx"
+            mime_type_rol = "application/pdf" if tipo_archivo_rol == "PDF" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            
+            st.write("2. Selecciona el medio y el operador destinatario:")
+            cols_envio_rol = st.columns(2)
+            
+            # --- Enviar por Correo ---
+            with cols_envio_rol[0]:
+                st.info("📧 Envío por Email")
+                if lista_correos:
+                    op_email_rol = st.selectbox("Seleccionar Operador (Correo)", ["-- Seleccione --"] + lista_correos, key="sel_correo_rol")
+                    if st.button("Enviar por Correo", use_container_width=True, key="btn_correo_rol"):
+                        if op_email_rol != "-- Seleccione --":
+                            email_dest = op_email_rol.split(" - ")[-1].strip()
+                            with st.spinner("Enviando correo..."):
+                                exito = enviar_reporte_correo(email_dest, archivo_enviar_rol, nombre_archivo_rol, "Matriz de Roles", ext_real)
+                                if exito:
+                                    st.success(f"Enviado a {email_dest}")
+                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Matriz Roles enviada a {email_dest}")
+                        else:
+                            st.warning("Selecciona un operador.")
+                else:
+                    st.warning("No hay operadores con correo.")
+
+            # --- Enviar por WhatsApp ---
+            with cols_envio_rol[1]:
+                st.success("💬 Envío por WhatsApp")
+                if lista_telefonos:
+                    op_wa_rol = st.selectbox("Seleccionar Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos, key="sel_wa_rol")
+                    mensaje_base_rol = f"Hola, te comparto la Matriz de Roles de InmoLeasing en formato {tipo_archivo_rol}."
+                    
+                    if op_wa_rol != "-- Seleccione --":
+                        if st.button("Generar Link WhatsApp", use_container_width=True, key="btn_wa_rol"):
+                            with st.spinner("Subiendo a la nube segura..."):
+                                tel_wa = re.sub(r'\D', '', op_wa_rol.split(" - ")[-1].strip())
+                                try:
+                                    ts_actual = int(time.time())
+                                    ruta_nube_rol = f"matriz_roles_{ts_actual}.{ext_real}"
+                                    
+                                    supabase.storage.from_("reportes").upload(
+                                        path=ruta_nube_rol,
+                                        file=archivo_enviar_rol,
+                                        file_options={"content-type": mime_type_rol}
+                                    )
+                                    link_rol = supabase.storage.from_("reportes").get_public_url(ruta_nube_rol)
+                                    
+                                    msg_final_rol = f"{mensaje_base_rol} Descárgalo aquí: {link_rol}"
+                                    link_wa_final = f"https://wa.me/{tel_wa}?text={urllib.parse.quote(msg_final_rol)}"
+                                    
+                                    btn_html_rol = f'''<a href="{link_wa_final}" target="_blank" style="text-decoration: none;"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:16px; margin-top:10px;">Abrir chat de WhatsApp</button></a>'''
+                                    st.markdown(btn_html_rol, unsafe_allow_html=True)
+                                    
+                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Matriz Roles por WA a {op_wa_rol}")
+                                except Exception as e:
+                                    st.error(f"Error nube: {e}")
+                    else:
+                        st.button("Generar Link WhatsApp", disabled=True, use_container_width=True, key="btn_wa_rol_dis")
+                else:
+                    st.warning("No hay operadores con teléfono.")
 
     # --- TAB 5: LOGS Y AUDITORÍA ---
     with tab5:
@@ -662,8 +701,6 @@ def mostrar_modulo_usuarios(supabase):
                 
                 st.dataframe(df_visual, use_container_width=True, hide_index=True)
                 st.download_button("Descargar Auditoría", generar_pdf_logs(df_l), "auditoria.pdf")
-        #except Exception: 
-        #    st.info("Sin registros.")
         except Exception as e:
             st.error(f"🚨 Error detectado: {e}")
             st.info("Sin registros.")
