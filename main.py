@@ -66,7 +66,7 @@ st.markdown("""
         .stButton button { margin-top: -1.5rem !important; }
     </style>
 """, unsafe_allow_html=True)
-
+# linea 69 de error de  identacion 
 # ==========================================
 # 2. FUNCIONES DE SEGURIDAD
 # ==========================================
