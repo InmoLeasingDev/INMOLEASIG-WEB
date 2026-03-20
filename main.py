@@ -5,8 +5,8 @@ from supabase import create_client
 import hashlib
 from datetime import datetime
 import propietarios_modulo 
-import usuarios_modulo
 import operadores_modulo
+import usuarios_modulo
 
 # ==========================================
 # FUNCIONES DE INTERFAZ Y SONIDO
@@ -66,7 +66,7 @@ st.markdown("""
         .stButton button { margin-top: -1.5rem !important; }
     </style>
 """, unsafe_allow_html=True)
-# linea 69 de error de  identacion 
+
 # ==========================================
 # 2. FUNCIONES DE SEGURIDAD
 # ==========================================
