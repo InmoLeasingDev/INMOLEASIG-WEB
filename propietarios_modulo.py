@@ -4,35 +4,16 @@ import re
 import time
 import urllib.parse
 from fpdf import FPDF
-import smtplib
-from email.message import EmailMessage
 import zoneinfo
 from datetime import datetime
-from herramientas import log_accion
+# --- NUESTRA LIBRERÍA MAESTRA ---
+from herramientas import log_accion, enviar_reporte_correo, generar_excel_bytes
 
 # ==========================================
-# 1. FUNCIONES AUXILIARES Y CORREO
+# 1. FUNCIONES AUXILIARES
 # ==========================================
-
 def limpiar_texto_pdf(texto):
     return str(texto).encode('latin-1', 'ignore').decode('latin-1') if pd.notna(texto) else ""
-
-def enviar_reporte_correo(destinatario, pdf_bytes, nombre_archivo, tipo_reporte="Propietarios"):
-    try:
-        remitente = st.secrets.get("EMAIL_USER", "")
-        password = st.secrets.get("EMAIL_PASS", "") 
-        msg = EmailMessage()
-        msg['Subject'] = f'Reporte de {tipo_reporte} - InmoLeasing ERP'
-        msg['From'] = remitente
-        msg['To'] = destinatario
-        msg.set_content(f"Hola,\n\nSe adjunta el reporte de {tipo_reporte} generado desde InmoLeasing.\n\nSaludos.")
-        msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=nombre_archivo)
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(remitente, password.replace(" ", "")) 
-            smtp.send_message(msg)
-        return True
-    except Exception as e:
-        st.error(f"❌ Error al enviar el correo: {e}"); return False
 
 # ==========================================
 # 2. MOTORES PDF (Básico y Detallado)
@@ -120,47 +101,114 @@ def mostrar_modulo_propietarios(supabase):
                 
             st.dataframe(df_display[['nombre', 'tipo_id', 'identificacion', 'movil', 'correo', 'moneda']], use_container_width=True, hide_index=True)
             
+            # ==========================================
+            # NUEVO PANEL DE EXPORTACIÓN TAB 1 (FLEXIBLE)
+            # ==========================================
             st.markdown("---")
-            st.markdown("### 📄 Exportar y Compartir")
-            pdf_b = generar_pdf_propietarios(df_display, detallado=False)
-            pdf_d = generar_pdf_propietarios(df_display, detallado=True)
+            st.markdown("### 📄 Exportar y Compartir Reportes")
             
-            c1, c2 = st.columns(2)
-            c1.download_button("📄 Descargar PDF Básico", pdf_b, "propietarios_basico.pdf")
-            c2.download_button("📊 Descargar PDF Detallado", pdf_d, "propietarios_detallado.pdf")
+            # --- 1. Opciones de Generación ---
+            st.write("**1. Selecciona el contenido del reporte:**")
+            tipo_contenido = st.radio(
+                "Contenido:", 
+                ["Reporte Básico", "Reporte Detallado"], 
+                horizontal=True, 
+                label_visibility="collapsed",
+                key="radio_cont_prop"
+            )
+            
+            st.write("**2. Selecciona el formato:**")
+            formato_archivo = st.radio(
+                "Formato:", 
+                ["PDF", "Excel"], 
+                horizontal=True, 
+                label_visibility="collapsed",
+                key="radio_form_prop"
+            )
 
+            # --- 2. Preparar los datos según la elección ---
+            es_detallado = (tipo_contenido == "Reporte Detallado")
+            nombre_base = "propietarios_detallado" if es_detallado else "propietarios_basico"
+            
+            if formato_archivo == "PDF":
+                archivo_bytes = generar_pdf_propietarios(df_display, detallado=es_detallado)
+                ext, mime = "pdf", "application/pdf"
+            else: # Excel
+                if es_detallado:
+                    df_excel = df_display[['nombre', 'identificacion', 'movil', 'correo', 'moneda', 'banco', 'cuenta_banco']].copy()
+                    df_excel.rename(columns={'nombre':'NOMBRE', 'identificacion':'ID', 'movil':'MOVIL', 'correo':'CORREO', 'moneda':'MONEDA', 'banco':'BANCO', 'cuenta_banco':'CUENTA'}, inplace=True)
+                else:
+                    df_excel = df_display[['nombre', 'identificacion', 'movil', 'correo']].copy()
+                    df_excel.rename(columns={'nombre':'NOMBRE', 'identificacion':'ID', 'movil':'MOVIL', 'correo':'CORREO'}, inplace=True)
+                
+                archivo_bytes = generar_excel_bytes(df_excel, "Propietarios")
+                ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+            nombre_final_archivo = f"{nombre_base}.{ext}"
+
+            # --- 3. Botón de Descarga Directa ---
+            st.write("**3. Descargar al equipo:**")
+            st.download_button(
+                label=f"⬇️ Descargar {tipo_contenido} en {formato_archivo}",
+                data=archivo_bytes,
+                file_name=nombre_final_archivo,
+                mime=mime,
+                use_container_width=True
+            )
+
+            # --- 4. Compartir ---
+            st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("#### 📤 Compartir a Operadores")
-            tipo_r = st.radio("Selecciona el reporte:", ["Básico", "Detallado"], horizontal=True)
-            pdf_sel = pdf_b if tipo_r == "Básico" else pdf_d
+            st.write(f"*(Se enviará el archivo: **{nombre_final_archivo}**)*")
             
-            col_e = st.columns(2)
-            with col_e[0]:
-                lista_c = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if r['correo']]
-                op_c = st.selectbox("📧 Enviar por Correo a:", ["-- Seleccione --"] + lista_c)
-                if st.button("Enviar Email", use_container_width=True):
-                    if op_c != "-- Seleccione --":
-                        dest = op_c.split(" - ")[-1]
-                        if enviar_reporte_correo(dest, pdf_sel, "propietarios.pdf"):
-                            st.success("✅ Enviado"); log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Propietarios a {dest}")
+            cols_env_t1 = st.columns(2)
+            
+            # Preparar listas de contactos
+            lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if r['correo']]
+            lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if r['telefono']]
+            
+            # Correo
+            with cols_env_t1[0]:
+                st.info("📧 Email")
+                if lista_correos:
+                    sel_em_t1 = st.selectbox("Operador (Correo)", ["-- Seleccione --"] + lista_correos, key="em_prop_t1")
+                    if st.button("Enviar por Correo", use_container_width=True, key="btn_em_prop"):
+                        if sel_em_t1 != "-- Seleccione --":
+                            dest = sel_em_t1.split(" - ")[-1].strip()
+                            with st.spinner(f"Enviando {formato_archivo}..."):
+                                if enviar_reporte_correo(dest, archivo_bytes, nombre_final_archivo, tipo_contenido, ext):
+                                    st.success("¡Enviado!")
+                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"{tipo_contenido} a {dest}")
+                        else: 
+                            st.warning("Elige un operador.")
+                else:
+                    st.warning("No hay operadores con correo.")
 
-            with col_e[1]:
-                lista_t = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if r['telefono']]
-                op_t = st.selectbox("💬 Compartir por WhatsApp a:", ["-- Seleccione --"] + lista_t)
-                if st.button("Generar Link WhatsApp", use_container_width=True):
-                    if op_t != "-- Seleccione --":
-                        with st.spinner("Subiendo a la nube..."):
-                            tel = re.sub(r'\D', '', op_t.split(" - ")[-1])
-                            ruta = f"prop_{int(time.time())}.pdf"
-                            try:
-                                supabase.storage.from_("reportes").upload(path=ruta, file=pdf_sel, file_options={"content-type":"application/pdf"})
-                                url = supabase.storage.from_("reportes").get_public_url(ruta)
-                                msg_wa = urllib.parse.quote(f"Hola, te comparto el reporte de Propietarios InmoLeasing: {url}")
-                                st.markdown(f'<a href="https://wa.me/{tel}?text={msg_wa}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;border:none;padding:10px;border-radius:5px;">Abrir Chat</button></a>', unsafe_allow_html=True)
-                                log_accion(supabase, usuario_actual, "ENVIO WA", f"Propietarios a {op_t}")
-                            except Exception as e: st.error(f"❌ Error: {e}")
+            # WhatsApp
+            with cols_env_t1[1]:
+                st.success("💬 WhatsApp")
+                if lista_telefonos:
+                    sel_wa_t1 = st.selectbox("Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos, key="wa_prop_t1")
+                    if sel_wa_t1 != "-- Seleccione --":
+                        if st.button("Generar Link WhatsApp", use_container_width=True, key="btn_wa_prop"):
+                            with st.spinner("Subiendo a la nube..."):
+                                tel = re.sub(r'\D', '', sel_wa_t1.split(" - ")[-1].strip())
+                                try:
+                                    ts = int(time.time())
+                                    path = f"{nombre_base}_{ts}.{ext}"
+                                    supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes, file_options={"content-type": mime})
+                                    link = supabase.storage.from_("reportes").get_public_url(path)
+                                    msg = urllib.parse.quote(f"Hola, te comparto el {tipo_contenido} de Propietarios. Puedes descargarlo aquí: {link}")
+                                    st.markdown(f'''<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold;">Abrir WhatsApp</button></a>''', unsafe_allow_html=True)
+                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"{tipo_contenido} WA a {sel_wa_t1}")
+                                except Exception as e: 
+                                    st.error(f"Error al subir: {e}")
+                    else: 
+                        st.button("Generar Link WhatsApp", disabled=True, use_container_width=True, key="btn_wa_prop_dis")
+                else:
+                    st.warning("No hay operadores con teléfono.")
         else:
             st.info("ℹ️ No hay propietarios registrados o activos en tu región.")
-
     # ==========================================
     # TAB 2: NUEVO PROPIETARIO
     # ==========================================
