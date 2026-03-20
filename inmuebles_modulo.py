@@ -252,7 +252,7 @@ def mostrar_modulo_inmuebles(supabase):
                     c1, c2, c3 = st.columns(3)
                     u_prop = c1.selectbox("Pertenece a la Propiedad *", opciones_prop)
                     u_nom = c2.text_input("Nombre de la Unidad *", placeholder="Ej: Habitación 1, PH 2, S02")
-                    u_tip = c3.selectbox("Tipo *", ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "OTRO"])
+                    u_tip = c3.selectbox("Tipo *", ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "PARQUEADERO", "OTRO"])
                     
                     if st.form_submit_button("💾 Guardar Unidad"):
                         if u_prop != "-- Seleccione --" and u_nom:
@@ -296,7 +296,7 @@ def mostrar_modulo_inmuebles(supabase):
                                 st.write(f"Actualizando: **{datos_u_edit['PROPIEDAD']}**")
                                 e_c1, e_c2 = st.columns(2)
                                 e_nom = e_c1.text_input("Nombre de la Unidad", datos_u_edit['nombre'])
-                                lista_tipos = ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "OTRO"]
+                                lista_tipos = ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "PARQUEADERO", "OTRO"]
                                 idx_tip = lista_tipos.index(datos_u_edit['tipo']) if datos_u_edit['tipo'] in lista_tipos else 0
                                 e_tip = e_c2.selectbox("Tipo", lista_tipos, index=idx_tip)
                                 
