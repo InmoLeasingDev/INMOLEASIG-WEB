@@ -12,21 +12,32 @@ from datetime import datetime
 # ==========================================
 # 0. FUNCIONES AUXILIARES Y LOGS
 # ==========================================
+
 def log_accion(supabase, usuario, accion, detalle):
     try:
+        # --- NUEVO: FILTRO INTELIGENTE DE USUARIO ---
+        # Si 'usuario' es un diccionario (el paquete completo), sacamos solo el nombre
+        if isinstance(usuario, dict):
+            nombre_limpio = usuario.get("nombre", "Usuario Desconocido")
+        else:
+            # Si ya es un texto (como en el módulo usuarios), lo dejamos tal cual
+            nombre_limpio = str(usuario)
+        # --------------------------------------------
+
         # 1. Calculamos la hora exacta de Madrid
         zona_madrid = zoneinfo.ZoneInfo("Europe/Madrid")
         hora_exacta = datetime.now(zona_madrid).strftime("%Y-%m-%d %H:%M:%S")
         
-        # 2. Insertamos en tu columna 'fecha'
+        # 2. Insertamos en tu base de datos con el nombre ya limpio
         supabase.table("logs_actividad").insert({
-            "usuario": usuario, 
+            "usuario": nombre_limpio, 
             "accion": accion, 
             "detalle": detalle,
             "fecha": hora_exacta
         }).execute()
     except Exception as e:
         print(f"Error al registrar log: {e}")
+
 def limpiar_texto_pdf(texto):
     if pd.isna(texto): return ""
     return str(texto).encode('latin-1', 'ignore').decode('latin-1')
