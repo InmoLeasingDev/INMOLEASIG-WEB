@@ -26,23 +26,64 @@ def mostrar_modulo_inmuebles(supabase):
     # ==========================================
     # TAB 1: PROPIEDADES (El Cascarón)
     # ==========================================
+    # ==========================================
+    # TAB 1: PROPIEDADES (El Cascarón)
+    # ==========================================
     with tab1:
         st.subheader("Catálogo de Propiedades Base")
         st.info("💡 Aquí daremos de alta el edificio o casa principal (Ej: Edificio Los Alpes, Casa Calle 5).")
         
-        # Prueba de lectura de la tabla que creamos en SQL
+        # --- 1. FORMULARIO NUEVA PROPIEDAD ---
+        with st.expander("➕ Añadir Nueva Propiedad", expanded=False):
+            with st.form("form_nueva_propiedad"):
+                st.write("Datos Generales del Inmueble")
+                c1, c2, c3 = st.columns(3)
+                n_nom = c1.text_input("Nombre / Dirección Principal *", placeholder="Ej: Edificio Central")
+                n_tip = c2.selectbox("Tipo de Propiedad *", ["EDIFICIO", "CASA", "LOCAL COMERCIAL", "LOTE/TERRENO", "OTRO"])
+                n_ciu = c3.text_input("Ciudad *")
+                
+                st.write("Datos del Seguro (Opcional)")
+                c4, c5, c6 = st.columns(3)
+                n_ase = c4.text_input("Aseguradora")
+                n_pol = c5.text_input("Número de Póliza")
+                n_tel_ase = c6.text_input("Teléfono Aseguradora")
+                
+                if st.form_submit_button("💾 Guardar Propiedad"):
+                    if n_nom and n_tip and n_ciu:
+                        datos_insert = {
+                            "nombre": n_nom.strip().upper(),
+                            "tipo": n_tip,
+                            "ciudad": n_ciu.strip().upper(),
+                            "aseguradora": n_ase.strip().upper(),
+                            "numero_poliza": n_pol.strip().upper(),
+                            "telefono_aseguradora": n_tel_ase.strip(),
+                            "estado": "ACTIVO"
+                        }
+                        try:
+                            supabase.table("inmuebles").insert(datos_insert).execute()
+                            log_accion(supabase, usuario_actual, "CREAR PROPIEDAD", n_nom.strip().upper())
+                            st.success("✅ Propiedad registrada con éxito.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al guardar: {e}")
+                    else:
+                        st.warning("⚠️ Los campos con asterisco (*) son obligatorios.")
+
+        st.markdown("---")
+        
+        # --- 2. TABLA DE PROPIEDADES ---
         try:
-            res_inm = supabase.table("inmuebles").select("*").execute()
+            res_inm = supabase.table("inmuebles").select("*").order("id", desc=True).execute()
             df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
             
             if not df_inm.empty:
-                st.dataframe(df_inm, use_container_width=True)
+                df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'aseguradora', 'estado']].copy()
+                df_display.rename(columns={'id': 'ID', 'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'aseguradora': 'ASEGURADORA', 'estado': 'ESTADO'}, inplace=True)
+                st.dataframe(df_display, use_container_width=True, hide_index=True)
             else:
-                st.write("Aún no hay propiedades registradas en la base de datos.")
+                st.info("Aún no hay propiedades registradas en la base de datos.")
         except Exception as e:
             st.error(f"Error de conexión con la tabla inmuebles: {e}")
-
-        st.button("➕ Simular Botón: Nueva Propiedad", disabled=True)
 
     # ==========================================
     # TAB 2: UNIDADES (Las Divisiones)
