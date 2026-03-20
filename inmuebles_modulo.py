@@ -44,6 +44,37 @@ def generar_pdf_propiedades(df):
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================
+# 2. MOTOR PDF UNIDADES
+# ==========================================
+def generar_pdf_unidades(df):
+    pdf = FPDF() # Vertical
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - DIRECTORIO DE UNIDADES", ln=True, align="C")
+    pdf.ln(5)
+
+    pdf.set_font("Arial", "B", 10)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [80, 60, 50]
+    headers = ["PROPIEDAD", "UNIDAD", "TIPO"]
+    for i, h in enumerate(headers):
+        pdf.cell(cw[i], 8, h, 1, 0, "C", True)
+    pdf.ln()
+
+    pdf.set_font("Arial", "", 9)
+    for _, row in df.iterrows():
+        textos = [str(row.get('PROPIEDAD', '')), str(row.get('UNIDAD', '')), str(row.get('TIPO', ''))]
+        textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
+        h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
+        if pdf.get_y() + h_fila > 270: pdf.add_page()
+        x, y = pdf.get_x(), pdf.get_y()
+        for i, txt in enumerate(textos):
+            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
+        pdf.set_xy(10, y + h_fila)
+    return pdf.output(dest='S').encode('latin-1')
+
+# ==========================================
 # MÓDULO PRINCIPAL: INMUEBLES
 # ==========================================
 def mostrar_modulo_inmuebles(supabase):
@@ -195,7 +226,16 @@ def mostrar_modulo_inmuebles(supabase):
         st.subheader("Subdivisión de Espacios Rentables")
         st.info("💡 Aquí dividimos la propiedad (Ej: Piso 2B) en las unidades que vamos a alquilar (Ej: Habitación 1, Suite 3). Si se alquila completo, ponle el mismo nombre del local.")
         
+        # --- Cargar Operadores para los envíos ---
+        try:
+            res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
+            df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+        except:
+            df_ops = pd.DataFrame()
+
+        # 1. Traer los inmuebles activos
         query_inm = supabase.table("inmuebles").select("id, nombre").eq("estado", "ACTIVO")
+        moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
         if moneda_sesion != "ALL": query_inm = query_inm.eq("moneda", moneda_sesion)
         res_prop = query_inm.order("nombre").execute()
         df_prop = pd.DataFrame(res_prop.data) if res_prop.data else pd.DataFrame()
@@ -206,6 +246,7 @@ def mostrar_modulo_inmuebles(supabase):
             dict_prop = dict(zip(df_prop['id'], df_prop['nombre']))
             opciones_prop = ["-- Seleccione --"] + df_prop['nombre'].tolist()
             
+            # --- 1. FORMULARIO NUEVA UNIDAD (CREATE) ---
             with st.expander("➕ Añadir Nueva Unidad", expanded=False):
                 with st.form("form_nueva_unidad"):
                     c1, c2, c3 = st.columns(3)
@@ -229,17 +270,99 @@ def mostrar_modulo_inmuebles(supabase):
                             st.warning("⚠️ Debes seleccionar una propiedad y darle un nombre a la unidad.")
             
             st.markdown("---")
-            res_uni = supabase.table("unidades").select("*").eq("estado", "ACTIVO").execute()
+            
+            # --- 2. LECTURA DE DATOS (READ) ---
+            res_uni = supabase.table("unidades").select("id, id_inmueble, nombre, tipo").eq("estado", "ACTIVO").execute()
             df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
             
             if not df_uni.empty:
-                df_uni = df_uni[df_uni['id_inmueble'].isin(df_prop['id'])]
+                df_uni = df_uni[df_uni['id_inmueble'].isin(df_prop['id'])].copy()
                 if not df_uni.empty:
                     df_uni['PROPIEDAD'] = df_uni['id_inmueble'].map(dict_prop)
+                    df_uni['selector'] = df_uni['PROPIEDAD'] + " - " + df_uni['nombre']
+                    
                     df_uni_display = df_uni[['PROPIEDAD', 'nombre', 'tipo']].copy()
                     df_uni_display.rename(columns={'nombre': 'UNIDAD', 'tipo': 'TIPO'}, inplace=True)
                     df_uni_display = df_uni_display.sort_values(by=['PROPIEDAD', 'UNIDAD'])
+                    
                     st.dataframe(df_uni_display, use_container_width=True, hide_index=True)
+                    
+                    # --- 3. GESTIONAR UNIDAD (UPDATE / DELETE) ---
+                    with st.expander("⚙️ Gestionar / Editar Unidad", expanded=False):
+                        uni_sel = st.selectbox("Seleccione la unidad a editar:", df_uni['selector'].sort_values().tolist())
+                        if uni_sel:
+                            datos_u_edit = df_uni[df_uni['selector'] == uni_sel].iloc[0]
+                            with st.form("form_editar_uni"):
+                                st.write(f"Actualizando: **{datos_u_edit['PROPIEDAD']}**")
+                                e_c1, e_c2 = st.columns(2)
+                                e_nom = e_c1.text_input("Nombre de la Unidad", datos_u_edit['nombre'])
+                                lista_tipos = ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "OTRO"]
+                                idx_tip = lista_tipos.index(datos_u_edit['tipo']) if datos_u_edit['tipo'] in lista_tipos else 0
+                                e_tip = e_c2.selectbox("Tipo", lista_tipos, index=idx_tip)
+                                
+                                col_btn1, col_btn2 = st.columns(2)
+                                if col_btn1.form_submit_button("📝 Guardar Cambios"):
+                                    datos_upd = {"nombre": e_nom.strip().upper(), "tipo": e_tip}
+                                    supabase.table("unidades").update(datos_upd).eq("id", int(datos_u_edit['id'])).execute()
+                                    log_accion(supabase, usuario_actual, "EDITAR UNIDAD", e_nom.strip().upper())
+                                    st.success("✅ Actualizado correctamente.")
+                                    time.sleep(1)
+                                    st.rerun()
+                                    
+                            if st.button("🚫 Dar de Baja (Eliminar) Unidad"):
+                                supabase.table("unidades").update({"estado": "INACTIVO"}).eq("id", int(datos_u_edit['id'])).execute()
+                                log_accion(supabase, usuario_actual, "ELIMINAR UNIDAD", datos_u_edit['nombre'])
+                                st.success("✅ Unidad dada de baja.")
+                                time.sleep(1)
+                                st.rerun()
+
+                    # --- 4. EXPORTAR Y COMPARTIR ---
+                    st.markdown("---")
+                    st.markdown("### 📄 Exportar y Compartir Listado")
+                    formato_archivo_u = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True, key="radio_form_uni")
+                    if formato_archivo_u == "PDF":
+                        archivo_bytes_u = generar_pdf_unidades(df_uni_display)
+                        ext_u, mime_u = "pdf", "application/pdf"
+                    else:
+                        archivo_bytes_u = generar_excel_bytes(df_uni_display, "Unidades")
+                        ext_u, mime_u = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    
+                    nombre_final_u = f"directorio_unidades.{ext_u}"
+                    st.download_button(f"⬇️ Descargar en {formato_archivo_u}", data=archivo_bytes_u, file_name=nombre_final_u, mime=mime_u, use_container_width=True)
+
+                    st.markdown("#### 📤 Compartir a Operadores")
+                    cols_env = st.columns(2)
+                    lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if pd.notna(r.get('correo')) and r['correo']]
+                    lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if pd.notna(r.get('telefono')) and r['telefono']]
+                    
+                    with cols_env[0]:
+                        st.info("📧 Email")
+                        sel_em = st.selectbox("Operador (Correo)", ["-- Seleccione --"] + lista_correos, key="em_uni")
+                        if st.button("Enviar por Correo", use_container_width=True, key="btn_em_uni"):
+                            if sel_em != "-- Seleccione --":
+                                dest = sel_em.split(" - ")[-1].strip()
+                                with st.spinner(f"Enviando {formato_archivo_u}..."):
+                                    if enviar_reporte_correo(dest, archivo_bytes_u, nombre_final_u, "Unidades", ext_u):
+                                        st.success("¡Enviado!"); log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Unidades a {dest}")
+                            else: st.warning("Elige un operador.")
+                            
+                    with cols_env[1]:
+                        st.success("💬 WhatsApp")
+                        sel_wa = st.selectbox("Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos, key="wa_uni")
+                        if sel_wa != "-- Seleccione --":
+                            if st.button("Generar Link WA", use_container_width=True, key="btn_wa_uni"):
+                                with st.spinner("Subiendo..."):
+                                    tel = re.sub(r'\D', '', sel_wa.split(" - ")[-1].strip())
+                                    try:
+                                        path = f"unidades_{int(time.time())}.{ext_u}"
+                                        supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes_u, file_options={"content-type": mime_u})
+                                        url = supabase.storage.from_("reportes").get_public_url(path)
+                                        msg = urllib.parse.quote(f"Hola, te comparto el Directorio de Unidades: {url}")
+                                        st.markdown(f'<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;border:none;padding:10px;border-radius:5px;">Abrir WhatsApp</button></a>', unsafe_allow_html=True)
+                                        log_accion(supabase, usuario_actual, "ENVIO WA", f"Unidades a {sel_wa}")
+                                    except Exception as e: st.error(f"Error: {e}")
+                        else: st.button("Generar Link WA", disabled=True, use_container_width=True)
+
                 else: st.info("No hay unidades registradas para las propiedades actuales.")
             else: st.info("Aún no hay unidades registradas en el sistema.")
     # ==========================================
