@@ -19,8 +19,9 @@ def generar_pdf_propiedades(df):
 
     pdf.set_font("Arial", "B", 9)
     pdf.set_fill_color(200, 220, 255)
-    cw = [15, 60, 30, 40, 50, 40]
-    headers = ["ID", "NOMBRE", "TIPO", "CIUDAD", "ASEGURADORA", "POLIZA"]
+    # Ajustamos anchos: quitamos ID y agregamos MONEDA
+    cw = [65, 35, 45, 25, 55, 45] 
+    headers = ["NOMBRE", "TIPO", "CIUDAD", "MONEDA", "ASEGURADORA", "POLIZA"]
     for i, h in enumerate(headers):
         pdf.cell(cw[i], 8, h, 1, 0, "C", True)
     pdf.ln()
@@ -28,8 +29,9 @@ def generar_pdf_propiedades(df):
     pdf.set_font("Arial", "", 8)
     for _, row in df.iterrows():
         textos = [
-            str(row.get('ID', '')), str(row.get('NOMBRE', '')), str(row.get('TIPO', '')),
-            str(row.get('CIUDAD', '')), str(row.get('ASEGURADORA', '')), str(row.get('numero_poliza', ''))
+            str(row.get('NOMBRE', '')), str(row.get('TIPO', '')),
+            str(row.get('CIUDAD', '')), str(row.get('MONEDA', '')), 
+            str(row.get('ASEGURADORA', '')), str(row.get('numero_poliza', ''))
         ]
         textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
         h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
@@ -40,7 +42,6 @@ def generar_pdf_propiedades(df):
             pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
         pdf.set_xy(10, y + h_fila)
     return pdf.output(dest='S').encode('latin-1')
-
 
 # ==========================================
 # MÓDULO PRINCIPAL: INMUEBLES
@@ -141,8 +142,8 @@ def mostrar_modulo_inmuebles(supabase):
             # Mostrar la tabla incluyendo la columna moneda
             df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'moneda', 'aseguradora', 'numero_poliza']].copy()
             df_display.rename(columns={'id': 'ID', 'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'moneda': 'MONEDA', 'aseguradora': 'ASEGURADORA'}, inplace=True)
-            st.dataframe(df_display[['ID', 'NOMBRE', 'TIPO', 'CIUDAD', 'MONEDA', 'ASEGURADORA']], use_container_width=True, hide_index=True)
-            
+            # Ocultamos el ID en la vista de la pantalla
+            st.dataframe(df_display[['NOMBRE', 'TIPO', 'CIUDAD', 'MONEDA', 'ASEGURADORA']], use_container_width=True, hide_index=True)
             # --- 3. GESTIONAR PROPIEDAD (UPDATE / DELETE) ---
             with st.expander("⚙️ Gestionar / Editar Propiedad", expanded=False):
                 prop_sel = st.selectbox("Seleccione la propiedad a editar:", df_display['NOMBRE'].tolist())
@@ -187,12 +188,12 @@ def mostrar_modulo_inmuebles(supabase):
             st.markdown("### 📄 Exportar y Compartir")
             
             formato_archivo = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True, key="radio_form_inm")
-            
             if formato_archivo == "PDF":
                 archivo_bytes = generar_pdf_propiedades(df_display)
                 ext, mime = "pdf", "application/pdf"
             else:
-                archivo_bytes = generar_excel_bytes(df_display[['ID', 'NOMBRE', 'TIPO', 'CIUDAD', 'MONEDA', 'ASEGURADORA']], "Propiedades")
+                # Ocultamos el ID en la exportación a Excel
+                archivo_bytes = generar_excel_bytes(df_display[['NOMBRE', 'TIPO', 'CIUDAD', 'MONEDA', 'ASEGURADORA']], "Propiedades")
                 ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 
             nombre_final_archivo = f"directorio_propiedades.{ext}"
