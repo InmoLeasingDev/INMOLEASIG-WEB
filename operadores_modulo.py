@@ -6,20 +6,27 @@ from email.message import EmailMessage
 import urllib.parse
 import re
 import time 
+import zoneinfo
+from datetime import datetime
 
 # ==========================================
 # 0. FUNCIONES AUXILIARES Y LOGS
 # ==========================================
 def log_accion(supabase, usuario, accion, detalle):
     try:
+        # 1. Calculamos la hora exacta de Madrid
+        zona_madrid = zoneinfo.ZoneInfo("Europe/Madrid")
+        hora_exacta = datetime.now(zona_madrid).strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 2. Insertamos en tu columna 'fecha'
         supabase.table("logs_actividad").insert({
             "usuario": usuario, 
             "accion": accion, 
-            "detalle": detalle
+            "detalle": detalle,
+            "fecha": hora_exacta
         }).execute()
-    except Exception:
-        pass 
-
+    except Exception as e:
+        print(f"Error al registrar log: {e}")
 def limpiar_texto_pdf(texto):
     if pd.isna(texto): return ""
     return str(texto).encode('latin-1', 'ignore').decode('latin-1')
