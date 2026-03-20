@@ -68,52 +68,49 @@ def mostrar_modulo_inmuebles(supabase):
     # ==========================================
     with tab1:
         st.subheader("Catálogo de Propiedades Base")
-        st.info("💡 Aquí gestionamos los edificios o casas principales (El Cascarón).")
+        st.info("💡 Aquí gestionamos los inmuebles principales (Ej: Piso 2B, Oficina 1202, Local S02).")
         
-        # --- Cargar Operadores para los envíos ---
-        try:
-            res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
-            df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
-        except:
-            df_ops = pd.DataFrame()
-
-        # --- Lógica dinámica de tipos y moneda según la región ---
+        # Lógica dinámica de región
         moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
         if moneda_sesion == "EUR": 
             opciones_tipo = ["PISO", "OFICINA", "LOCAL", "NAVE", "BODEGA"]
             opciones_moneda = ["EUR"]
+            label_catastro = "Referencia Catastral"
         elif moneda_sesion == "COP": 
             opciones_tipo = ["APARTAMENTO", "OFICINA", "LOCAL", "NAVE", "BODEGA"]
             opciones_moneda = ["COP"]
+            label_catastro = "Matrícula Inmobiliaria"
         else: 
             opciones_tipo = ["PISO", "APARTAMENTO", "OFICINA", "LOCAL", "NAVE", "BODEGA"]
             opciones_moneda = ["EUR", "COP"]
+            label_catastro = "Ref. Catastral / Matrícula"
 
-        # --- 1. FORMULARIO NUEVA PROPIEDAD (CREATE) ---
+        # --- FORMULARIO NUEVA PROPIEDAD ---
         with st.expander("➕ Añadir Nueva Propiedad", expanded=False):
             with st.form("form_nueva_propiedad"):
                 st.write("Datos Generales del Inmueble")
                 c1, c2 = st.columns(2)
-                n_nom = c1.text_input("Nombre / Dirección Principal *", placeholder="Ej: Edificio Central o Piso 5A")
+                n_nom = c1.text_input("Nombre / Dirección Principal *", placeholder="Ej: Piso 2B Calle Mayor")
                 n_tip = c2.selectbox("Tipo de Propiedad *", opciones_tipo)
                 
-                c3, c4 = st.columns(2)
+                c3, c4, c5 = st.columns(3)
                 n_ciu = c3.text_input("Ciudad *")
                 n_mon = c4.selectbox("Región / Moneda *", opciones_moneda)
+                n_cat = c5.text_input(label_catastro)
                 
                 st.write("Datos del Seguro (Opcional)")
-                c5, c6, c7 = st.columns(3)
-                n_ase = c5.text_input("Aseguradora")
-                n_pol = c6.text_input("Número de Póliza")
-                n_tel_ase = c7.text_input("Teléfono Aseguradora")
+                c6, c7, c8 = st.columns(3)
+                n_ase = c6.text_input("Aseguradora")
+                n_pol = c7.text_input("Número de Póliza")
+                n_tel_ase = c8.text_input("Teléfono Aseguradora")
                 
                 if st.form_submit_button("💾 Guardar Propiedad"):
                     if n_nom and n_ciu:
                         datos_insert = {
                             "nombre": n_nom.strip().upper(), "tipo": n_tip, "ciudad": n_ciu.strip().upper(),
-                            "moneda": n_mon, "aseguradora": n_ase.strip().upper(), 
-                            "numero_poliza": n_pol.strip().upper(), "telefono_aseguradora": n_tel_ase.strip(), 
-                            "estado": "ACTIVO"
+                            "moneda": n_mon, "referencia_catastral": n_cat.strip().upper(),
+                            "aseguradora": n_ase.strip().upper(), "numero_poliza": n_pol.strip().upper(), 
+                            "telefono_aseguradora": n_tel_ase.strip(), "estado": "ACTIVO"
                         }
                         supabase.table("inmuebles").insert(datos_insert).execute()
                         log_accion(supabase, usuario_actual, "CREAR PROPIEDAD", n_nom.strip().upper())
@@ -123,28 +120,21 @@ def mostrar_modulo_inmuebles(supabase):
                     else:
                         st.warning("⚠️ Los campos con asterisco (*) son obligatorios.")
 
-        # --- 2. LECTURA DE DATOS (READ) CON FILTRO ---
+        # --- LECTURA DE DATOS (READ) ---
         query = supabase.table("inmuebles").select("*").eq("estado", "ACTIVO")
-        
-        # ¡LA MAGIA DEL FILTRO! Si no es ALL, filtramos por la moneda del operador
-        if moneda_sesion != "ALL":
-            query = query.eq("moneda", moneda_sesion)
+        if moneda_sesion != "ALL": query = query.eq("moneda", moneda_sesion)
             
-      
-        # Ejecutamos la consulta sin el orden por ID, dejaremos que Pandas haga la magia
         res_inm = query.execute()
         df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
         
         if not df_inm.empty:
-            # --- NUEVO: ORDENAR POR MONEDA Y LUEGO POR NOMBRE ---
             df_inm = df_inm.sort_values(by=['moneda', 'nombre'], ascending=[True, True])
             
-            # Mostrar la tabla incluyendo la columna moneda
-            df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'moneda', 'aseguradora', 'numero_poliza']].copy()
-            df_display.rename(columns={'id': 'ID', 'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'moneda': 'MONEDA', 'aseguradora': 'ASEGURADORA'}, inplace=True)
-            # Ocultamos el ID en la vista de la pantalla
-            st.dataframe(df_display[['NOMBRE', 'TIPO', 'CIUDAD', 'MONEDA', 'ASEGURADORA']], use_container_width=True, hide_index=True)
-            # --- 3. GESTIONAR PROPIEDAD (UPDATE / DELETE) ---
+            df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'moneda', 'referencia_catastral']].copy()
+            df_display.rename(columns={'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'moneda': 'MONEDA', 'referencia_catastral': label_catastro.upper()}, inplace=True)
+            st.dataframe(df_display.drop(columns=['id']), use_container_width=True, hide_index=True)
+            
+            # --- GESTIONAR PROPIEDAD ---
             with st.expander("⚙️ Gestionar / Editar Propiedad", expanded=False):
                 prop_sel = st.selectbox("Seleccione la propiedad a editar:", df_display['NOMBRE'].tolist())
                 if prop_sel:
@@ -157,18 +147,18 @@ def mostrar_modulo_inmuebles(supabase):
                         
                         e_c3, e_c4 = st.columns(2)
                         idx_mon = 0 if datos_p.get('moneda') == 'EUR' else (1 if datos_p.get('moneda') == 'COP' else 0)
-                        # Solo el Director General (ALL) puede cambiar un edificio de país/moneda
                         e_mon = e_c3.selectbox("Moneda", ["EUR", "COP"] if moneda_sesion == "ALL" else [moneda_sesion], index=idx_mon if moneda_sesion == "ALL" else 0)
-                        e_ase = e_c4.text_input("Aseguradora", str(datos_p.get('aseguradora', '')))
+                        e_cat = e_c4.text_input(label_catastro, str(datos_p.get('referencia_catastral', '')))
                         
-                        e_pol = st.text_input("Número Póliza", str(datos_p.get('numero_poliza', '')))
+                        e_c5, e_c6 = st.columns(2)
+                        e_ase = e_c5.text_input("Aseguradora", str(datos_p.get('aseguradora', '')))
+                        e_pol = e_c6.text_input("Número Póliza", str(datos_p.get('numero_poliza', '')))
                         
-                        col_btn1, col_btn2 = st.columns(2)
-                        if col_btn1.form_submit_button("📝 Guardar Cambios"):
+                        if st.form_submit_button("📝 Guardar Cambios"):
                             datos_upd = {
                                 "nombre": e_nom.strip().upper(), "ciudad": e_ciu.strip().upper(),
-                                "moneda": e_mon, "aseguradora": e_ase.strip().upper(), 
-                                "numero_poliza": e_pol.strip().upper()
+                                "moneda": e_mon, "referencia_catastral": e_cat.strip().upper(),
+                                "aseguradora": e_ase.strip().upper(), "numero_poliza": e_pol.strip().upper()
                             }
                             supabase.table("inmuebles").update(datos_upd).eq("id", int(datos_p['id'])).execute()
                             log_accion(supabase, usuario_actual, "EDITAR PROPIEDAD", e_nom.strip().upper())
@@ -183,66 +173,75 @@ def mostrar_modulo_inmuebles(supabase):
                         time.sleep(1)
                         st.rerun()
 
-            # --- 4. EXPORTAR Y COMPARTIR ---
+            # --- EXPORTAR ---
             st.markdown("---")
-            st.markdown("### 📄 Exportar y Compartir")
-            
+            st.markdown("### 📄 Exportar Listado")
             formato_archivo = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True, key="radio_form_inm")
             if formato_archivo == "PDF":
-                archivo_bytes = generar_pdf_propiedades(df_display)
+                archivo_bytes = generar_pdf_propiedades(df_display) # Usa tu misma función de arriba
                 ext, mime = "pdf", "application/pdf"
             else:
-                # Ocultamos el ID en la exportación a Excel
-                archivo_bytes = generar_excel_bytes(df_display[['NOMBRE', 'TIPO', 'CIUDAD', 'MONEDA', 'ASEGURADORA']], "Propiedades")
+                archivo_bytes = generar_excel_bytes(df_display.drop(columns=['id']), "Propiedades")
                 ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                
-            nombre_final_archivo = f"directorio_propiedades.{ext}"
-            
-            st.download_button(f"⬇️ Descargar en {formato_archivo}", data=archivo_bytes, file_name=nombre_final_archivo, mime=mime, use_container_width=True)
-            
-            st.markdown("#### 📤 Compartir a Operadores")
-            cols_env = st.columns(2)
-            lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if pd.notna(r.get('correo')) and r['correo']]
-            lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if pd.notna(r.get('telefono')) and r['telefono']]
-            
-            with cols_env[0]:
-                st.info("📧 Email")
-                sel_em = st.selectbox("Operador (Correo)", ["-- Seleccione --"] + lista_correos, key="em_inm")
-                if st.button("Enviar por Correo", use_container_width=True, key="btn_em_inm"):
-                    if sel_em != "-- Seleccione --":
-                        dest = sel_em.split(" - ")[-1].strip()
-                        with st.spinner(f"Enviando {formato_archivo}..."):
-                            if enviar_reporte_correo(dest, archivo_bytes, nombre_final_archivo, "Propiedades Base", ext):
-                                st.success("¡Enviado!"); log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Propiedades a {dest}")
-                    else: st.warning("Elige un operador.")
-                    
-            with cols_env[1]:
-                st.success("💬 WhatsApp")
-                sel_wa = st.selectbox("Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos, key="wa_inm")
-                if sel_wa != "-- Seleccione --":
-                    if st.button("Generar Link WA", use_container_width=True, key="btn_wa_inm"):
-                        with st.spinner("Subiendo..."):
-                            tel = re.sub(r'\D', '', sel_wa.split(" - ")[-1].strip())
-                            try:
-                                path = f"propiedades_{int(time.time())}.{ext}"
-                                supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes, file_options={"content-type": mime})
-                                url = supabase.storage.from_("reportes").get_public_url(path)
-                                msg = urllib.parse.quote(f"Hola, te comparto el Directorio de Propiedades: {url}")
-                                st.markdown(f'<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;border:none;padding:10px;border-radius:5px;">Abrir WhatsApp</button></a>', unsafe_allow_html=True)
-                                log_accion(supabase, usuario_actual, "ENVIO WA", f"Propiedades a {sel_wa}")
-                            except Exception as e: st.error(f"Error: {e}")
-                else: st.button("Generar Link WA", disabled=True, use_container_width=True)
+            st.download_button(f"⬇️ Descargar en {formato_archivo}", data=archivo_bytes, file_name=f"directorio_propiedades.{ext}", mime=mime, use_container_width=True)
 
         else:
             st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
+
     # ==========================================
-    # TAB 2: UNIDADES (Las Divisiones)
+    # TAB 2: UNIDADES (Subdivisión de Propiedades)
     # ==========================================
     with tab2:
-        st.subheader("Gestión de Unidades Rentables")
-        st.info("💡 Aquí dividiremos la propiedad seleccionada en Apartamentos, Locales o Habitaciones para poder alquilarlas.")
-        st.button("➕ Simular Botón: Añadir Unidad", disabled=True)
-
+        st.subheader("Subdivisión de Espacios Rentables")
+        st.info("💡 Aquí dividimos la propiedad (Ej: Piso 2B) en las unidades que vamos a alquilar (Ej: Habitación 1, Suite 3). Si se alquila completo, ponle el mismo nombre del local.")
+        
+        query_inm = supabase.table("inmuebles").select("id, nombre").eq("estado", "ACTIVO")
+        if moneda_sesion != "ALL": query_inm = query_inm.eq("moneda", moneda_sesion)
+        res_prop = query_inm.order("nombre").execute()
+        df_prop = pd.DataFrame(res_prop.data) if res_prop.data else pd.DataFrame()
+        
+        if df_prop.empty:
+            st.warning("⚠️ Primero debes crear una Propiedad Base (Tab 1).")
+        else:
+            dict_prop = dict(zip(df_prop['id'], df_prop['nombre']))
+            opciones_prop = ["-- Seleccione --"] + df_prop['nombre'].tolist()
+            
+            with st.expander("➕ Añadir Nueva Unidad", expanded=False):
+                with st.form("form_nueva_unidad"):
+                    c1, c2, c3 = st.columns(3)
+                    u_prop = c1.selectbox("Pertenece a la Propiedad *", opciones_prop)
+                    u_nom = c2.text_input("Nombre de la Unidad *", placeholder="Ej: Habitación 1, PH 2, S02")
+                    u_tip = c3.selectbox("Tipo *", ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "OTRO"])
+                    
+                    if st.form_submit_button("💾 Guardar Unidad"):
+                        if u_prop != "-- Seleccione --" and u_nom:
+                            id_inmueble_sel = df_prop[df_prop['nombre'] == u_prop]['id'].values[0]
+                            datos_u = {
+                                "id_inmueble": int(id_inmueble_sel), "nombre": u_nom.strip().upper(),
+                                "tipo": u_tip, "estado": "ACTIVO"
+                            }
+                            supabase.table("unidades").insert(datos_u).execute()
+                            log_accion(supabase, usuario_actual, "CREAR UNIDAD", f"{u_nom.upper()} en {u_prop}")
+                            st.success("✅ Unidad registrada con éxito.")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.warning("⚠️ Debes seleccionar una propiedad y darle un nombre a la unidad.")
+            
+            st.markdown("---")
+            res_uni = supabase.table("unidades").select("*").eq("estado", "ACTIVO").execute()
+            df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
+            
+            if not df_uni.empty:
+                df_uni = df_uni[df_uni['id_inmueble'].isin(df_prop['id'])]
+                if not df_uni.empty:
+                    df_uni['PROPIEDAD'] = df_uni['id_inmueble'].map(dict_prop)
+                    df_uni_display = df_uni[['PROPIEDAD', 'nombre', 'tipo']].copy()
+                    df_uni_display.rename(columns={'nombre': 'UNIDAD', 'tipo': 'TIPO'}, inplace=True)
+                    df_uni_display = df_uni_display.sort_values(by=['PROPIEDAD', 'UNIDAD'])
+                    st.dataframe(df_uni_display, use_container_width=True, hide_index=True)
+                else: st.info("No hay unidades registradas para las propiedades actuales.")
+            else: st.info("Aún no hay unidades registradas en el sistema.")
     # ==========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # ==========================================
