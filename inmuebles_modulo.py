@@ -313,14 +313,19 @@ def mostrar_modulo_inmuebles(supabase):
                                     st.success("✅ Actualizado correctamente.")
                                     time.sleep(1)
                                     st.rerun()
-                                    
-                            if st.button("🚫 Dar de Baja (Eliminar) Unidad"):
+                            # --- SEGURO DE ELIMINACIÓN TAB 2 ---
+                            st.markdown("---")
+                            st.warning("⚠️ **Zona de Peligro:** Dar de baja esta unidad evitará que se pueda alquilar.")
+                            confirmar_baja_uni = st.checkbox("Confirmo que deseo dar de baja esta unidad.", key=f"conf_uni_{datos_u_edit['id']}")
+                            
+                            if st.button("🚫 Dar de Baja (Eliminar) Unidad", disabled=not confirmar_baja_uni):
                                 supabase.table("unidades").update({"estado": "INACTIVO"}).eq("id", int(datos_u_edit['id'])).execute()
                                 log_accion(supabase, usuario_actual, "ELIMINAR UNIDAD", datos_u_edit['nombre'])
                                 st.success("✅ Unidad dada de baja.")
                                 time.sleep(1)
                                 st.rerun()
-
+                                    
+                            
                     # --- 4. EXPORTAR Y COMPARTIR ---
                     st.markdown("---")
                     st.markdown("### 📄 Exportar y Compartir Listado")
