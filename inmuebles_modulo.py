@@ -26,20 +26,26 @@ def mostrar_modulo_inmuebles(supabase):
     # ==========================================
     # TAB 1: PROPIEDADES (El Cascarón)
     # ==========================================
-    # ==========================================
-    # TAB 1: PROPIEDADES (El Cascarón)
-    # ==========================================
     with tab1:
         st.subheader("Catálogo de Propiedades Base")
         st.info("💡 Aquí daremos de alta el edificio o casa principal (Ej: Edificio Los Alpes, Casa Calle 5).")
         
+        # --- Lógica dinámica de tipos según la región ---
+        moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
+        if moneda_sesion == "EUR":
+            opciones_tipo = ["PISO"]
+        elif moneda_sesion == "COP":
+            opciones_tipo = ["APARTAMENTO", "OFICINA", "LOCAL"]
+        else:
+            opciones_tipo = ["APARTAMENTO", "OFICINA"]
+
         # --- 1. FORMULARIO NUEVA PROPIEDAD ---
         with st.expander("➕ Añadir Nueva Propiedad", expanded=False):
             with st.form("form_nueva_propiedad"):
                 st.write("Datos Generales del Inmueble")
                 c1, c2, c3 = st.columns(3)
-                n_nom = c1.text_input("Nombre / Dirección Principal *", placeholder="Ej: Edificio Central")
-                n_tip = c2.selectbox("Tipo de Propiedad *", ["EDIFICIO", "CASA", "LOCAL COMERCIAL", "LOTE/TERRENO", "OTRO"])
+                n_nom = c1.text_input("Nombre / Dirección Principal *", placeholder="Ej: Edificio Central o Piso 5A")
+                n_tip = c2.selectbox("Tipo de Propiedad *", opciones_tipo)
                 n_ciu = c3.text_input("Ciudad *")
                 
                 st.write("Datos del Seguro (Opcional)")
@@ -49,7 +55,7 @@ def mostrar_modulo_inmuebles(supabase):
                 n_tel_ase = c6.text_input("Teléfono Aseguradora")
                 
                 if st.form_submit_button("💾 Guardar Propiedad"):
-                    if n_nom and n_tip and n_ciu:
+                    if n_nom and n_ciu: # n_tip siempre tendrá un valor seleccionado
                         datos_insert = {
                             "nombre": n_nom.strip().upper(),
                             "tipo": n_tip,
@@ -71,6 +77,13 @@ def mostrar_modulo_inmuebles(supabase):
 
         st.markdown("---")
         
+        # --- 2. TABLA DE PROPIEDADES ---
+        try:
+            res_inm = supabase.table("inmuebles").select("*").order("id", desc=True).execute()
+            df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
+            
+            if not df_inm.empty:
+                df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'aseguradora',    
         # --- 2. TABLA DE PROPIEDADES ---
         try:
             res_inm = supabase.table("inmuebles").select("*").order("id", desc=True).execute()
