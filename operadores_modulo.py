@@ -1,15 +1,24 @@
 import streamlit as st
 import pandas as pd
 from fpdf import FPDF
-import smtplib
-from email.message import EmailMessage
 import urllib.parse
 import re
 import time 
 import zoneinfo
 from datetime import datetime
-from herramientas import log_accion
+# --- NUESTRA LIBRERÍA MAESTRA ---
+from herramientas import log_accion, enviar_reporte_correo, generar_excel_bytes
 
+# ==========================================
+# 0. FUNCIONES AUXILIARES
+# ==========================================
+def limpiar_texto_pdf(texto):
+    if pd.isna(texto): return ""
+    return str(texto).encode('latin-1', 'ignore').decode('latin-1')
+
+def es_correo_valido(correo):
+    patron = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    return re.match(patron, correo) is not None
 # ==========================================
 # 0. FUNCIONES AUXILIARES Y LOGS
 # ==========================================
@@ -161,18 +170,41 @@ def mostrar_modulo_operadores(supabase):
                 use_container_width=True, hide_index=True
             )
             
+            # ==========================================
+            # NUEVO PANEL DE EXPORTACIÓN TAB 1
+            # ==========================================
             st.markdown("---")
             st.markdown("### 📄 Exportar y Compartir Reportes")
             
+            # 1. Preparar archivos
             pdf_bytes = generar_pdf_operadores(df_display)
-            st.download_button("📄 Descargar Reporte en PDF", pdf_bytes, "directorio_operadores.pdf", "application/pdf")
+            df_para_excel = df_display[["NOMBRE", "IDENTIFICACION", "DIRECCION", "CORREO", "TELEFONO", "MONEDA", "ESTADO"]].copy()
+            excel_bytes = generar_excel_bytes(df_para_excel, "Operadores")
             
+            # 2. Botones de descarga directa
+            st.write("**1. Descargar al equipo:**")
+            c_desc_t1_1, c_desc_t1_2 = st.columns(2)
+            with c_desc_t1_1:
+                st.download_button("📄 Descargar PDF", pdf_bytes, "directorio_operadores.pdf", "application/pdf", use_container_width=True)
+            with c_desc_t1_2:
+                st.download_button("📊 Descargar Excel", excel_bytes, "directorio_operadores.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
             # ==========================================
             # SECCIÓN COMPARTIR A OPERADORES
             # ==========================================
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("#### 📤 Compartir Reporte a Operadores")
-            st.write("Selecciona el medio y el operador destinatario:")
+            st.markdown("#### 📤 Compartir Directorio a Operadores")
+            
+            # 3. Elección de Formato
+            formato_envio = st.radio("2. Selecciona el formato a enviar:", ["PDF", "Excel"], horizontal=True, key="radio_formato_op")
+            
+            archivo_enviar = pdf_bytes if formato_envio == "PDF" else excel_bytes
+            nombre_archivo_envio = "directorio_operadores.pdf" if formato_envio == "PDF" else "directorio_operadores.xlsx"
+            ext_envio = "pdf" if formato_envio == "PDF" else "xlsx"
+            mime_envio = "application/pdf" if formato_envio == "PDF" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            
+            st.write(f"*(Se enviará el archivo: **{nombre_archivo_envio}**)*")
+            st.write("3. Selecciona el medio y el operador destinatario:")
             
             cols_envio = st.columns(2)
             
@@ -189,67 +221,58 @@ def mostrar_modulo_operadores(supabase):
             with cols_envio[0]:
                 st.info("📧 Envío por Email")
                 if lista_correos:
-                    operador_correo_sel = st.selectbox("Seleccionar Operador (Correo)", ["-- Seleccione --"] + lista_correos)
-                    if st.button("Enviar PDF por Correo", use_container_width=True):
+                    operador_correo_sel = st.selectbox("Seleccionar Operador (Correo)", ["-- Seleccione --"] + lista_correos, key="sel_correo_op")
+                    if st.button("Enviar por Correo", use_container_width=True, key="btn_correo_op"):
                         if operador_correo_sel != "-- Seleccione --":
                             correo_destinatario = operador_correo_sel.split(" - ")[-1].strip()
-                            with st.spinner("Conectando con el servidor de Gmail..."):
-                                exito = enviar_reporte_correo(correo_destinatario, pdf_bytes, "operadores_inmoleasing.pdf", "Operadores")
+                            with st.spinner(f"Enviando {formato_envio}..."):
+                                exito = enviar_reporte_correo(correo_destinatario, archivo_enviar, nombre_archivo_envio, "Operadores", ext_envio)
                                 if exito:
-                                    st.success(f"Reporte enviado a {correo_destinatario}")
-                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Reporte Operadores enviado a {correo_destinatario}")
+                                    st.success(f"Enviado a {correo_destinatario}")
+                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Operadores enviado a {correo_destinatario}")
                         else:
                             st.warning("Selecciona un operador de la lista.")
                 else:
-                    st.warning("No hay operadores registrados con correo electrónico.")
+                    st.warning("No hay operadores con correo registrado.")
 
             with cols_envio[1]:
                 st.success("💬 Envío por WhatsApp")
                 if lista_telefonos:
-                    operador_tel_sel = st.selectbox("Seleccionar Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos)
+                    operador_tel_sel = st.selectbox("Seleccionar Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos, key="sel_wa_op")
                     mensaje_base = "Hola, te comparto el Directorio de Operadores actualizado de InmoLeasing."
                     
                     if operador_tel_sel != "-- Seleccione --":
-                        if st.button("Generar Link y Abrir WhatsApp", use_container_width=True):
-                            with st.spinner("Generando link seguro en la nube..."):
+                        if st.button("Generar Link WhatsApp", use_container_width=True, key="btn_wa_op"):
+                            with st.spinner("Generando link seguro..."):
                                 telefono_wa = operador_tel_sel.split(" - ")[-1].strip()
                                 telefono_wa = re.sub(r'\D', '', telefono_wa) 
                                 
                                 try:
                                     timestamp_actual = int(time.time())
-                                    ruta_nube = f"directorio_operadores_{timestamp_actual}.pdf"
+                                    ruta_nube = f"directorio_operadores_{timestamp_actual}.{ext_envio}"
                                     
                                     supabase.storage.from_("reportes").upload(
                                         path=ruta_nube,
-                                        file=pdf_bytes,
-                                        file_options={"content-type": "application/pdf"}
+                                        file=archivo_enviar,
+                                        file_options={"content-type": mime_envio}
                                     )
                                     
-                                    link_pdf = supabase.storage.from_("reportes").get_public_url(ruta_nube)
-                                    
-                                    mensaje_final = f"{mensaje_base} Puedes descargarlo de forma segura aquí: {link_pdf}"
+                                    link_archivo = supabase.storage.from_("reportes").get_public_url(ruta_nube)
+                                    mensaje_final = f"{mensaje_base} Puedes descargarlo aquí: {link_archivo}"
                                     texto_codificado = urllib.parse.quote(mensaje_final)
                                     link_wa = f"https://wa.me/{telefono_wa}?text={texto_codificado}"
                                     
-                                    boton_html = f"""
-                                    <a href="{link_wa}" target="_blank" style="text-decoration: none;">
-                                        <button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:16px; margin-top:10px;">
-                                            Abrir chat de WhatsApp
-                                        </button>
-                                    </a>
-                                    """
+                                    boton_html = f'''<a href="{link_wa}" target="_blank" style="text-decoration: none;"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:16px; margin-top:10px;">Abrir WhatsApp</button></a>'''
                                     st.markdown(boton_html, unsafe_allow_html=True)
                                     
-                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Enviado por WA a {operador_tel_sel}")
-                                    st.success("¡Link generado! Haz clic en el botón verde de arriba.")
-                                    
+                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Operadores WA a {operador_tel_sel}")
+                                    st.success("¡Link generado!")
                                 except Exception as e:
-                                    st.error(f"Error al subir el archivo: {e}")
-                                    st.info("⚠️ Asegúrate de que el bucket se llame exactamente 'reportes' y sea público.")
+                                    st.error(f"Error al subir: {e}")
                     else:
-                        st.button("Generar Link y Abrir WhatsApp", disabled=True, use_container_width=True)
+                        st.button("Generar Link WhatsApp", disabled=True, use_container_width=True, key="btn_wa_op_dis")
                 else:
-                    st.warning("No hay operadores registrados con teléfono.")
+                    st.warning("No hay operadores con teléfono registrado.")
                     
         else:
             st.info("No hay operadores registrados en tu región.")
