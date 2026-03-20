@@ -8,34 +8,11 @@ import smtplib
 from email.message import EmailMessage
 import zoneinfo
 from datetime import datetime
+from herramientas import log_accion
 
 # ==========================================
 # 1. FUNCIONES AUXILIARES Y CORREO
 # ==========================================
-def log_accion(supabase, usuario, accion, detalle):
-    try:
-        # --- FILTRO INTELIGENTE DE USUARIO ---
-        # Si 'usuario' es un diccionario (el paquete completo), sacamos solo el nombre
-        if isinstance(usuario, dict):
-            nombre_limpio = usuario.get("nombre", "Usuario Desconocido")
-        else:
-            # Si ya es un texto, lo dejamos tal cual
-            nombre_limpio = str(usuario)
-        # --------------------------------------------
-
-        # 1. Calculamos la hora exacta de Madrid
-        zona_madrid = zoneinfo.ZoneInfo("Europe/Madrid")
-        hora_exacta = datetime.now(zona_madrid).strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 2. Insertamos en tu base de datos con el nombre ya limpio
-        supabase.table("logs_actividad").insert({
-            "usuario": nombre_limpio, 
-            "accion": accion, 
-            "detalle": detalle,
-            "fecha": hora_exacta
-        }).execute()
-    except Exception as e:
-        print(f"Error al registrar log: {e}")
 
 def limpiar_texto_pdf(texto):
     return str(texto).encode('latin-1', 'ignore').decode('latin-1') if pd.notna(texto) else ""
