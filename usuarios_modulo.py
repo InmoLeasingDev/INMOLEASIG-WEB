@@ -43,7 +43,7 @@ def log_accion(supabase, usuario, accion, detalle):
             "detalle": detalle,
             "fecha": hora_exacta  # <--- Adaptado exactamente a tu base de datos
         }).execute()
-    except Exception as e: 
+    except Exception as e:
         print(f"Error al registrar log: {e}")
 
 def es_correo_valido(correo):

@@ -6,7 +6,6 @@ import hashlib
 from datetime import datetime
 import propietarios_modulo 
 import operadores_modulo
-#import usuarios_modulo
 import usuarios_modulo
 
 # ==========================================
