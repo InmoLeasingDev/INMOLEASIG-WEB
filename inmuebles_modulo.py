@@ -83,21 +83,20 @@ def mostrar_modulo_inmuebles(supabase):
             df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
             
             if not df_inm.empty:
-                df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'aseguradora',    
-        # --- 2. TABLA DE PROPIEDADES ---
-        try:
-            res_inm = supabase.table("inmuebles").select("*").order("id", desc=True).execute()
-            df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
-            
-            if not df_inm.empty:
                 df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'aseguradora', 'estado']].copy()
-                df_display.rename(columns={'id': 'ID', 'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'aseguradora': 'ASEGURADORA', 'estado': 'ESTADO'}, inplace=True)
+                df_display.rename(columns={
+                    'id': 'ID', 
+                    'nombre': 'NOMBRE', 
+                    'tipo': 'TIPO', 
+                    'ciudad': 'CIUDAD', 
+                    'aseguradora': 'ASEGURADORA', 
+                    'estado': 'ESTADO'
+                }, inplace=True)
                 st.dataframe(df_display, use_container_width=True, hide_index=True)
             else:
                 st.info("Aún no hay propiedades registradas en la base de datos.")
         except Exception as e:
             st.error(f"Error de conexión con la tabla inmuebles: {e}")
-
     # ==========================================
     # TAB 2: UNIDADES (Las Divisiones)
     # ==========================================
