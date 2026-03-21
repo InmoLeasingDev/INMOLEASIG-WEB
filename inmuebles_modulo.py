@@ -223,13 +223,12 @@ def mostrar_modulo_inmuebles(supabase):
 
         else:
             st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
-
-    # ==========================================
+# ==========================================
     # TAB 2: UNIDADES (Subdivisión de Propiedades)
     # ==========================================
     with tab2:
         st.subheader("Subdivisión de Espacios Rentables")
-        st.info("💡 Aquí dividimos la propiedad (Ej: Piso 2B) en las unidades que vamos a alquilar (Ej: Habitación 1, Suite 3). Si se alquila completo, ponle el mismo nombre del local.")
+        st.info("💡 Aquí dividimos la propiedad (Ej: Piso 2B) en las unidades que vamos a alquilar (Ej: Habitación 1, Suite 3).")
         
         # --- Cargar Operadores para los envíos ---
         try:
@@ -256,26 +255,23 @@ def mostrar_modulo_inmuebles(supabase):
                 with st.form("form_nueva_unidad"):
                     c1, c2, c3 = st.columns(3)
                     u_prop = c1.selectbox("Pertenece a la Propiedad *", opciones_prop)
-                    u_nom = c2.text_input("Nombre de la Unidad *", placeholder="Ej: Habitación 1, PH 2, S02")
+                    u_nom = c2.text_input("Nombre de la Unidad *", placeholder="Ej: Habitación 1, PH 2")
                     u_tip = c3.selectbox("Tipo *", ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "PARQUEADERO", "OTRO"])
                     
                     c4, c5, c6 = st.columns(3)
-                    u_disp = c4.selectbox("Estado de Disponibilidad", ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"])
+                    u_disp = c4.selectbox("Estado", ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"])
                     u_area = c5.number_input("Área (m2)", min_value=0.0, step=1.0)
                     u_precio = c6.number_input("Precio Base", min_value=0.0, step=100.0)
                     
                     if st.form_submit_button("💾 Guardar Unidad"):
                         if u_prop != "-- Seleccione --" and u_nom:
                             id_inmueble_sel = df_prop[df_prop['nombre'] == u_prop]['id'].values[0]
-                            # Limpiar el emoji para la base de datos
                             estado_limpio = u_disp.split(" ")[1]
                             
                             datos_u = {
                                 "id_inmueble": int(id_inmueble_sel), "nombre": u_nom.strip().upper(),
-                                "tipo": u_tip, "estado": "ACTIVO",
-                                "disponibilidad": estado_limpio,
-                                "area_m2": u_area, "precio_base": u_precio,
-                                "fotos": [] # Inicializamos la galería vacía
+                                "tipo": u_tip, "estado": "ACTIVO", "disponibilidad": estado_limpio,
+                                "area_m2": u_area, "precio_base": u_precio, "fotos": []
                             }
                             supabase.table("unidades").insert(datos_u).execute()
                             log_accion(supabase, usuario_actual, "CREAR UNIDAD", f"{u_nom.upper()} en {u_prop}")
@@ -287,34 +283,34 @@ def mostrar_modulo_inmuebles(supabase):
             
             st.markdown("---")
             
-            # --- 2. LECTURA DE DATOS (READ) ---
-            res_uni = supabase.table("unidades").select("id, id_inmueble, nombre, tipo, disponibilidad, fotos").eq("estado", "ACTIVO").execute()
-            df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
+            # --- 2. FILTRO MAESTRO Y VISOR DE UNIDADES ---
+            st.subheader("📋 Visor y Gestión de Unidades")
+            prop_visor = st.selectbox("🔍 Selecciona una Propiedad para ver y gestionar sus unidades:", opciones_prop, key="visor_prop_tab2")
             
-            if not df_uni.empty:
-                df_uni = df_uni[df_uni['id_inmueble'].isin(df_prop['id'])].copy()
+            if prop_visor != "-- Seleccione --":
+                id_prop_visor = df_prop[df_prop['nombre'] == prop_visor]['id'].values[0]
+                
+                # Buscar solo las unidades de la propiedad seleccionada
+                res_uni = supabase.table("unidades").select("*").eq("estado", "ACTIVO").eq("id_inmueble", int(id_prop_visor)).execute()
+                df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
+                
                 if not df_uni.empty:
-                    df_uni['PROPIEDAD'] = df_uni['id_inmueble'].map(dict_prop)
-                    df_uni['selector'] = df_uni['PROPIEDAD'] + " - " + df_uni['nombre']
-                    
-                    # Mapear estado a emoji para la tabla
+                    # Preparar tabla visual
                     emoji_map = {"DISPONIBLE": "🟢 DISP.", "OCUPADA": "🔴 OCUP.", "EN REPARACIÓN": "🟡 REP."}
                     df_uni['ESTADO'] = df_uni['disponibilidad'].map(lambda x: emoji_map.get(str(x).upper(), "⚪ DESC."))
                     
-                    df_uni_display = df_uni[['PROPIEDAD', 'nombre', 'tipo', 'ESTADO']].copy()
-                    df_uni_display.rename(columns={'nombre': 'UNIDAD', 'tipo': 'TIPO'}, inplace=True)
-                    df_uni_display = df_uni_display.sort_values(by=['PROPIEDAD', 'UNIDAD'])
+                    df_uni_display = df_uni[['nombre', 'tipo', 'ESTADO', 'area_m2', 'precio_base']].copy()
+                    df_uni_display.rename(columns={'nombre': 'UNIDAD', 'tipo': 'TIPO', 'area_m2': 'ÁREA (m2)', 'precio_base': 'PRECIO'}, inplace=True)
+                    df_uni_display = df_uni_display.sort_values(by=['UNIDAD'])
                     
                     st.dataframe(df_uni_display, use_container_width=True, hide_index=True)
                     
-                    # --- 3. GESTIONAR UNIDAD E INVENTARIO (UPDATE / DELETE) ---
-                    with st.expander("⚙️ Gestionar Unidad / Galería de Fotos", expanded=False):
-                        uni_sel = st.selectbox("Seleccione la unidad a gestionar:", df_uni['selector'].sort_values().tolist(), key="sel_gest_uni")
+                    # --- 3. GESTIONAR LA UNIDAD SELECCIONADA ---
+                    with st.expander(f"⚙️ Gestionar / Galería de Fotos - {prop_visor}", expanded=False):
+                        uni_sel = st.selectbox("Seleccione la unidad a gestionar:", df_uni['nombre'].sort_values().tolist(), key="sel_gest_uni")
                         if uni_sel:
-                            datos_u_edit = df_uni[df_uni['selector'] == uni_sel].iloc[0]
+                            datos_u_edit = df_uni[df_uni['nombre'] == uni_sel].iloc[0]
                             u_id = str(datos_u_edit['id'])
-                            
-                            st.markdown(f"### 🛠️ Actualizando: **{datos_u_edit['nombre']}** ({datos_u_edit['PROPIEDAD']})")
                             
                             with st.form(key=f"form_editar_uni_{u_id}"):
                                 st.write("**1. Detalles Básicos**")
@@ -325,23 +321,18 @@ def mostrar_modulo_inmuebles(supabase):
                                 idx_tip = lista_tipos.index(datos_u_edit['tipo']) if datos_u_edit['tipo'] in lista_tipos else 0
                                 e_tip = e_c2.selectbox("Tipo", lista_tipos, index=idx_tip)
                                 
-                                # Selector de estado actualizando el valor
                                 val_disp = str(datos_u_edit.get('disponibilidad', 'DISPONIBLE')).upper()
                                 lista_disp = ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"]
-                                idx_disp = 0
-                                for i, d in enumerate(lista_disp):
-                                    if val_disp in d: idx_disp = i
+                                idx_disp = next((i for i, d in enumerate(lista_disp) if val_disp in d), 0)
                                 e_disp = e_c3.selectbox("Estado", lista_disp, index=idx_disp)
                                 
                                 st.markdown("---")
                                 st.write("**2. Galería de Marketing**")
                                 
-                                # Visualizar fotos actuales
                                 fotos_actuales = datos_u_edit.get('fotos', [])
                                 if isinstance(fotos_actuales, list) and len(fotos_actuales) > 0:
                                     st.write(f"Tiene {len(fotos_actuales)} foto(s) registrada(s).")
-                                    # Mostrar miniaturas
-                                    cols_fotos = st.columns(min(len(fotos_actuales), 4)) # Max 4 columnas para que no se vea amontonado
+                                    cols_fotos = st.columns(min(len(fotos_actuales), 4))
                                     for i, url_foto in enumerate(fotos_actuales):
                                         with cols_fotos[i % 4]:
                                             st.image(url_foto, width=150)
@@ -350,7 +341,7 @@ def mostrar_modulo_inmuebles(supabase):
                                     st.info("No hay fotos registradas para esta unidad.")
                                     fotos_actuales = []
                                 
-                                st.write("Subir nuevas fotos (Se añadirán a las existentes):")
+                                st.write("Subir nuevas fotos:")
                                 nuevas_fotos = st.file_uploader("Selecciona imágenes (Max 5MB c/u)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True, key=f"up_{u_id}")
 
                                 st.markdown("---")
@@ -361,11 +352,9 @@ def mostrar_modulo_inmuebles(supabase):
                                 if len(fotos_actuales) > 0:
                                     btn_borrar_fotos = col_btn2.form_submit_button("🗑️ Borrar TODAS las fotos")
 
-                                # --- Lógica de Botones ---
                                 if btn_borrar_fotos:
-                                    # Vaciamos la lista en la BD (No borramos de Supabase Storage para simplificar el código por ahora, se puede limpiar manual)
                                     supabase.table("unidades").update({"fotos": []}).eq("id", int(u_id)).execute()
-                                    st.success("✅ Galería vaciada correctamente.")
+                                    st.success("✅ Galería vaciada.")
                                     time.sleep(1)
                                     st.rerun()
                                     
@@ -374,9 +363,8 @@ def mostrar_modulo_inmuebles(supabase):
                                     urls_nuevas = []
                                     hubo_error = False
                                     
-                                    # Subir nuevas fotos si las hay
                                     if nuevas_fotos:
-                                        with st.spinner("Subiendo fotos a la galería..."):
+                                        with st.spinner("Subiendo fotos..."):
                                             for foto in nuevas_fotos:
                                                 if foto.size > 5 * 1024 * 1024:
                                                     st.error(f"❌ La foto {foto.name} supera 5MB.")
@@ -394,32 +382,25 @@ def mostrar_modulo_inmuebles(supabase):
                                                     hubo_error = True
                                     
                                     if not hubo_error:
-                                        # Combinamos las viejas con las nuevas
                                         fotos_finales = fotos_actuales + urls_nuevas
-                                        
-                                        datos_upd = {
-                                            "nombre": e_nom.strip().upper(), 
-                                            "tipo": e_tip,
-                                            "disponibilidad": estado_limpio,
-                                            "fotos": fotos_finales
-                                        }
+                                        datos_upd = {"nombre": e_nom.strip().upper(), "tipo": e_tip, "disponibilidad": estado_limpio, "fotos": fotos_finales}
                                         supabase.table("unidades").update(datos_upd).eq("id", int(u_id)).execute()
                                         log_accion(supabase, usuario_actual, "EDITAR UNIDAD", e_nom.strip().upper())
-                                        st.success("✅ Unidad y galería actualizadas correctamente.")
+                                        st.success("✅ Actualizado correctamente.")
                                         time.sleep(1)
                                         st.rerun()
 
-                            # --- SEGURO DE ELIMINACIÓN TAB 2 ---
                             st.markdown("---")
-                            st.warning("⚠️ **Zona de Peligro:** Dar de baja esta unidad evitará que se pueda alquilar.")
                             confirmar_baja_uni = st.checkbox("Confirmo que deseo dar de baja esta unidad.", key=f"conf_uni_{u_id}")
-                            
-                            if st.button("🚫 Dar de Baja (Eliminar) Unidad", disabled=not confirmar_baja_uni, key=f"btn_del_u_{u_id}"):
+                            if st.button("🚫 Dar de Baja Unidad", disabled=not confirmar_baja_uni, key=f"btn_del_u_{u_id}"):
                                 supabase.table("unidades").update({"estado": "INACTIVO"}).eq("id", int(u_id)).execute()
-                                log_accion(supabase, usuario_actual, "ELIMINAR UNIDAD", datos_u_edit['nombre'])
                                 st.success("✅ Unidad dada de baja.")
                                 time.sleep(1)
                                 st.rerun()
+                else:
+                    st.info(f"ℹ️ Aún no hay unidades registradas para {prop_visor}.")
+            else:
+                st.info("👆 Selecciona una propiedad en el menú desplegable para cargar su cuadrícula de unidades.")
     # ==========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # ==========================================
