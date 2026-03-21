@@ -229,7 +229,7 @@ def mostrar_modulo_inmuebles(supabase):
     # ==========================================
     with tab2:
         st.subheader("Subdivisión de Espacios Rentables")
-        st.info("💡 Primero selecciona una Propiedad Base para gestionar o crear sus unidades.")
+        st.info("💡 Primero selecciona una Propiedad Base para ver, gestionar o crear sus unidades.")
         
         # --- Cargar Operadores (para uso futuro/exportación) ---
         try:
@@ -250,52 +250,21 @@ def mostrar_modulo_inmuebles(supabase):
         else:
             opciones_prop = ["-- Seleccione --"] + df_prop['nombre'].tolist()
             
-            # --- SELECTOR MAESTRO (En la cima) ---
+            # --- SELECTOR MAESTRO ---
             st.markdown("### 🏢 Seleccionar Propiedad")
             prop_maestra = st.selectbox("Elige la propiedad sobre la que deseas trabajar:", opciones_prop, key="sel_maestra_prop")
             
             if prop_maestra != "-- Seleccione --":
                 id_prop_maestra = df_prop[df_prop['nombre'] == prop_maestra]['id'].values[0]
                 
-                st.markdown("---")
-                
-                # --- 1. FORMULARIO NUEVA UNIDAD (Hereda la propiedad automáticamente) ---
-                with st.expander(f"➕ Añadir Nueva Unidad a: {prop_maestra}", expanded=False):
-                    with st.form("form_nueva_unidad"):
-                        st.write(f"**Propiedad destino:** `{prop_maestra}`") # Feedback visual de herencia
-                        
-                        c1, c2 = st.columns(2)
-                        u_nom = c1.text_input("Nombre de la Unidad *", placeholder="Ej: Habitación 1, PH 2")
-                        u_tip = c2.selectbox("Tipo *", ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "PARQUEADERO", "OTRO"])
-                        
-                        c3, c4, c5 = st.columns(3)
-                        u_disp = c3.selectbox("Estado", ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"])
-                        u_area = c4.number_input("Área (m2)", min_value=0.0, step=1.0)
-                        u_precio = c5.number_input("Precio Base", min_value=0.0, step=100.0)
-                        
-                        if st.form_submit_button("💾 Guardar Unidad"):
-                            if u_nom:
-                                estado_limpio = u_disp.split(" ")[1]
-                                datos_u = {
-                                    "id_inmueble": int(id_prop_maestra), 
-                                    "nombre": u_nom.strip().upper(),
-                                    "tipo": u_tip, "estado": "ACTIVO", 
-                                    "disponibilidad": estado_limpio,
-                                    "area_m2": u_area, "precio_base": u_precio, "fotos": []
-                                }
-                                supabase.table("unidades").insert(datos_u).execute()
-                                log_accion(supabase, usuario_actual, "CREAR UNIDAD", f"{u_nom.upper()} en {prop_maestra}")
-                                st.success("✅ Unidad registrada con éxito.")
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.warning("⚠️ Debes darle un nombre a la unidad.")
-                
-                # --- 2. LECTURA Y VISOR DE UNIDADES (Solo del edificio seleccionado) ---
-                st.markdown(f"### 📋 Unidades en {prop_maestra}")
+                # --- 1. LECTURA DE BASE DE DATOS (Primero consultamos qué hay) ---
                 res_uni = supabase.table("unidades").select("*").eq("estado", "ACTIVO").eq("id_inmueble", int(id_prop_maestra)).execute()
                 df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
                 
+                st.markdown("---")
+                st.markdown(f"### 📋 Unidades en {prop_maestra}")
+                
+                # --- 2. EL VISOR (La estrella del día a día) ---
                 if not df_uni.empty:
                     emoji_map = {"DISPONIBLE": "🟢 DISP.", "OCUPADA": "🔴 OCUP.", "EN REPARACIÓN": "🟡 REP."}
                     df_uni['ESTADO'] = df_uni['disponibilidad'].map(lambda x: emoji_map.get(str(x).upper(), "⚪ DESC."))
@@ -305,8 +274,14 @@ def mostrar_modulo_inmuebles(supabase):
                     df_uni_display = df_uni_display.sort_values(by=['UNIDAD'])
                     
                     st.dataframe(df_uni_display, use_container_width=True, hide_index=True)
-                    
-                    # --- 3. GESTIONAR LA UNIDAD SELECCIONADA ---
+                else:
+                    st.info(f"ℹ️ Aún no hay unidades registradas para {prop_maestra}. Usa el panel de abajo para crear la primera.")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("### 🛠️ Panel de Gestión")
+                
+                # --- 3. GESTIONAR UNIDADES (Prioridad Operativa) ---
+                if not df_uni.empty:
                     with st.expander(f"⚙️ Gestionar / Galería de Fotos", expanded=False):
                         uni_sel = st.selectbox("Seleccione la unidad a gestionar:", df_uni['nombre'].sort_values().tolist(), key="sel_gest_uni")
                         if uni_sel:
@@ -398,10 +373,40 @@ def mostrar_modulo_inmuebles(supabase):
                                 st.success("✅ Unidad dada de baja.")
                                 time.sleep(1)
                                 st.rerun()
-                else:
-                    st.info(f"ℹ️ Aún no hay unidades registradas para {prop_maestra}.")
+
+                # --- 4. CREAR NUEVA UNIDAD (Se mantiene en la base, expandido solo si no hay unidades) ---
+                with st.expander(f"➕ Añadir Nueva Unidad a: {prop_maestra}", expanded=(True if df_uni.empty else False)):
+                    with st.form("form_nueva_unidad"):
+                        st.write(f"**Propiedad destino:** `{prop_maestra}`") 
+                        
+                        c1, c2 = st.columns(2)
+                        u_nom = c1.text_input("Nombre de la Unidad *", placeholder="Ej: Habitación 1, PH 2")
+                        u_tip = c2.selectbox("Tipo *", ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "PARQUEADERO", "OTRO"])
+                        
+                        c3, c4, c5 = st.columns(3)
+                        u_disp = c3.selectbox("Estado Inicial", ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"])
+                        u_area = c4.number_input("Área (m2)", min_value=0.0, step=1.0)
+                        u_precio = c5.number_input("Precio Base", min_value=0.0, step=100.0)
+                        
+                        if st.form_submit_button("💾 Guardar Unidad"):
+                            if u_nom:
+                                estado_limpio = u_disp.split(" ")[1]
+                                datos_u = {
+                                    "id_inmueble": int(id_prop_maestra), 
+                                    "nombre": u_nom.strip().upper(),
+                                    "tipo": u_tip, "estado": "ACTIVO", 
+                                    "disponibilidad": estado_limpio,
+                                    "area_m2": u_area, "precio_base": u_precio, "fotos": []
+                                }
+                                supabase.table("unidades").insert(datos_u).execute()
+                                log_accion(supabase, usuario_actual, "CREAR UNIDAD", f"{u_nom.upper()} en {prop_maestra}")
+                                st.success("✅ Unidad registrada con éxito.")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.warning("⚠️ Debes darle un nombre a la unidad.")
             else:
-                st.info("👆 Selecciona una propiedad en el menú desplegable para comenzar a trabajar.")
+                st.info("👆 Selecciona una propiedad en el menú desplegable superior para comenzar a trabajar.")
     # ==========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # ==========================================
