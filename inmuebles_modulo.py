@@ -259,12 +259,23 @@ def mostrar_modulo_inmuebles(supabase):
                     u_nom = c2.text_input("Nombre de la Unidad *", placeholder="Ej: Habitación 1, PH 2, S02")
                     u_tip = c3.selectbox("Tipo *", ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "PARQUEADERO", "OTRO"])
                     
+                    c4, c5, c6 = st.columns(3)
+                    u_disp = c4.selectbox("Estado de Disponibilidad", ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"])
+                    u_area = c5.number_input("Área (m2)", min_value=0.0, step=1.0)
+                    u_precio = c6.number_input("Precio Base", min_value=0.0, step=100.0)
+                    
                     if st.form_submit_button("💾 Guardar Unidad"):
                         if u_prop != "-- Seleccione --" and u_nom:
                             id_inmueble_sel = df_prop[df_prop['nombre'] == u_prop]['id'].values[0]
+                            # Limpiar el emoji para la base de datos
+                            estado_limpio = u_disp.split(" ")[1]
+                            
                             datos_u = {
                                 "id_inmueble": int(id_inmueble_sel), "nombre": u_nom.strip().upper(),
-                                "tipo": u_tip, "estado": "ACTIVO"
+                                "tipo": u_tip, "estado": "ACTIVO",
+                                "disponibilidad": estado_limpio,
+                                "area_m2": u_area, "precio_base": u_precio,
+                                "fotos": [] # Inicializamos la galería vacía
                             }
                             supabase.table("unidades").insert(datos_u).execute()
                             log_accion(supabase, usuario_actual, "CREAR UNIDAD", f"{u_nom.upper()} en {u_prop}")
@@ -277,7 +288,7 @@ def mostrar_modulo_inmuebles(supabase):
             st.markdown("---")
             
             # --- 2. LECTURA DE DATOS (READ) ---
-            res_uni = supabase.table("unidades").select("id, id_inmueble, nombre, tipo").eq("estado", "ACTIVO").execute()
+            res_uni = supabase.table("unidades").select("id, id_inmueble, nombre, tipo, disponibilidad, fotos").eq("estado", "ACTIVO").execute()
             df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
             
             if not df_uni.empty:
@@ -286,95 +297,129 @@ def mostrar_modulo_inmuebles(supabase):
                     df_uni['PROPIEDAD'] = df_uni['id_inmueble'].map(dict_prop)
                     df_uni['selector'] = df_uni['PROPIEDAD'] + " - " + df_uni['nombre']
                     
-                    df_uni_display = df_uni[['PROPIEDAD', 'nombre', 'tipo']].copy()
+                    # Mapear estado a emoji para la tabla
+                    emoji_map = {"DISPONIBLE": "🟢 DISP.", "OCUPADA": "🔴 OCUP.", "EN REPARACIÓN": "🟡 REP."}
+                    df_uni['ESTADO'] = df_uni['disponibilidad'].map(lambda x: emoji_map.get(str(x).upper(), "⚪ DESC."))
+                    
+                    df_uni_display = df_uni[['PROPIEDAD', 'nombre', 'tipo', 'ESTADO']].copy()
                     df_uni_display.rename(columns={'nombre': 'UNIDAD', 'tipo': 'TIPO'}, inplace=True)
                     df_uni_display = df_uni_display.sort_values(by=['PROPIEDAD', 'UNIDAD'])
                     
                     st.dataframe(df_uni_display, use_container_width=True, hide_index=True)
                     
-                    # --- 3. GESTIONAR UNIDAD (UPDATE / DELETE) ---
-                    with st.expander("⚙️ Gestionar / Editar Unidad", expanded=False):
-                        uni_sel = st.selectbox("Seleccione la unidad a editar:", df_uni['selector'].sort_values().tolist())
+                    # --- 3. GESTIONAR UNIDAD E INVENTARIO (UPDATE / DELETE) ---
+                    with st.expander("⚙️ Gestionar Unidad / Galería de Fotos", expanded=False):
+                        uni_sel = st.selectbox("Seleccione la unidad a gestionar:", df_uni['selector'].sort_values().tolist(), key="sel_gest_uni")
                         if uni_sel:
                             datos_u_edit = df_uni[df_uni['selector'] == uni_sel].iloc[0]
-                            with st.form("form_editar_uni"):
-                                st.write(f"Actualizando: **{datos_u_edit['PROPIEDAD']}**")
-                                e_c1, e_c2 = st.columns(2)
+                            u_id = str(datos_u_edit['id'])
+                            
+                            st.markdown(f"### 🛠️ Actualizando: **{datos_u_edit['nombre']}** ({datos_u_edit['PROPIEDAD']})")
+                            
+                            with st.form(key=f"form_editar_uni_{u_id}"):
+                                st.write("**1. Detalles Básicos**")
+                                e_c1, e_c2, e_c3 = st.columns([2, 1, 1])
                                 e_nom = e_c1.text_input("Nombre de la Unidad", datos_u_edit['nombre'])
+                                
                                 lista_tipos = ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "PARQUEADERO", "OTRO"]
                                 idx_tip = lista_tipos.index(datos_u_edit['tipo']) if datos_u_edit['tipo'] in lista_tipos else 0
                                 e_tip = e_c2.selectbox("Tipo", lista_tipos, index=idx_tip)
                                 
-                                col_btn1, col_btn2 = st.columns(2)
-                                if col_btn1.form_submit_button("📝 Guardar Cambios"):
-                                    datos_upd = {"nombre": e_nom.strip().upper(), "tipo": e_tip}
-                                    supabase.table("unidades").update(datos_upd).eq("id", int(datos_u_edit['id'])).execute()
-                                    log_accion(supabase, usuario_actual, "EDITAR UNIDAD", e_nom.strip().upper())
-                                    st.success("✅ Actualizado correctamente.")
+                                # Selector de estado actualizando el valor
+                                val_disp = str(datos_u_edit.get('disponibilidad', 'DISPONIBLE')).upper()
+                                lista_disp = ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"]
+                                idx_disp = 0
+                                for i, d in enumerate(lista_disp):
+                                    if val_disp in d: idx_disp = i
+                                e_disp = e_c3.selectbox("Estado", lista_disp, index=idx_disp)
+                                
+                                st.markdown("---")
+                                st.write("**2. Galería de Marketing**")
+                                
+                                # Visualizar fotos actuales
+                                fotos_actuales = datos_u_edit.get('fotos', [])
+                                if isinstance(fotos_actuales, list) and len(fotos_actuales) > 0:
+                                    st.write(f"Tiene {len(fotos_actuales)} foto(s) registrada(s).")
+                                    # Mostrar miniaturas
+                                    cols_fotos = st.columns(min(len(fotos_actuales), 4)) # Max 4 columnas para que no se vea amontonado
+                                    for i, url_foto in enumerate(fotos_actuales):
+                                        with cols_fotos[i % 4]:
+                                            st.image(url_foto, width=150)
+                                            st.caption(f"[🔍 Ver Original]({url_foto})")
+                                else:
+                                    st.info("No hay fotos registradas para esta unidad.")
+                                    fotos_actuales = []
+                                
+                                st.write("Subir nuevas fotos (Se añadirán a las existentes):")
+                                nuevas_fotos = st.file_uploader("Selecciona imágenes (Max 5MB c/u)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True, key=f"up_{u_id}")
+
+                                st.markdown("---")
+                                col_btn1, col_btn2 = st.columns([2, 1])
+                                btn_guardar = col_btn1.form_submit_button("📝 Guardar Cambios y Subir Fotos")
+                                
+                                btn_borrar_fotos = False
+                                if len(fotos_actuales) > 0:
+                                    btn_borrar_fotos = col_btn2.form_submit_button("🗑️ Borrar TODAS las fotos")
+
+                                # --- Lógica de Botones ---
+                                if btn_borrar_fotos:
+                                    # Vaciamos la lista en la BD (No borramos de Supabase Storage para simplificar el código por ahora, se puede limpiar manual)
+                                    supabase.table("unidades").update({"fotos": []}).eq("id", int(u_id)).execute()
+                                    st.success("✅ Galería vaciada correctamente.")
                                     time.sleep(1)
                                     st.rerun()
+                                    
+                                elif btn_guardar:
+                                    estado_limpio = e_disp.split(" ")[1]
+                                    urls_nuevas = []
+                                    hubo_error = False
+                                    
+                                    # Subir nuevas fotos si las hay
+                                    if nuevas_fotos:
+                                        with st.spinner("Subiendo fotos a la galería..."):
+                                            for foto in nuevas_fotos:
+                                                if foto.size > 5 * 1024 * 1024:
+                                                    st.error(f"❌ La foto {foto.name} supera 5MB.")
+                                                    hubo_error = True
+                                                    continue
+                                                try:
+                                                    ext = foto.name.split('.')[-1].lower()
+                                                    tipo_mime = f"image/{ext.replace('jpg', 'jpeg')}"
+                                                    ruta_foto = f"uni_{u_id}_{int(time.time())}_{foto.name}"
+                                                    supabase.storage.from_("fotos_unidades").upload(path=ruta_foto, file=foto.getvalue(), file_options={"content-type": tipo_mime})
+                                                    url_publica = supabase.storage.from_("fotos_unidades").get_public_url(ruta_foto)
+                                                    urls_nuevas.append(url_publica)
+                                                except Exception as e:
+                                                    st.error(f"Error al subir {foto.name}: {e}")
+                                                    hubo_error = True
+                                    
+                                    if not hubo_error:
+                                        # Combinamos las viejas con las nuevas
+                                        fotos_finales = fotos_actuales + urls_nuevas
+                                        
+                                        datos_upd = {
+                                            "nombre": e_nom.strip().upper(), 
+                                            "tipo": e_tip,
+                                            "disponibilidad": estado_limpio,
+                                            "fotos": fotos_finales
+                                        }
+                                        supabase.table("unidades").update(datos_upd).eq("id", int(u_id)).execute()
+                                        log_accion(supabase, usuario_actual, "EDITAR UNIDAD", e_nom.strip().upper())
+                                        st.success("✅ Unidad y galería actualizadas correctamente.")
+                                        time.sleep(1)
+                                        st.rerun()
+
                             # --- SEGURO DE ELIMINACIÓN TAB 2 ---
                             st.markdown("---")
                             st.warning("⚠️ **Zona de Peligro:** Dar de baja esta unidad evitará que se pueda alquilar.")
-                            confirmar_baja_uni = st.checkbox("Confirmo que deseo dar de baja esta unidad.", key=f"conf_uni_{datos_u_edit['id']}")
+                            confirmar_baja_uni = st.checkbox("Confirmo que deseo dar de baja esta unidad.", key=f"conf_uni_{u_id}")
                             
-                            if st.button("🚫 Dar de Baja (Eliminar) Unidad", disabled=not confirmar_baja_uni):
-                                supabase.table("unidades").update({"estado": "INACTIVO"}).eq("id", int(datos_u_edit['id'])).execute()
+                            if st.button("🚫 Dar de Baja (Eliminar) Unidad", disabled=not confirmar_baja_uni, key=f"btn_del_u_{u_id}"):
+                                supabase.table("unidades").update({"estado": "INACTIVO"}).eq("id", int(u_id)).execute()
                                 log_accion(supabase, usuario_actual, "ELIMINAR UNIDAD", datos_u_edit['nombre'])
                                 st.success("✅ Unidad dada de baja.")
                                 time.sleep(1)
                                 st.rerun()
-                                    
-                            
-                    # --- 4. EXPORTAR Y COMPARTIR ---
-                    st.markdown("---")
-                    st.markdown("### 📄 Exportar y Compartir Listado")
-                    formato_archivo_u = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True, key="radio_form_uni")
-                    if formato_archivo_u == "PDF":
-                        archivo_bytes_u = generar_pdf_unidades(df_uni_display)
-                        ext_u, mime_u = "pdf", "application/pdf"
-                    else:
-                        archivo_bytes_u = generar_excel_bytes(df_uni_display, "Unidades")
-                        ext_u, mime_u = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    
-                    nombre_final_u = f"directorio_unidades.{ext_u}"
-                    st.download_button(f"⬇️ Descargar en {formato_archivo_u}", data=archivo_bytes_u, file_name=nombre_final_u, mime=mime_u, use_container_width=True)
-
-                    st.markdown("#### 📤 Compartir a Operadores")
-                    cols_env = st.columns(2)
-                    lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if pd.notna(r.get('correo')) and r['correo']]
-                    lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if pd.notna(r.get('telefono')) and r['telefono']]
-                    
-                    with cols_env[0]:
-                        st.info("📧 Email")
-                        sel_em = st.selectbox("Operador (Correo)", ["-- Seleccione --"] + lista_correos, key="em_uni")
-                        if st.button("Enviar por Correo", use_container_width=True, key="btn_em_uni"):
-                            if sel_em != "-- Seleccione --":
-                                dest = sel_em.split(" - ")[-1].strip()
-                                with st.spinner(f"Enviando {formato_archivo_u}..."):
-                                    if enviar_reporte_correo(dest, archivo_bytes_u, nombre_final_u, "Unidades", ext_u):
-                                        st.success("¡Enviado!"); log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"Unidades a {dest}")
-                            else: st.warning("Elige un operador.")
-                            
-                    with cols_env[1]:
-                        st.success("💬 WhatsApp")
-                        sel_wa = st.selectbox("Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos, key="wa_uni")
-                        if sel_wa != "-- Seleccione --":
-                            if st.button("Generar Link WA", use_container_width=True, key="btn_wa_uni"):
-                                with st.spinner("Subiendo..."):
-                                    tel = re.sub(r'\D', '', sel_wa.split(" - ")[-1].strip())
-                                    try:
-                                        path = f"unidades_{int(time.time())}.{ext_u}"
-                                        supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes_u, file_options={"content-type": mime_u})
-                                        url = supabase.storage.from_("reportes").get_public_url(path)
-                                        msg = urllib.parse.quote(f"Hola, te comparto el Directorio de Unidades: {url}")
-                                        st.markdown(f'<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;border:none;padding:10px;border-radius:5px;">Abrir WhatsApp</button></a>', unsafe_allow_html=True)
-                                        log_accion(supabase, usuario_actual, "ENVIO WA", f"Unidades a {sel_wa}")
-                                    except Exception as e: st.error(f"Error: {e}")
-                        else: st.button("Generar Link WA", disabled=True, use_container_width=True)
-
-                else: st.info("No hay unidades registradas para las propiedades actuales.")
-            else: st.info("Aún no hay unidades registradas en el sistema.")
     # ==========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # ==========================================
