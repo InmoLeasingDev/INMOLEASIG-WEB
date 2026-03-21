@@ -328,9 +328,7 @@ def mostrar_modulo_propietarios(supabase):
                     st.markdown(f"**Documento actual:** [👁️ Ver archivo subido]({url_actual})")
                 else:
                     st.info("ℹ️ No hay documento registrado para este propietario.")
-                
-               doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
-                
+                doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
                 st.markdown("---")
                 col_btn1, col_btn2 = st.columns(2)
                 
