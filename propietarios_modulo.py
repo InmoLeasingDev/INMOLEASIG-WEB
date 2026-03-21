@@ -254,7 +254,7 @@ def mostrar_modulo_propietarios(supabase):
                 else:
                     st.warning("⚠️ Debes llenar los campos obligatorios.")
 
-    # ==========================================
+   # ==========================================
     # TAB 3: GESTIONAR
     # ==========================================
     with tab3:
@@ -263,33 +263,66 @@ def mostrar_modulo_propietarios(supabase):
             datos_p = df_prop[df_prop['nombre'] == prop_sel].iloc[0]
             
             with st.form("form_editar_prop"):
-                st.subheader("Editar Información")
-                e_nom = st.text_input("Nombre", datos_p['nombre'])
-                e_mov = st.text_input("Móvil", str(datos_p.get('movil', '')))
-                e_cor = st.text_input("Correo", str(datos_p.get('correo', '')))
+                st.subheader("Editar Información Personal")
+                c1, c2, c3 = st.columns([2, 1, 1])
+                e_nom = c1.text_input("Nombre", datos_p['nombre'])
+                
+                # Rescatar índices para los selectores
+                lista_tid = ["CC", "NIT", "DNI", "NIE", "CIF", "OTRO"]
+                idx_tid = lista_tid.index(datos_p['tipo_id']) if datos_p.get('tipo_id') in lista_tid else 0
+                e_tid = c2.selectbox("Tipo ID", lista_tid, index=idx_tid)
+                
+                e_id = c3.text_input("Número de Identificación", str(datos_p.get('identificacion', '')))
+                
+                c4, c5 = st.columns(2)
+                e_mov = c4.text_input("Móvil", str(datos_p.get('movil', '')))
+                e_cor = c5.text_input("Correo", str(datos_p.get('correo', '')))
                 
                 st.subheader("Finanzas")
-                e_ban = st.text_input("Banco", str(datos_p.get('banco', '')))
-                e_cba = st.text_input("Cuenta Banco", str(datos_p.get('cuenta_banco', '')))
+                c6, c7 = st.columns([1, 2])
+                
+                lista_mon = ["EUR", "COP"]
+                idx_mon = lista_mon.index(datos_p['moneda']) if datos_p.get('moneda') in lista_mon else 0
+                e_mon = c6.selectbox("Moneda", lista_mon, index=idx_mon)
+                
+                e_ban = c7.text_input("Banco", str(datos_p.get('banco', '')))
+                
+                c8, c9 = st.columns([1, 2])
+                lista_tcu = ["IBAN", "AHORROS", "CORRIENTE", "NEQUI", "DAVIPLATA"]
+                idx_tcu = lista_tcu.index(datos_p['tipo_cuenta']) if datos_p.get('tipo_cuenta') in lista_tcu else 0
+                e_tcu = c8.selectbox("Tipo de Cuenta", lista_tcu, index=idx_tcu)
+                
+                e_cba = c9.text_input("Número de Cuenta / IBAN", str(datos_p.get('cuenta_banco', '')))
                 
                 col_btn1, col_btn2 = st.columns(2)
                 if col_btn1.form_submit_button("📝 Actualizar Datos"):
-                    datos_upd = {
-                        "nombre": e_nom.strip().upper(),
-                        "movil": e_mov.strip(),
-                        "correo": e_cor.strip().lower(),
-                        "banco": e_ban.strip().upper(),
-                        "cuenta_banco": e_cba.strip().upper()
-                    }
-                    supabase.table("propietarios").update(datos_upd).eq("id", int(datos_p['id'])).execute()
-                    log_accion(supabase, usuario_actual, "EDITAR PROPIETARIO", e_nom.strip().upper())
-                    st.success("✅ Actualizado correctamente.")
-                    time.sleep(1)
-                    st.rerun()
+                    if e_nom and e_id:
+                        datos_upd = {
+                            "nombre": e_nom.strip().upper(),
+                            "tipo_id": e_tid,
+                            "identificacion": e_id.strip().upper(),
+                            "movil": e_mov.strip(),
+                            "correo": e_cor.strip().lower(),
+                            "moneda": e_mon,
+                            "banco": e_ban.strip().upper(),
+                            "tipo_cuenta": e_tcu,
+                            "cuenta_banco": e_cba.strip().upper()
+                        }
+                        supabase.table("propietarios").update(datos_upd).eq("id", int(datos_p['id'])).execute()
+                        log_accion(supabase, usuario_actual, "EDITAR PROPIETARIO", e_nom.strip().upper())
+                        st.success("✅ Actualizado correctamente.")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ El Nombre y el Número de Identificación son obligatorios.")
                     
+            # --- SEGURO DE ELIMINACIÓN TAB 3 ---
             st.markdown("---")
             st.subheader("🚨 Zona de Peligro")
-            if st.button("🗑️ Dar de Baja (Eliminar)"):
+            st.warning("⚠️ **Atención:** Dar de baja a este propietario lo ocultará del sistema y afectará los mandatos vinculados.")
+            confirmar_baja_prop = st.checkbox("Confirmo que deseo dar de baja a este propietario.", key=f"conf_prop_{datos_p['id']}")
+            
+            if st.button("🗑️ Dar de Baja (Eliminar)", disabled=not confirmar_baja_prop):
                 supabase.table("propietarios").update({"estado": "INACTIVO"}).eq("id", int(datos_p['id'])).execute()
                 log_accion(supabase, usuario_actual, "ELIMINAR PROPIETARIO", datos_p['nombre'])
                 st.success("✅ Propietario dado de baja.")
