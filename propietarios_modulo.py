@@ -251,7 +251,7 @@ def mostrar_modulo_propietarios(supabase):
             n_cba = st.text_input("Número de Cuenta / IBAN")
             
             # --- NUEVO: GESTIÓN DOCUMENTAL ---
-            st.subheader("📄 Documento Legal")
+            st.subheader("📄 Identificacion Propietario")
             doc_subido = st.file_uploader("Escáner de Identificación (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
             
             st.markdown("*Campos obligatorios marcados con asterisco (*)*")
@@ -347,7 +347,7 @@ def mostrar_modulo_propietarios(supabase):
                 e_cba = c9.text_input("Número de Cuenta / IBAN", str(datos_p.get('cuenta_banco', '')), key=f"cba_{p_id}")
                 
                 # --- GESTIÓN DOCUMENTAL ---
-                st.subheader("📄 Identificacion del Propietario")
+                st.subheader("📄 Identificacion Propietario")
                 
                 # Limpieza de valores nulos o "NaN" de Pandas para que funcione siempre
                 url_actual = datos_p.get('url_documento')
