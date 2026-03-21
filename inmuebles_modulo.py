@@ -259,7 +259,7 @@ def mostrar_modulo_inmuebles(supabase):
                 df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
                 
                 st.markdown("---")
-                st.markdown(f"### 📋 Unidades en {prop_maestra}")
+                st.markdown(f"** 📋 Unidades en {prop_maestra}")
                 
                 # --- 2. EL VISOR (La estrella del día a día) ---
                 if not df_uni.empty:
