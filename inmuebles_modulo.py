@@ -47,26 +47,34 @@ def generar_pdf_propiedades(df):
 # 2. MOTOR PDF UNIDADES
 # ==========================================
 def generar_pdf_unidades(df):
-    pdf = FPDF() # Vertical
+    pdf = FPDF(orientation="L") # Cambiado a Horizontal (Landscape)
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 10, "INMOLEASING - DIRECTORIO DE UNIDADES", ln=True, align="C")
     pdf.ln(5)
 
-    pdf.set_font("Arial", "B", 10)
+    pdf.set_font("Arial", "B", 9)
     pdf.set_fill_color(200, 220, 255)
-    cw = [80, 60, 50]
-    headers = ["PROPIEDAD", "UNIDAD", "TIPO"]
+    # Anchos para: PROPIEDAD, UNIDAD, TIPO, ESTADO, ÁREA, PRECIO
+    cw = [65, 45, 40, 30, 25, 40] 
+    headers = ["PROPIEDAD", "UNIDAD", "TIPO", "ESTADO", "ÁREA (m2)", "PRECIO"]
     for i, h in enumerate(headers):
         pdf.cell(cw[i], 8, h, 1, 0, "C", True)
     pdf.ln()
 
-    pdf.set_font("Arial", "", 9)
+    pdf.set_font("Arial", "", 8)
     for _, row in df.iterrows():
-        textos = [str(row.get('PROPIEDAD', '')), str(row.get('UNIDAD', '')), str(row.get('TIPO', ''))]
+        textos = [
+            str(row.get('PROPIEDAD', '')), 
+            str(row.get('UNIDAD', '')), 
+            str(row.get('TIPO', '')),
+            str(row.get('ESTADO', '')),
+            str(row.get('ÁREA (m2)', '')),
+            str(row.get('PRECIO', ''))
+        ]
         textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
         h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
-        if pdf.get_y() + h_fila > 270: pdf.add_page()
+        if pdf.get_y() + h_fila > 190: pdf.add_page()
         x, y = pdf.get_x(), pdf.get_y()
         for i, txt in enumerate(textos):
             pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
@@ -448,9 +456,13 @@ def mostrar_modulo_inmuebles(supabase):
 
                 # --- PANEL: REPORTES (MÓDULO COMPARTIR CENTRALIZADO) ---
                 elif st.session_state.modo_unidad == "REPORTES" and not df_uni.empty:
-                    # 💡 EL CAMBIO CLAVE 3: ¡Limpiamos las 50 líneas redundantes! Solo llamamos a la herramienta.
+                    
+                    # 💡 SOLUCIÓN: Creamos una copia solo para exportar y le inyectamos la Propiedad
+                    df_exportar = df_uni_display.copy()
+                    df_exportar.insert(0, 'PROPIEDAD', prop_maestra) 
+                    
                     panel_reportes_y_compartir(
-                        df_datos=df_uni_display,
+                        df_datos=df_exportar, # Pasamos la tabla enriquecida
                         nombre_base=f"unidades_{prop_maestra.replace(' ', '_')}",
                         modulo_origen="Unidades",
                         funcion_pdf=generar_pdf_unidades,
@@ -459,6 +471,7 @@ def mostrar_modulo_inmuebles(supabase):
                         usuario_actual=st.session_state.usuario.get("nombre", "ADMIN"),
                         clave_estado_cerrar="modo_unidad"
                     )
+                    
     # =========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # =========================================
