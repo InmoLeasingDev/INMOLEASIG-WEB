@@ -95,7 +95,7 @@ def mostrar_modulo_propietarios(supabase):
             busqueda = st.text_input("🔍 Buscar por nombre o ID...").upper().strip()
             df_display = df_prop.sort_values('nombre')
             
-            st.dataframe(df_display[['nombre', 'tipo_id', 'identificacion', 'movil', 'correo', 'moneda']], use_container_width=True, hide_index=True)
+            #st.dataframe(df_display[['nombre', 'tipo_id', 'identificacion', 'movil', 'correo', 'moneda']], use_container_width=True, hide_index=True)
             if busqueda:
                 mask = df_display['nombre'].str.contains(busqueda) | df_display['identificacion'].str.contains(busqueda)
                 df_display = df_display[mask]
