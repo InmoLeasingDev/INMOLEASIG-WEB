@@ -224,13 +224,10 @@ def mostrar_modulo_inmuebles(supabase):
         else:
             st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
 
-# ==========================================
+    # ==========================================
     # TAB 2: UNIDADES (Subdivisión de Propiedades)
     # ==========================================
     with tab2:
-        st.subheader("Subdivisión de Espacios Rentables")
-        st.info("💡 Primero selecciona una Propiedad Base para ver, gestionar o crear sus unidades.")
-        
         # --- Cargar Operadores (para uso futuro/exportación) ---
         try:
             res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
@@ -250,9 +247,9 @@ def mostrar_modulo_inmuebles(supabase):
         else:
             opciones_prop = ["-- Seleccione --"] + df_prop['nombre'].tolist()
             
-            # --- SELECTOR MAESTRO ---
-            st.markdown("### 🏢 Seleccionar Propiedad")
-            prop_maestra = st.selectbox("Elige la propiedad sobre la que deseas trabajar:", opciones_prop, key="sel_maestra_prop")
+            # --- SELECTOR MAESTRO (MINIMALISTA) ---
+            st.write("") # Pequeño respiro visual superior
+            prop_maestra = st.selectbox("🏢 Elige la propiedad sobre la que deseas trabajar:", opciones_prop, key="sel_maestra_prop")
             
             if prop_maestra != "-- Seleccione --":
                 id_prop_maestra = df_prop[df_prop['nombre'] == prop_maestra]['id'].values[0]
