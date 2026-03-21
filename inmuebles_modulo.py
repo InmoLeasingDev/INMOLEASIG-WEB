@@ -4,12 +4,12 @@ import time
 import urllib.parse
 import re
 from fpdf import FPDF
-# --- NUESTRA LIBRERÍA MAESTRA ---
-from herramientas import log_accion, enviar_reporte_correo, generar_excel_bytes
 
-# ==========================================
+# --- NUESTRA LIBRERÍA MAESTRA ---
+from herramientas import log_accion, enviar_reporte_correo, generar_excel_bytes, panel_reportes_y_compartir
+# =========================================
 # 1. MOTOR PDF PROPIEDADES
-# ==========================================
+# =========================================
 def generar_pdf_propiedades(df):
     pdf = FPDF(orientation="L")
     pdf.add_page()
