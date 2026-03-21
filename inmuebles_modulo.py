@@ -247,7 +247,7 @@ def mostrar_modulo_inmuebles(supabase):
         else:
             opciones_prop = ["-- Seleccione --"] + df_prop['nombre'].tolist()
             
-            # --- SELECTOR MAESTRO (MINIMALISTA) ---
+            # --- SELECTOR MAESTRO (MINIMALISTA) ----
             st.write("") # Pequeño respiro visual superior
             prop_maestra = st.selectbox("🏢 Elige la propiedad sobre la que deseas trabajar:", opciones_prop, key="sel_maestra_prop")
             
