@@ -278,7 +278,7 @@ def mostrar_modulo_inmuebles(supabase):
                 # 🛠️ BARRA DE HERRAMIENTAS (TOOLBAR)
                 # ==========================================
                 st.markdown("<br>", unsafe_allow_html=True)
-                t_c1, t_c2, t_c3 = st.columns([2, 2, 6]) # Botones pegados a la izquierda
+                t_c1, t_c2, t_c3 = st.columns([2, 2, 6]) 
                 
                 if t_c1.button("➕ Nueva Unidad", use_container_width=True):
                     st.session_state.modo_unidad = "CREAR"
@@ -302,20 +302,19 @@ def mostrar_modulo_inmuebles(supabase):
                         u_nom = c1.text_input("Nombre de la Unidad *", placeholder="Ej: Habitación 1, PH 2")
                         u_tip = c2.selectbox("Tipo *", ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "PARQUEADERO", "OTRO"])
                         
-                        c3, c4, c5 = st.columns(3)
-                        u_disp = c3.selectbox("Estado Inicial", ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"])
-                        u_area = c4.number_input("Área (m2)", min_value=0.0, step=1.0)
-                        u_precio = c5.number_input("Precio Base", min_value=0.0, step=100.0)
+                        c3, c4 = st.columns(2)
+                        u_area = c3.number_input("Área (m2)", min_value=0.0, step=1.0)
+                        u_precio = c4.number_input("Precio Base", min_value=0.0, step=100.0)
                         
                         st.markdown("---")
                         col_b1, col_b2 = st.columns([2, 8])
                         
                         if col_b1.form_submit_button("💾 Guardar Unidad"):
                             if u_nom:
-                                estado_limpio = u_disp.split(" ")[1]
+                                # Aquí nace siempre como DISPONIBLE de forma automática
                                 datos_u = {
                                     "id_inmueble": int(id_prop_maestra), "nombre": u_nom.strip().upper(),
-                                    "tipo": u_tip, "estado": "ACTIVO", "disponibilidad": estado_limpio,
+                                    "tipo": u_tip, "estado": "ACTIVO", "disponibilidad": "DISPONIBLE",
                                     "area_m2": u_area, "precio_base": u_precio, "fotos": []
                                 }
                                 supabase.table("unidades").insert(datos_u).execute()
@@ -328,7 +327,7 @@ def mostrar_modulo_inmuebles(supabase):
                                 st.warning("⚠️ Debes darle un nombre a la unidad.")
                                 
                         if col_b2.form_submit_button("❌ Cancelar"):
-                            st.session_state.modo_unidad = "NADA" # Cierra el panel sin hacer nada
+                            st.session_state.modo_unidad = "NADA" 
                             st.rerun()
 
                 # --- PANEL: GESTIONAR Y GALERÍA ---
@@ -343,7 +342,6 @@ def mostrar_modulo_inmuebles(supabase):
                         
                         with st.form(key=f"form_editar_uni_{u_id}", clear_on_submit=True):
                             st.write("**1. Detalles Básicos**")
-                            # Primera fila: Nombre y Tipo
                             e_c1, e_c2 = st.columns([2, 1])
                             e_nom = e_c1.text_input("Nombre de la Unidad *", datos_u_edit['nombre'])
                             
@@ -351,19 +349,18 @@ def mostrar_modulo_inmuebles(supabase):
                             idx_tip = lista_tipos.index(datos_u_edit['tipo']) if datos_u_edit['tipo'] in lista_tipos else 0
                             e_tip = e_c2.selectbox("Tipo *", lista_tipos, index=idx_tip)
                             
-                            # Segunda fila: Estado, Área y Precio
                             e_c3, e_c4, e_c5 = st.columns(3)
                             val_disp = str(datos_u_edit.get('disponibilidad', 'DISPONIBLE')).upper()
-                            lista_disp = ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"]
-                            idx_disp = next((i for i, d in enumerate(lista_disp) if val_disp in d), 0)
-                            e_disp = e_c3.selectbox("Estado", lista_disp, index=idx_disp)
                             
-                            # Manejo seguro de valores nulos para área y precio
+                            # Estado bloqueado (Solo Lectura)
+                            e_c3.text_input("Estado (Automático)", val_disp, disabled=True)
+                            
                             val_area = float(datos_u_edit.get('area_m2', 0.0)) if pd.notna(datos_u_edit.get('area_m2')) else 0.0
                             val_precio = float(datos_u_edit.get('precio_base', 0.0)) if pd.notna(datos_u_edit.get('precio_base')) else 0.0
                             
                             e_area = e_c4.number_input("Área (m2)", min_value=0.0, step=1.0, value=val_area)
-                            e_precio = e_c5.number_input("Precio Base", min_value=0.0, step=100.0, value=val_precio)                            
+                            e_precio = e_c5.number_input("Precio Base", min_value=0.0, step=100.0, value=val_precio)
+                            
                             st.markdown("---")
                             st.write("**2. Galería de Marketing**")
                             
@@ -391,7 +388,7 @@ def mostrar_modulo_inmuebles(supabase):
                                 
                             btn_cerrar = col_btn3.form_submit_button("❌ Cerrar Panel")
 
-                            # Acciones de los botones
+                            # Acciones
                             if btn_cerrar:
                                 st.session_state.modo_unidad = "NADA"
                                 st.rerun()
@@ -403,7 +400,6 @@ def mostrar_modulo_inmuebles(supabase):
                                 st.rerun()
                                 
                             elif btn_guardar:
-                                estado_limpio = e_disp.split(" ")[1]
                                 urls_nuevas = []
                                 hubo_error = False
                                 
@@ -427,25 +423,31 @@ def mostrar_modulo_inmuebles(supabase):
                                 
                                 if not hubo_error:
                                     fotos_finales = fotos_actuales + urls_nuevas
-                                    datos_upd = {"nombre": e_nom.strip().upper(), "tipo": e_tip, "disponibilidad": estado_limpio, "fotos": fotos_finales}
+                                    # NOTA: Ya NO actualizamos 'disponibilidad' aquí
+                                    datos_upd = {
+                                        "nombre": e_nom.strip().upper(), 
+                                        "tipo": e_tip, 
+                                        "area_m2": e_area,
+                                        "precio_base": e_precio,
+                                        "fotos": fotos_finales
+                                    }
                                     supabase.table("unidades").update(datos_upd).eq("id", int(u_id)).execute()
                                     log_accion(supabase, usuario_actual, "EDITAR UNIDAD", e_nom.strip().upper())
                                     st.success("✅ Actualizado correctamente.")
-                                    st.session_state.modo_unidad = "NADA" # Cierra el panel automáticamente tras guardar
+                                    st.session_state.modo_unidad = "NADA" # Cierra panel
                                     time.sleep(1)
                                     st.rerun()
 
-                        # Botón Eliminar (Fuera del form principal para mayor seguridad)
+                        # Botón Eliminar (Fuera del form)
                         st.markdown("<br>", unsafe_allow_html=True)
                         c_del1, c_del2 = st.columns([7, 3])
                         confirmar_baja_uni = c_del1.checkbox("⚠️ Confirmo que deseo dar de baja esta unidad.", key=f"conf_uni_{u_id}")
                         if c_del2.button("🚫 Eliminar Unidad", disabled=not confirmar_baja_uni, key=f"btn_del_u_{u_id}"):
                             supabase.table("unidades").update({"estado": "INACTIVO"}).eq("id", int(u_id)).execute()
                             st.success("✅ Unidad dada de baja.")
-                            st.session_state.modo_unidad = "NADA" # Cierra el panel tras borrar
+                            st.session_state.modo_unidad = "NADA" 
                             time.sleep(1)
                             st.rerun()
-
     # =========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # =========================================
