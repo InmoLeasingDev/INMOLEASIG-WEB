@@ -403,8 +403,6 @@ def mostrar_modulo_inmuebles(supabase):
                                 st.rerun()
                             else:
                                 st.warning("⚠️ Debes darle un nombre a la unidad.")
-            else:
-                st.info("👆 Selecciona una propiedad en el menú desplegable superior para comenzar a trabajar.")
     # ==========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # ==========================================
