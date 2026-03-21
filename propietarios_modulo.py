@@ -365,9 +365,37 @@ def mostrar_modulo_propietarios(supabase):
                 doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"], key=f"doc_{p_id}")
                 
                 st.markdown("---")
-                col_btn1, col_btn2 = st.columns(2)
+                # Ampliamos a 3 columnas para acomodar el nuevo botón
+                col_btn1, col_btn2, col_btn3 = st.columns([2, 2, 1])
                 
-                if col_btn1.form_submit_button("📝 Actualizar Datos"):
+                # Definimos los botones
+                btn_actualizar = col_btn1.form_submit_button("📝 Actualizar Datos")
+                
+                btn_borrar_doc = False
+                if url_actual:
+                    # Este botón solo aparece si el propietario tiene un documento guardado
+                    btn_borrar_doc = col_btn2.form_submit_button("🗑️ Borrar Documento Actual")
+
+                # --- 1. LÓGICA DE BORRADO DE DOCUMENTO ---
+                if btn_borrar_doc:
+                    with st.spinner("Eliminando documento de la bóveda..."):
+                        # Primero borramos físicamente de Supabase Storage
+                        try:
+                            ruta_vieja = url_actual.split('/documentos/')[-1]
+                            supabase.storage.from_("documentos").remove([ruta_vieja])
+                        except:
+                            pass # Si ya no existe en la nube, lo ignoramos y seguimos
+                        
+                        # Luego vaciamos el bolsillo en la base de datos
+                        supabase.table("propietarios").update({"url_documento": None}).eq("id", int(p_id)).execute()
+                        log_accion(supabase, usuario_actual, "ELIMINAR DOC PROPIETARIO", e_nom.strip().upper())
+                        
+                        st.success("✅ Documento eliminado correctamente.")
+                        time.sleep(1)
+                        st.rerun()
+
+                # --- 2. LÓGICA DE ACTUALIZACIÓN DE DATOS ---
+                elif btn_actualizar:
                     if e_nom and e_id:
                         url_doc_upd = url_actual 
                         hubo_error_archivo = False
@@ -381,11 +409,12 @@ def mostrar_modulo_propietarios(supabase):
                                     try:
                                         ext = doc_edit.name.split('.')[-1].lower()
                                         tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
+                                        
                                         ruta_doc_nueva = f"id_{e_id.strip()}_{int(time.time())}.{ext}"
                                         supabase.storage.from_("documentos").upload(path=ruta_doc_nueva, file=doc_edit.getvalue(), file_options={"content-type": tipo_mime})
                                         url_doc_upd = supabase.storage.from_("documentos").get_public_url(ruta_doc_nueva)
                                         
-                                        # Auto-Limpieza
+                                        # Auto-Limpieza del viejo
                                         if url_actual:
                                             try:
                                                 ruta_vieja = url_actual.split('/documentos/')[-1]
