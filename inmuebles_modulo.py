@@ -341,14 +341,18 @@ def mostrar_modulo_inmuebles(supabase):
 
                 # --- PANEL: GESTIONAR Y GALERÍA ---
                 elif st.session_state.modo_unidad == "EDITAR" and not df_uni.empty:
-                    with st.form(key="form_editor_dinamico", clear_on_submit=True):
-                        st.markdown("**🛠️ Editor de Unidad y Galería**")
-                        uni_sel = st.selectbox("Selecciona la unidad:", df_uni['nombre'].sort_values().tolist())
+                    st.markdown("---")
+                    st.markdown("**🛠️ Editor de Unidad y Galería**")
+                    
+                    # 💡 EL CAMBIO CLAVE: Selector fuera del formulario
+                    uni_sel = st.selectbox("Selecciona la unidad:", df_uni['nombre'].sort_values().tolist())
+                    
+                    if uni_sel:
+                        datos_u_edit = df_uni[df_uni['nombre'] == uni_sel].iloc[0]
+                        u_id = str(datos_u_edit['id'])
                         
-                        if uni_sel:
-                            datos_u_edit = df_uni[df_uni['nombre'] == uni_sel].iloc[0]
-                            u_id = str(datos_u_edit['id'])
-                            
+                        # 💡 EL CAMBIO CLAVE 2: La llave del formulario ahora es dinámica (tiene el u_id)
+                        with st.form(key=f"form_editor_dinamico_{u_id}", clear_on_submit=True):
                             st.write("**1. Detalles Básicos**")
                             e_c1, e_c2 = st.columns([2, 1])
                             e_nom = e_c1.text_input("Nombre *", datos_u_edit['nombre'])
@@ -434,8 +438,8 @@ def mostrar_modulo_inmuebles(supabase):
                     # Eliminar Unidad (fuera del form)
                     st.write("")
                     c_del1, c_del2 = st.columns([7, 3])
-                    confirmar_baja = c_del1.checkbox("⚠️ Confirmo que deseo dar de baja esta unidad.")
-                    if c_del2.button("🚫 Eliminar Unidad", disabled=not confirmar_baja):
+                    confirmar_baja = c_del1.checkbox("⚠️ Confirmo que deseo dar de baja esta unidad.", key=f"del_chk_{u_id}")
+                    if c_del2.button("🚫 Eliminar Unidad", disabled=not confirmar_baja, key=f"del_btn_{u_id}"):
                         supabase.table("unidades").update({"estado": "INACTIVO"}).eq("id", int(u_id)).execute()
                         st.success("✅ Unidad dada de baja.")
                         st.session_state.modo_unidad = "NADA" 
@@ -444,6 +448,7 @@ def mostrar_modulo_inmuebles(supabase):
 
                 # --- PANEL: REPORTES (MÓDULO COMPARTIR CENTRALIZADO) ---
                 elif st.session_state.modo_unidad == "REPORTES" and not df_uni.empty:
+                    # 💡 EL CAMBIO CLAVE 3: ¡Limpiamos las 50 líneas redundantes! Solo llamamos a la herramienta.
                     panel_reportes_y_compartir(
                         df_datos=df_uni_display,
                         nombre_base=f"unidades_{prop_maestra.replace(' ', '_')}",
@@ -454,56 +459,6 @@ def mostrar_modulo_inmuebles(supabase):
                         usuario_actual=st.session_state.usuario.get("nombre", "ADMIN"),
                         clave_estado_cerrar="modo_unidad"
                     )
-                    st.markdown("**📊 Exportar y Compartir Listado**")
-                    formato_archivo_u = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True)
-                        
-                    if formato_archivo_u == "PDF":
-                            archivo_bytes_u = generar_pdf_unidades(df_uni_display)
-                            ext_u, mime_u = "pdf", "application/pdf"
-                    else:
-                            archivo_bytes_u = generar_excel_bytes(df_uni_display, "Unidades")
-                            ext_u, mime_u = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        
-                    nombre_final_u = f"unidades_{prop_maestra.replace(' ', '_')}.{ext_u}"
-                    st.download_button(f"⬇️ Descargar", data=archivo_bytes_u, file_name=nombre_final_u, mime=mime_u)
-                        
-                    st.markdown("---")
-                    st.write("📤 **Compartir a Operadores**")
-                    cols_env = st.columns(2)
-                    lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if pd.notna(r.get('correo')) and r['correo']]
-                    lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if pd.notna(r.get('telefono')) and r['telefono']]
-                        
-                    with cols_env[0]:
-                            sel_em = st.selectbox("📧 Email:", ["-- Seleccione --"] + lista_correos)
-                            if st.button("Enviar por Correo", use_container_width=True):
-                                if sel_em != "-- Seleccione --":
-                                    dest = sel_em.split(" - ")[-1].strip()
-                                    with st.spinner("Enviando..."):
-                                        if enviar_reporte_correo(dest, archivo_bytes_u, nombre_final_u, "Unidades", ext_u):
-                                            st.success("¡Enviado!")
-                                            log_accion(supabase, st.session_state.usuario.get("nombre", "ADMIN"), "ENVIO REPORTE", f"Unidades a {dest}")
-                                else: st.warning("Elige un operador.")
-                                
-                    with cols_env[1]:
-                            sel_wa = st.selectbox("💬 WhatsApp:", ["-- Seleccione --"] + lista_telefonos)
-                            if sel_wa != "-- Seleccione --":
-                                if st.button("Generar Link WA", use_container_width=True):
-                                    with st.spinner("Generando..."):
-                                        tel = re.sub(r'\D', '', sel_wa.split(" - ")[-1].strip())
-                                        try:
-                                            path = f"reportes_temp_{int(time.time())}.{ext_u}"
-                                            supabase.storage.from_("fotos_unidades").upload(path=path, file=archivo_bytes_u, file_options={"content-type": mime_u})
-                                            url = supabase.storage.from_("fotos_unidades").get_public_url(path)
-                                            msg = urllib.parse.quote(f"Hola, te comparto el reporte de unidades de {prop_maestra}: {url}")
-                                            st.markdown(f'<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;border:none;padding:5px 10px;border-radius:5px;">Abrir WhatsApp</button></a>', unsafe_allow_html=True)
-                                            log_accion(supabase, st.session_state.usuario.get("nombre", "ADMIN"), "ENVIO WA", f"Unidades a {sel_wa}")
-                                        except Exception as e: st.error(f"Error: {e}")
-                            else: st.button("Generar Link WA", disabled=True, use_container_width=True)
-                        
-                    st.markdown("---")
-                    if st.button("❌ Cerrar Panel"):
-                            st.session_state.modo_unidad = "NADA"
-                            st.rerun()
     # =========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # =========================================
