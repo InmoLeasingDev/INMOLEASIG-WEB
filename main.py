@@ -156,7 +156,7 @@ with st.sidebar:
     st.title("🏢 INMOLEASING")
     st.caption(f"Versión: {APP_VERSION}")
     
-    st.write(f"👤 Hola, **{st.session_state.usuario.get('nombre')}**")
+    st.write(f"👤 Hola, **{str(st.session_state.usuario.get('nombre', '')).strip()}**")
     st.caption(f"Región/Moneda: **{st.session_state.moneda_usuario}**")
     
     rol_actual = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
