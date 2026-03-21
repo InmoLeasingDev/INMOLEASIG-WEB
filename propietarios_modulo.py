@@ -282,64 +282,74 @@ def mostrar_modulo_propietarios(supabase):
                 else:
                     st.warning("⚠️ El Nombre y el Número de Identificación son obligatorios.")
     # ==========================================
-    # TAB 3: GESTIONAR (Con Auto-limpieza)
+    # TAB 3: GESTIONAR (Refresh Dinámico y Auto-Limpieza)
     # ==========================================
     with tab3:
         if not df_prop.empty:
-            prop_sel = st.selectbox("🔍 Selecciona un propietario para editar:", df_prop['nombre'].tolist())
+            prop_sel = st.selectbox("🔍 Selecciona un propietario para editar:", df_prop['nombre'].tolist(), key="sel_prop_tab3")
             datos_p = df_prop[df_prop['nombre'] == prop_sel].iloc[0]
+            p_id = str(datos_p.get('id', '0')) # Obtenemos el ID para forzar el refresco
             
-            with st.form("form_editar_prop"):
+            # 1. AL INICIO: Forzamos que cada formulario sea único por propietario
+            with st.form(key=f"form_edit_{p_id}"):
                 st.subheader("Editar Información Personal")
                 c1, c2, c3 = st.columns([2, 1, 1])
-                e_nom = c1.text_input("Nombre", datos_p['nombre'])
+                # 2. Atamos cada input al ID del propietario para que se limpie al cambiar
+                e_nom = c1.text_input("Nombre", str(datos_p.get('nombre', '')), key=f"nom_{p_id}")
                 
-                # Rescatar índices para los selectores (con validación de nulos)
                 lista_tid = ["CC", "NIT", "DNI", "NIE", "CIF", "OTRO"]
-                idx_tid = lista_tid.index(datos_p['tipo_id']) if pd.notna(datos_p.get('tipo_id')) and datos_p.get('tipo_id') in lista_tid else 0
-                e_tid = c2.selectbox("Tipo ID", lista_tid, index=idx_tid)
+                val_tid = datos_p.get('tipo_id')
+                idx_tid = lista_tid.index(val_tid) if pd.notna(val_tid) and val_tid in lista_tid else 0
+                e_tid = c2.selectbox("Tipo ID", lista_tid, index=idx_tid, key=f"tid_{p_id}")
                 
-                e_id = c3.text_input("Número de Identificación", str(datos_p.get('identificacion', '')))
+                e_id = c3.text_input("Número de Identificación", str(datos_p.get('identificacion', '')), key=f"id_{p_id}")
                 
                 c4, c5 = st.columns(2)
-                e_mov = c4.text_input("Móvil", str(datos_p.get('movil', '')))
-                e_cor = c5.text_input("Correo", str(datos_p.get('correo', '')))
+                e_mov = c4.text_input("Móvil", str(datos_p.get('movil', '')), key=f"mov_{p_id}")
+                e_cor = c5.text_input("Correo", str(datos_p.get('correo', '')), key=f"cor_{p_id}")
                 
                 st.subheader("Finanzas")
                 c6, c7 = st.columns([1, 2])
                 
                 lista_mon = ["EUR", "COP"]
-                idx_mon = lista_mon.index(datos_p['moneda']) if pd.notna(datos_p.get('moneda')) and datos_p.get('moneda') in lista_mon else 0
-                e_mon = c6.selectbox("Moneda", lista_mon, index=idx_mon)
+                val_mon = datos_p.get('moneda')
+                idx_mon = lista_mon.index(val_mon) if pd.notna(val_mon) and val_mon in lista_mon else 0
+                e_mon = c6.selectbox("Moneda", lista_mon, index=idx_mon, key=f"mon_{p_id}")
                 
-                e_ban = c7.text_input("Banco", str(datos_p.get('banco', '')))
+                e_ban = c7.text_input("Banco", str(datos_p.get('banco', '')), key=f"ban_{p_id}")
                 
                 c8, c9 = st.columns([1, 2])
                 lista_tcu = ["IBAN", "AHORROS", "CORRIENTE", "NEQUI", "DAVIPLATA"]
-                idx_tcu = lista_tcu.index(datos_p['tipo_cuenta']) if pd.notna(datos_p.get('tipo_cuenta')) and datos_p.get('tipo_cuenta') in lista_tcu else 0
-                e_tcu = c8.selectbox("Tipo de Cuenta", lista_tcu, index=idx_tcu)
+                val_tcu = datos_p.get('tipo_cuenta')
+                idx_tcu = lista_tcu.index(val_tcu) if pd.notna(val_tcu) and val_tcu in lista_tcu else 0
+                e_tcu = c8.selectbox("Tipo de Cuenta", lista_tcu, index=idx_tcu, key=f"tcu_{p_id}")
                 
-                e_cba = c9.text_input("Número de Cuenta / IBAN", str(datos_p.get('cuenta_banco', '')))
+                e_cba = c9.text_input("Número de Cuenta / IBAN", str(datos_p.get('cuenta_banco', '')), key=f"cba_{p_id}")
                 
-                # --- GESTIÓN DOCUMENTAL (Visualización y Edición) ---
+                # --- GESTIÓN DOCUMENTAL ---
                 st.subheader("📄 Documento Legal")
+                
+                # Limpieza de valores nulos o "NaN" de Pandas para que funcione siempre
                 url_actual = datos_p.get('url_documento')
-                if pd.notna(url_actual) and url_actual:
+                if pd.isna(url_actual) or str(url_actual).strip() == "" or str(url_actual).lower() == "nan":
+                    url_actual = None
+                
+                if url_actual:
                     st.markdown(f"**Documento actual:** [👁️ Ver archivo subido]({url_actual})")
                 else:
                     st.info("ℹ️ No hay documento registrado para este propietario.")
                 
-                doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
+                # El file_uploader también atado al ID para que suelte el PDF anterior
+                doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"], key=f"doc_{p_id}")
                 
                 st.markdown("---")
                 col_btn1, col_btn2 = st.columns(2)
                 
                 if col_btn1.form_submit_button("📝 Actualizar Datos"):
                     if e_nom and e_id:
-                        url_doc_upd = url_actual # Mantiene el archivo viejo por defecto
+                        url_doc_upd = url_actual 
                         hubo_error_archivo = False
                         
-                        # --- Lógica de actualización y Auto-Limpieza ---
                         if doc_edit is not None:
                             if doc_edit.size > 5 * 1024 * 1024:
                                 st.error("❌ El documento supera el límite de 5MB. Por favor, redúcelo.")
@@ -347,26 +357,23 @@ def mostrar_modulo_propietarios(supabase):
                             else:
                                 with st.spinner("Actualizando documento en la bóveda..."):
                                     try:
-                                        # 1. Subir el archivo nuevo
                                         ext = doc_edit.name.split('.')[-1]
                                         ruta_doc_nueva = f"id_{e_id.strip()}_{int(time.time())}.{ext}"
                                         supabase.storage.from_("documentos").upload(path=ruta_doc_nueva, file=doc_edit.getvalue())
                                         url_doc_upd = supabase.storage.from_("documentos").get_public_url(ruta_doc_nueva)
                                         
-                                        # 2. AUTO-LIMPIEZA: Eliminar el archivo viejo de Supabase
-                                        if pd.notna(url_actual) and url_actual:
+                                        # Auto-Limpieza
+                                        if url_actual:
                                             try:
-                                                # Extraemos el nombre exacto del archivo viejo desde la URL
                                                 ruta_vieja = url_actual.split('/documentos/')[-1]
                                                 supabase.storage.from_("documentos").remove([ruta_vieja])
-                                            except Exception as e_del:
-                                                pass # Si no logra borrarlo por alguna razón, no detenemos el sistema
+                                            except:
+                                                pass 
                                                 
                                     except Exception as e:
                                         st.error(f"❌ Error al subir el archivo: {e}")
                                         hubo_error_archivo = True
 
-                        # --- Guardar en BD si no hay errores ---
                         if not hubo_error_archivo:
                             datos_upd = {
                                 "nombre": e_nom.strip().upper(),
@@ -380,7 +387,7 @@ def mostrar_modulo_propietarios(supabase):
                                 "cuenta_banco": e_cba.strip().upper(),
                                 "url_documento": url_doc_upd
                             }
-                            supabase.table("propietarios").update(datos_upd).eq("id", int(datos_p['id'])).execute()
+                            supabase.table("propietarios").update(datos_upd).eq("id", int(p_id)).execute()
                             log_accion(supabase, usuario_actual, "EDITAR PROPIETARIO", e_nom.strip().upper())
                             st.success("✅ Actualizado correctamente.")
                             time.sleep(1)
@@ -392,10 +399,10 @@ def mostrar_modulo_propietarios(supabase):
             st.markdown("---")
             st.subheader("🚨 Zona de Peligro")
             st.warning("⚠️ **Atención:** Dar de baja a este propietario lo ocultará del sistema y afectará los mandatos vinculados.")
-            confirmar_baja_prop = st.checkbox("Confirmo que deseo dar de baja a este propietario.", key=f"conf_prop_{datos_p['id']}")
+            confirmar_baja_prop = st.checkbox("Confirmo que deseo dar de baja a este propietario.", key=f"conf_prop_{p_id}")
             
-            if st.button("🗑️ Dar de Baja (Eliminar)", disabled=not confirmar_baja_prop):
-                supabase.table("propietarios").update({"estado": "INACTIVO"}).eq("id", int(datos_p['id'])).execute()
+            if st.button("🗑️ Dar de Baja (Eliminar)", disabled=not confirmar_baja_prop, key=f"btn_baja_{p_id}"):
+                supabase.table("propietarios").update({"estado": "INACTIVO"}).eq("id", int(p_id)).execute()
                 log_accion(supabase, usuario_actual, "ELIMINAR PROPIETARIO", datos_p['nombre'])
                 st.success("✅ Propietario dado de baja.")
                 time.sleep(1)
