@@ -250,10 +250,11 @@ def mostrar_modulo_propietarios(supabase):
                         else:
                             with st.spinner("Subiendo documento a la bóveda..."):
                                 try:
-                                    ext = doc_subido.name.split('.')[-1]
-                                    # Creamos un nombre único: id_12345678_16790000.pdf
+                                    ext = doc_subido.name.split('.')[-1].lower()
+                                    # Detectar el tipo de archivo (MIME)
+                                    tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
                                     ruta_doc = f"id_{n_id.strip()}_{int(time.time())}.{ext}"
-                                    supabase.storage.from_("documentos").upload(path=ruta_doc, file=doc_subido.getvalue())
+                                    supabase.storage.from_("documentos").upload(path=ruta_doc, file=doc_subido.getvalue(), file_options={"content-type": tipo_mime})
                                     url_doc = supabase.storage.from_("documentos").get_public_url(ruta_doc)
                                 except Exception as e:
                                     st.error(f"❌ Error al subir el archivo: {e}")
@@ -360,9 +361,10 @@ def mostrar_modulo_propietarios(supabase):
                             else:
                                 with st.spinner("Actualizando documento en la bóveda..."):
                                     try:
-                                        ext = doc_edit.name.split('.')[-1]
+                                        ext = doc_edit.name.split('.')[-1].lower()
+                                        tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
                                         ruta_doc_nueva = f"id_{e_id.strip()}_{int(time.time())}.{ext}"
-                                        supabase.storage.from_("documentos").upload(path=ruta_doc_nueva, file=doc_edit.getvalue())
+                                        supabase.storage.from_("documentos").upload(path=ruta_doc_nueva, file=doc_edit.getvalue(), file_options={"content-type": tipo_mime})
                                         url_doc_upd = supabase.storage.from_("documentos").get_public_url(ruta_doc_nueva)
                                         
                                         # Auto-Limpieza
