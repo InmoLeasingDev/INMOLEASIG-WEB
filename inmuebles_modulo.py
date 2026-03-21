@@ -343,18 +343,27 @@ def mostrar_modulo_inmuebles(supabase):
                         
                         with st.form(key=f"form_editar_uni_{u_id}", clear_on_submit=True):
                             st.write("**1. Detalles Básicos**")
-                            e_c1, e_c2, e_c3 = st.columns([2, 1, 1])
-                            e_nom = e_c1.text_input("Nombre de la Unidad", datos_u_edit['nombre'])
+                            # Primera fila: Nombre y Tipo
+                            e_c1, e_c2 = st.columns([2, 1])
+                            e_nom = e_c1.text_input("Nombre de la Unidad *", datos_u_edit['nombre'])
                             
                             lista_tipos = ["HABITACIÓN", "SUITE", "OFICINA", "PROPIEDAD COMPLETA", "PARQUEADERO", "OTRO"]
                             idx_tip = lista_tipos.index(datos_u_edit['tipo']) if datos_u_edit['tipo'] in lista_tipos else 0
-                            e_tip = e_c2.selectbox("Tipo", lista_tipos, index=idx_tip)
+                            e_tip = e_c2.selectbox("Tipo *", lista_tipos, index=idx_tip)
                             
+                            # Segunda fila: Estado, Área y Precio
+                            e_c3, e_c4, e_c5 = st.columns(3)
                             val_disp = str(datos_u_edit.get('disponibilidad', 'DISPONIBLE')).upper()
                             lista_disp = ["🟢 DISPONIBLE", "🔴 OCUPADA", "🟡 EN REPARACIÓN"]
                             idx_disp = next((i for i, d in enumerate(lista_disp) if val_disp in d), 0)
                             e_disp = e_c3.selectbox("Estado", lista_disp, index=idx_disp)
                             
+                            # Manejo seguro de valores nulos para área y precio
+                            val_area = float(datos_u_edit.get('area_m2', 0.0)) if pd.notna(datos_u_edit.get('area_m2')) else 0.0
+                            val_precio = float(datos_u_edit.get('precio_base', 0.0)) if pd.notna(datos_u_edit.get('precio_base')) else 0.0
+                            
+                            e_area = e_c4.number_input("Área (m2)", min_value=0.0, step=1.0, value=val_area)
+                            e_precio = e_c5.number_input("Precio Base", min_value=0.0, step=100.0, value=val_precio)                            
                             st.markdown("---")
                             st.write("**2. Galería de Marketing**")
                             
