@@ -95,12 +95,31 @@ def mostrar_modulo_propietarios(supabase):
             busqueda = st.text_input("🔍 Buscar por nombre o ID...").upper().strip()
             df_display = df_prop.sort_values('nombre')
             
+            st.dataframe(df_display[['nombre', 'tipo_id', 'identificacion', 'movil', 'correo', 'moneda']], use_container_width=True, hide_index=True)
             if busqueda:
                 mask = df_display['nombre'].str.contains(busqueda) | df_display['identificacion'].str.contains(busqueda)
                 df_display = df_display[mask]
                 
-            st.dataframe(df_display[['nombre', 'tipo_id', 'identificacion', 'movil', 'correo', 'moneda']], use_container_width=True, hide_index=True)
-            
+            # Mostramos la tabla configurando la columna de URL como un enlace interactivo
+            st.dataframe(
+                df_display[['nombre', 'tipo_id', 'identificacion', 'movil', 'correo', 'moneda', 'url_documento']],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "nombre": "NOMBRE",
+                    "tipo_id": "TIPO ID",
+                    "identificacion": "IDENTIFICACIÓN",
+                    "movil": "MÓVIL",
+                    "correo": "CORREO",
+                    "moneda": "MON",
+                    "url_documento": st.column_config.LinkColumn(
+                        "📄 DOCUMENTO",
+                        help="Haz clic para abrir el documento de identidad",
+                        display_text="🔍 Ver Archivo"
+                    )
+                }
+            )
+
             # ==========================================
             # NUEVO PANEL DE EXPORTACIÓN TAB 1 (FLEXIBLE)
             # ==========================================
