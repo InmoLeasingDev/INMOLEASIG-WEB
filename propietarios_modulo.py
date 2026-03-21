@@ -231,30 +231,57 @@ def mostrar_modulo_propietarios(supabase):
             n_tcu = c8.selectbox("Tipo de Cuenta", ["IBAN", "AHORROS", "CORRIENTE", "NEQUI", "DAVIPLATA"])
             n_cba = st.text_input("Número de Cuenta / IBAN")
             
+            # --- NUEVO: GESTIÓN DOCUMENTAL ---
+            st.subheader("📄 Documento Legal")
+            doc_subido = st.file_uploader("Escáner de Identificación (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
+            
             st.markdown("*Campos obligatorios marcados con asterisco (*)*")
+            
             if st.form_submit_button("💾 Guardar Propietario"):
                 if n_nom and n_id:
-                    datos_insert = {
-                        "nombre": n_nom.strip().upper(),
-                        "tipo_id": n_tid,
-                        "identificacion": n_id.strip().upper(),
-                        "movil": n_mov.strip(),
-                        "correo": n_cor.strip().lower(),
-                        "moneda": n_mon,
-                        "banco": n_ban.strip().upper(),
-                        "tipo_cuenta": n_tcu,
-                        "cuenta_banco": n_cba.strip().upper(),
-                        "estado": "ACTIVO"
-                    }
-                    supabase.table("propietarios").insert(datos_insert).execute()
-                    log_accion(supabase, usuario_actual, "CREAR PROPIETARIO", n_nom.strip().upper())
-                    st.success("✅ Propietario registrado con éxito.")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.warning("⚠️ Debes llenar los campos obligatorios.")
+                    url_doc = None
+                    hubo_error_archivo = False
+                    
+                    # --- Lógica de subida del archivo ---
+                    if doc_subido is not None:
+                        if doc_subido.size > 5 * 1024 * 1024:
+                            st.error("❌ El documento supera el límite de 5MB. Por favor, redúcelo.")
+                            hubo_error_archivo = True
+                        else:
+                            with st.spinner("Subiendo documento a la bóveda..."):
+                                try:
+                                    ext = doc_subido.name.split('.')[-1]
+                                    # Creamos un nombre único: id_12345678_16790000.pdf
+                                    ruta_doc = f"id_{n_id.strip()}_{int(time.time())}.{ext}"
+                                    supabase.storage.from_("documentos").upload(path=ruta_doc, file=doc_subido.getvalue())
+                                    url_doc = supabase.storage.from_("documentos").get_public_url(ruta_doc)
+                                except Exception as e:
+                                    st.error(f"❌ Error al subir el archivo: {e}")
+                                    hubo_error_archivo = True
 
-   # ==========================================
+                    # --- Guardar en Base de Datos (Solo si el archivo subió bien) ---
+                    if not hubo_error_archivo:
+                        datos_insert = {
+                            "nombre": n_nom.strip().upper(),
+                            "tipo_id": n_tid,
+                            "identificacion": n_id.strip().upper(),
+                            "movil": n_mov.strip(),
+                            "correo": n_cor.strip().lower(),
+                            "moneda": n_mon,
+                            "banco": n_ban.strip().upper(),
+                            "tipo_cuenta": n_tcu,
+                            "cuenta_banco": n_cba.strip().upper(),
+                            "url_documento": url_doc,
+                            "estado": "ACTIVO"
+                        }
+                        supabase.table("propietarios").insert(datos_insert).execute()
+                        log_accion(supabase, usuario_actual, "CREAR PROPIETARIO", n_nom.strip().upper())
+                        st.success("✅ Propietario registrado con éxito.")
+                        time.sleep(1)
+                        st.rerun()
+                else:
+                    st.warning("⚠️ El Nombre y el Número de Identificación son obligatorios.")
+    # ==========================================
     # TAB 3: GESTIONAR
     # ==========================================
     with tab3:
@@ -267,9 +294,9 @@ def mostrar_modulo_propietarios(supabase):
                 c1, c2, c3 = st.columns([2, 1, 1])
                 e_nom = c1.text_input("Nombre", datos_p['nombre'])
                 
-                # Rescatar índices para los selectores
+                # Rescatar índices para los selectores (con validación de nulos)
                 lista_tid = ["CC", "NIT", "DNI", "NIE", "CIF", "OTRO"]
-                idx_tid = lista_tid.index(datos_p['tipo_id']) if datos_p.get('tipo_id') in lista_tid else 0
+                idx_tid = lista_tid.index(datos_p['tipo_id']) if pd.notna(datos_p.get('tipo_id')) and datos_p.get('tipo_id') in lista_tid else 0
                 e_tid = c2.selectbox("Tipo ID", lista_tid, index=idx_tid)
                 
                 e_id = c3.text_input("Número de Identificación", str(datos_p.get('identificacion', '')))
@@ -282,49 +309,42 @@ def mostrar_modulo_propietarios(supabase):
                 c6, c7 = st.columns([1, 2])
                 
                 lista_mon = ["EUR", "COP"]
-                idx_mon = lista_mon.index(datos_p['moneda']) if datos_p.get('moneda') in lista_mon else 0
+                idx_mon = lista_mon.index(datos_p['moneda']) if pd.notna(datos_p.get('moneda')) and datos_p.get('moneda') in lista_mon else 0
                 e_mon = c6.selectbox("Moneda", lista_mon, index=idx_mon)
                 
                 e_ban = c7.text_input("Banco", str(datos_p.get('banco', '')))
                 
                 c8, c9 = st.columns([1, 2])
                 lista_tcu = ["IBAN", "AHORROS", "CORRIENTE", "NEQUI", "DAVIPLATA"]
-                idx_tcu = lista_tcu.index(datos_p['tipo_cuenta']) if datos_p.get('tipo_cuenta') in lista_tcu else 0
+                idx_tcu = lista_tcu.index(datos_p['tipo_cuenta']) if pd.notna(datos_p.get('tipo_cuenta')) and datos_p.get('tipo_cuenta') in lista_tcu else 0
                 e_tcu = c8.selectbox("Tipo de Cuenta", lista_tcu, index=idx_tcu)
                 
                 e_cba = c9.text_input("Número de Cuenta / IBAN", str(datos_p.get('cuenta_banco', '')))
                 
+                # --- GESTIÓN DOCUMENTAL (Visualización y Edición) ---
+                st.subheader("📄 Documento Legal")
+                url_actual = datos_p.get('url_documento')
+                if pd.notna(url_actual) and url_actual:
+                    st.markdown(f"**Documento actual:** [👁️ Ver archivo subido]({url_actual})")
+                else:
+                    st.info("ℹ️ No hay documento registrado para este propietario.")
+                
+                doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
+                
+                st.markdown("---")
                 col_btn1, col_btn2 = st.columns(2)
+                
                 if col_btn1.form_submit_button("📝 Actualizar Datos"):
                     if e_nom and e_id:
-                        datos_upd = {
-                            "nombre": e_nom.strip().upper(),
-                            "tipo_id": e_tid,
-                            "identificacion": e_id.strip().upper(),
-                            "movil": e_mov.strip(),
-                            "correo": e_cor.strip().lower(),
-                            "moneda": e_mon,
-                            "banco": e_ban.strip().upper(),
-                            "tipo_cuenta": e_tcu,
-                            "cuenta_banco": e_cba.strip().upper()
-                        }
-                        supabase.table("propietarios").update(datos_upd).eq("id", int(datos_p['id'])).execute()
-                        log_accion(supabase, usuario_actual, "EDITAR PROPIETARIO", e_nom.strip().upper())
-                        st.success("✅ Actualizado correctamente.")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.warning("⚠️ El Nombre y el Número de Identificación son obligatorios.")
-                    
-            # --- SEGURO DE ELIMINACIÓN TAB 3 ---
-            st.markdown("---")
-            st.subheader("🚨 Zona de Peligro")
-            st.warning("⚠️ **Atención:** Dar de baja a este propietario lo ocultará del sistema y afectará los mandatos vinculados.")
-            confirmar_baja_prop = st.checkbox("Confirmo que deseo dar de baja a este propietario.", key=f"conf_prop_{datos_p['id']}")
-            
-            if st.button("🗑️ Dar de Baja (Eliminar)", disabled=not confirmar_baja_prop):
-                supabase.table("propietarios").update({"estado": "INACTIVO"}).eq("id", int(datos_p['id'])).execute()
-                log_accion(supabase, usuario_actual, "ELIMINAR PROPIETARIO", datos_p['nombre'])
-                st.success("✅ Propietario dado de baja.")
-                time.sleep(1)
-                st.rerun()
+                        url_doc_upd = url_actual # Mantiene el archivo viejo por defecto
+                        hubo_error_archivo = False
+                        
+                        # --- Lógica de actualización de archivo ---
+                        if doc_edit is not None:
+                            if doc_edit.size > 5 * 1024 * 1024:
+                                st.error("❌ El documento supera el límite de 5MB. Por favor, redúcelo.")
+                                hubo_error_archivo = True
+                            else:
+                                with st.spinner("Actualizando documento en la bóveda..."):
+                                    try:
+                                        ext = doc
