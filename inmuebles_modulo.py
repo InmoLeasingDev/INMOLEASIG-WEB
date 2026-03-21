@@ -454,7 +454,7 @@ def mostrar_modulo_inmuebles(supabase):
                         time.sleep(1)
                         st.rerun()
 
-                # --- PANEL: REPORTES (MÓDULO COMPARTIR CENTRALIZADO) ---
+                # --- PANEL: REPORTES (MÓDULO COMPARTIR CENTRALIZADO) ----
                 elif st.session_state.modo_unidad == "REPORTES" and not df_uni.empty:
                     
                     # 💡 SOLUCIÓN: Creamos una copia solo para exportar y le inyectamos la Propiedad
@@ -471,7 +471,7 @@ def mostrar_modulo_inmuebles(supabase):
                         usuario_actual=st.session_state.usuario.get("nombre", "ADMIN"),
                         clave_estado_cerrar="modo_unidad"
                     )
-                    
+
     # =========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # =========================================
