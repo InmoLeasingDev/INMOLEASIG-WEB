@@ -258,8 +258,6 @@ def mostrar_modulo_inmuebles(supabase):
                 res_uni = supabase.table("unidades").select("*").eq("estado", "ACTIVO").eq("id_inmueble", int(id_prop_maestra)).execute()
                 df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
                 
-                st.markdown("---")
-                st.markdown(f"** 📋 Unidades en {prop_maestra}")
                 
                 # --- 2. EL VISOR (La estrella del día a día) ---
                 if not df_uni.empty:
