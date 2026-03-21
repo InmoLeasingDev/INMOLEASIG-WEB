@@ -327,7 +327,7 @@ def mostrar_modulo_propietarios(supabase):
                 e_cba = c9.text_input("Número de Cuenta / IBAN", str(datos_p.get('cuenta_banco', '')), key=f"cba_{p_id}")
                 
                 # --- GESTIÓN DOCUMENTAL ---
-                st.subheader("📄 Documento Legal")
+                st.subheader("📄 Identificacion del Propietario")
                 
                 # Limpieza de valores nulos o "NaN" de Pandas para que funcione siempre
                 url_actual = datos_p.get('url_documento')
@@ -335,10 +335,13 @@ def mostrar_modulo_propietarios(supabase):
                     url_actual = None
                 
                 if url_actual:
-                    st.markdown(f"**Documento actual:** [👁️ Ver archivo subido]({url_actual})")
+                    # Extraemos el nombre real del archivo cortando la URL desde la última barra '/'
+                    nombre_archivo = urllib.parse.unquote(url_actual.split('/')[-1])
+                    st.markdown(f"**Documento actual:** `{nombre_archivo}` - [🔍 Abrir y Ver Archivo]({url_actual})")
                 else:
                     st.info("ℹ️ No hay documento registrado para este propietario.")
                 
+                               
                 # El file_uploader también atado al ID para que suelte el PDF anterior
                 doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"], key=f"doc_{p_id}")
                 
