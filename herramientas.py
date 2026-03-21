@@ -5,6 +5,9 @@ from email.message import EmailMessage
 import streamlit as st
 import io
 import pandas as pd
+import time
+import urllib.parse
+import re
 
 # ==========================================
 # 1. LOG DE ACTIVIDAD
@@ -96,3 +99,76 @@ def generar_excel_bytes(df, nombre_hoja="Reporte"):
             worksheet.set_column(idx, idx, max_len)
             
     return output.getvalue()
+
+
+# (Asegúrate de poner esto al final de tu archivo herramientas.py, 
+# asumiendo que ya tienes ahí log_accion, enviar_reporte_correo y generar_excel_bytes)
+
+def panel_reportes_y_compartir(
+    df_datos, 
+    nombre_base, 
+    modulo_origen, 
+    funcion_pdf, 
+    df_operadores, 
+    supabase, 
+    usuario_actual,
+    clave_estado_cerrar="modo_unidad" 
+):
+    """
+    Panel universal para exportar DataFrames a PDF/Excel y enviarlos por Email o WhatsApp.
+    """
+    with st.container(border=True):
+        st.markdown(f"**📊 Exportar y Compartir Listado de {modulo_origen}**")
+        formato = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
+        
+        if formato == "PDF":
+            archivo_bytes = funcion_pdf(df_datos)
+            ext, mime = "pdf", "application/pdf"
+        else:
+            archivo_bytes = generar_excel_bytes(df_datos, modulo_origen)
+            ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        
+        nombre_final = f"{nombre_base}.{ext}"
+        st.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}")
+        
+        st.markdown("---")
+        st.write("📤 **Compartir a Operadores**")
+        cols_env = st.columns(2)
+        lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_operadores.iterrows() if pd.notna(r.get('correo')) and r['correo']]
+        lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_operadores.iterrows() if pd.notna(r.get('telefono')) and r['telefono']]
+        
+        with cols_env[0]:
+            sel_em = st.selectbox("📧 Email:", ["-- Seleccione --"] + lista_correos, key=f"sel_em_{modulo_origen}")
+            if st.button("Enviar por Correo", use_container_width=True, key=f"btn_em_{modulo_origen}"):
+                if sel_em != "-- Seleccione --":
+                    dest = sel_em.split(" - ")[-1].strip()
+                    with st.spinner("Enviando..."):
+                        if enviar_reporte_correo(dest, archivo_bytes, nombre_final, modulo_origen, ext):
+                            st.success("¡Enviado!")
+                            log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"{modulo_origen} a {dest}")
+                else: 
+                    st.warning("Elige un operador.")
+                    
+        with cols_env[1]:
+            sel_wa = st.selectbox("💬 WhatsApp:", ["-- Seleccione --"] + lista_telefonos, key=f"sel_wa_{modulo_origen}")
+            if sel_wa != "-- Seleccione --":
+                if st.button("Generar Link WA", use_container_width=True, key=f"btn_wa_{modulo_origen}"):
+                    with st.spinner("Generando..."):
+                        tel = re.sub(r'\D', '', sel_wa.split(" - ")[-1].strip())
+                        try:
+                            # Subimos al bucket general de reportes
+                            path = f"reporte_{modulo_origen.lower()}_{int(time.time())}.{ext}"
+                            supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes, file_options={"content-type": mime})
+                            url = supabase.storage.from_("reportes").get_public_url(path)
+                            msg = urllib.parse.quote(f"Hola, te comparto el reporte de {modulo_origen}: {url}")
+                            st.markdown(f'<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;border:none;padding:5px 10px;border-radius:5px;">Abrir WhatsApp</button></a>', unsafe_allow_html=True)
+                            log_accion(supabase, usuario_actual, "ENVIO WA", f"{modulo_origen} a {sel_wa}")
+                        except Exception as e: 
+                            st.error(f"Error al subir a Supabase: {e}")
+            else: 
+                st.button("Generar Link WA", disabled=True, use_container_width=True, key=f"btn_wa_dis_{modulo_origen}")
+        
+        st.markdown("---")
+        if st.button("❌ Cerrar Panel", key=f"btn_close_{modulo_origen}"):
+            st.session_state[clave_estado_cerrar] = "NADA"
+            st.rerun()
