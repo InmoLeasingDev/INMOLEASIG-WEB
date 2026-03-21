@@ -224,7 +224,7 @@ def mostrar_modulo_inmuebles(supabase):
         else:
             st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
 
-   # ==========================================
+    # ==========================================
     # TAB 2: UNIDADES (Subdivisión de Propiedades)
     # ==========================================
     with tab2:
@@ -285,7 +285,6 @@ def mostrar_modulo_inmuebles(supabase):
                 # ==========================================
                 # 🛠️ BARRA DE HERRAMIENTAS (COMPACTA Y PEGADA)
                 # ==========================================
-                # Anchos minimizados: 1.5 para botones, 5.5 vacío al final. Sin espacios <br> intermedios.
                 t_c1, t_c2, t_c3, t_c4 = st.columns([1.5, 1.5, 1.5, 5.5]) 
                 
                 if t_c1.button("➕ Nueva", use_container_width=True):
@@ -302,7 +301,7 @@ def mostrar_modulo_inmuebles(supabase):
                         st.rerun()
 
                 # ==========================================
-                # 🗂️ PANELES DINÁMICOS (SIN LÍNEAS DE SEPARACIÓN EXTERNAS)
+                # 🗂️ PANELES DINÁMICOS
                 # ==========================================
                 
                 # --- PANEL: CREAR NUEVA UNIDAD ---
@@ -362,7 +361,6 @@ def mostrar_modulo_inmuebles(supabase):
                             val_disp = str(datos_u_edit.get('disponibilidad', 'DISPONIBLE')).upper()
                             e_c3.text_input("Estado (Auto)", val_disp, disabled=True)
                             
-                            # Recuperar valores reales de BD para evitar que el string formateado dé error
                             res_crudo = supabase.table("unidades").select("area_m2, precio_base").eq("id", int(u_id)).execute()
                             val_area = float(res_crudo.data[0].get('area_m2') or 0.0) if res_crudo.data else 0.0
                             val_precio = float(res_crudo.data[0].get('precio_base') or 0.0) if res_crudo.data else 0.0
@@ -444,29 +442,38 @@ def mostrar_modulo_inmuebles(supabase):
                         time.sleep(1)
                         st.rerun()
 
-                # --- PANEL: REPORTES (MÓDULO COMPARTIR) ---
+                # --- PANEL: REPORTES (MÓDULO COMPARTIR CENTRALIZADO) ---
                 elif st.session_state.modo_unidad == "REPORTES" and not df_uni.empty:
-                    with st.container(border=True):
-                        st.markdown("**📊 Exportar y Compartir Listado**")
-                        formato_archivo_u = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True)
+                    panel_reportes_y_compartir(
+                        df_datos=df_uni_display,
+                        nombre_base=f"unidades_{prop_maestra.replace(' ', '_')}",
+                        modulo_origen="Unidades",
+                        funcion_pdf=generar_pdf_unidades,
+                        df_operadores=df_ops,
+                        supabase=supabase,
+                        usuario_actual=st.session_state.usuario.get("nombre", "ADMIN"),
+                        clave_estado_cerrar="modo_unidad"
+                    )
+                    st.markdown("**📊 Exportar y Compartir Listado**")
+                    formato_archivo_u = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True)
                         
-                        if formato_archivo_u == "PDF":
+                    if formato_archivo_u == "PDF":
                             archivo_bytes_u = generar_pdf_unidades(df_uni_display)
                             ext_u, mime_u = "pdf", "application/pdf"
-                        else:
+                    else:
                             archivo_bytes_u = generar_excel_bytes(df_uni_display, "Unidades")
                             ext_u, mime_u = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         
-                        nombre_final_u = f"unidades_{prop_maestra.replace(' ', '_')}.{ext_u}"
-                        st.download_button(f"⬇️ Descargar", data=archivo_bytes_u, file_name=nombre_final_u, mime=mime_u)
+                    nombre_final_u = f"unidades_{prop_maestra.replace(' ', '_')}.{ext_u}"
+                    st.download_button(f"⬇️ Descargar", data=archivo_bytes_u, file_name=nombre_final_u, mime=mime_u)
                         
-                        st.markdown("---")
-                        st.write("📤 **Compartir a Operadores**")
-                        cols_env = st.columns(2)
-                        lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if pd.notna(r.get('correo')) and r['correo']]
-                        lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if pd.notna(r.get('telefono')) and r['telefono']]
+                    st.markdown("---")
+                    st.write("📤 **Compartir a Operadores**")
+                    cols_env = st.columns(2)
+                    lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if pd.notna(r.get('correo')) and r['correo']]
+                    lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if pd.notna(r.get('telefono')) and r['telefono']]
                         
-                        with cols_env[0]:
+                    with cols_env[0]:
                             sel_em = st.selectbox("📧 Email:", ["-- Seleccione --"] + lista_correos)
                             if st.button("Enviar por Correo", use_container_width=True):
                                 if sel_em != "-- Seleccione --":
@@ -477,7 +484,7 @@ def mostrar_modulo_inmuebles(supabase):
                                             log_accion(supabase, st.session_state.usuario.get("nombre", "ADMIN"), "ENVIO REPORTE", f"Unidades a {dest}")
                                 else: st.warning("Elige un operador.")
                                 
-                        with cols_env[1]:
+                    with cols_env[1]:
                             sel_wa = st.selectbox("💬 WhatsApp:", ["-- Seleccione --"] + lista_telefonos)
                             if sel_wa != "-- Seleccione --":
                                 if st.button("Generar Link WA", use_container_width=True):
@@ -493,8 +500,8 @@ def mostrar_modulo_inmuebles(supabase):
                                         except Exception as e: st.error(f"Error: {e}")
                             else: st.button("Generar Link WA", disabled=True, use_container_width=True)
                         
-                        st.markdown("---")
-                        if st.button("❌ Cerrar Panel"):
+                    st.markdown("---")
+                    if st.button("❌ Cerrar Panel"):
                             st.session_state.modo_unidad = "NADA"
                             st.rerun()
     # =========================================
