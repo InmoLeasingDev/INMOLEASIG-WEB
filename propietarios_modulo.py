@@ -87,9 +87,9 @@ def mostrar_modulo_propietarios(supabase):
 
     tab1, tab2, tab3 = st.tabs(["📋 Directorio", "➕ Nuevo Propietario", "⚙️ Gestionar"])
 
-    # ==========================================
+    # ===========================================
     # TAB 1: DIRECTORIO Y REPORTES
-    # ==========================================
+    # ===========================================
     with tab1:
         if not df_prop.empty:
             busqueda = st.text_input("🔍 Buscar por nombre o ID...").upper().strip()
