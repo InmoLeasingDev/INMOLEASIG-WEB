@@ -282,7 +282,7 @@ def mostrar_modulo_propietarios(supabase):
                 else:
                     st.warning("⚠️ El Nombre y el Número de Identificación son obligatorios.")
     # ==========================================
-    # TAB 3: GESTIONAR
+    # TAB 3: GESTIONAR (Con Auto-limpieza)
     # ==========================================
     with tab3:
         if not df_prop.empty:
@@ -328,7 +328,9 @@ def mostrar_modulo_propietarios(supabase):
                     st.markdown(f"**Documento actual:** [👁️ Ver archivo subido]({url_actual})")
                 else:
                     st.info("ℹ️ No hay documento registrado para este propietario.")
+                
                 doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
+                
                 st.markdown("---")
                 col_btn1, col_btn2 = st.columns(2)
                 
@@ -337,7 +339,7 @@ def mostrar_modulo_propietarios(supabase):
                         url_doc_upd = url_actual # Mantiene el archivo viejo por defecto
                         hubo_error_archivo = False
                         
-                        # --- Lógica de actualización de archivo ---
+                        # --- Lógica de actualización y Auto-Limpieza ---
                         if doc_edit is not None:
                             if doc_edit.size > 5 * 1024 * 1024:
                                 st.error("❌ El documento supera el límite de 5MB. Por favor, redúcelo.")
@@ -345,10 +347,21 @@ def mostrar_modulo_propietarios(supabase):
                             else:
                                 with st.spinner("Actualizando documento en la bóveda..."):
                                     try:
+                                        # 1. Subir el archivo nuevo
                                         ext = doc_edit.name.split('.')[-1]
-                                        ruta_doc = f"id_{e_id.strip()}_{int(time.time())}.{ext}"
-                                        supabase.storage.from_("documentos").upload(path=ruta_doc, file=doc_edit.getvalue())
-                                        url_doc_upd = supabase.storage.from_("documentos").get_public_url(ruta_doc)
+                                        ruta_doc_nueva = f"id_{e_id.strip()}_{int(time.time())}.{ext}"
+                                        supabase.storage.from_("documentos").upload(path=ruta_doc_nueva, file=doc_edit.getvalue())
+                                        url_doc_upd = supabase.storage.from_("documentos").get_public_url(ruta_doc_nueva)
+                                        
+                                        # 2. AUTO-LIMPIEZA: Eliminar el archivo viejo de Supabase
+                                        if pd.notna(url_actual) and url_actual:
+                                            try:
+                                                # Extraemos el nombre exacto del archivo viejo desde la URL
+                                                ruta_vieja = url_actual.split('/documentos/')[-1]
+                                                supabase.storage.from_("documentos").remove([ruta_vieja])
+                                            except Exception as e_del:
+                                                pass # Si no logra borrarlo por alguna razón, no detenemos el sistema
+                                                
                                     except Exception as e:
                                         st.error(f"❌ Error al subir el archivo: {e}")
                                         hubo_error_archivo = True
