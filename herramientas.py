@@ -27,7 +27,7 @@ def log_accion(supabase, usuario, accion, detalle):
         }).execute()
     except Exception as e:
         print(f"Error al registrar log: {e}")
-
+    
 # ==========================================
 # 2. MOTOR DE CORREO (GMAIL)
 # ==========================================

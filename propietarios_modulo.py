@@ -329,7 +329,7 @@ def mostrar_modulo_propietarios(supabase):
                 else:
                     st.info("ℹ️ No hay documento registrado para este propietario.")
                 
-                doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
+               doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
                 
                 st.markdown("---")
                 col_btn1, col_btn2 = st.columns(2)
@@ -347,4 +347,45 @@ def mostrar_modulo_propietarios(supabase):
                             else:
                                 with st.spinner("Actualizando documento en la bóveda..."):
                                     try:
-                                        ext = doc
+                                        ext = doc_edit.name.split('.')[-1]
+                                        ruta_doc = f"id_{e_id.strip()}_{int(time.time())}.{ext}"
+                                        supabase.storage.from_("documentos").upload(path=ruta_doc, file=doc_edit.getvalue())
+                                        url_doc_upd = supabase.storage.from_("documentos").get_public_url(ruta_doc)
+                                    except Exception as e:
+                                        st.error(f"❌ Error al subir el archivo: {e}")
+                                        hubo_error_archivo = True
+
+                        # --- Guardar en BD si no hay errores ---
+                        if not hubo_error_archivo:
+                            datos_upd = {
+                                "nombre": e_nom.strip().upper(),
+                                "tipo_id": e_tid,
+                                "identificacion": e_id.strip().upper(),
+                                "movil": e_mov.strip(),
+                                "correo": e_cor.strip().lower(),
+                                "moneda": e_mon,
+                                "banco": e_ban.strip().upper(),
+                                "tipo_cuenta": e_tcu,
+                                "cuenta_banco": e_cba.strip().upper(),
+                                "url_documento": url_doc_upd
+                            }
+                            supabase.table("propietarios").update(datos_upd).eq("id", int(datos_p['id'])).execute()
+                            log_accion(supabase, usuario_actual, "EDITAR PROPIETARIO", e_nom.strip().upper())
+                            st.success("✅ Actualizado correctamente.")
+                            time.sleep(1)
+                            st.rerun()
+                    else:
+                        st.warning("⚠️ El Nombre y el Número de Identificación son obligatorios.")
+                        
+            # --- SEGURO DE ELIMINACIÓN TAB 3 ---
+            st.markdown("---")
+            st.subheader("🚨 Zona de Peligro")
+            st.warning("⚠️ **Atención:** Dar de baja a este propietario lo ocultará del sistema y afectará los mandatos vinculados.")
+            confirmar_baja_prop = st.checkbox("Confirmo que deseo dar de baja a este propietario.", key=f"conf_prop_{datos_p['id']}")
+            
+            if st.button("🗑️ Dar de Baja (Eliminar)", disabled=not confirmar_baja_prop):
+                supabase.table("propietarios").update({"estado": "INACTIVO"}).eq("id", int(datos_p['id'])).execute()
+                log_accion(supabase, usuario_actual, "ELIMINAR PROPIETARIO", datos_p['nombre'])
+                st.success("✅ Propietario dado de baja.")
+                time.sleep(1)
+                st.rerun()
