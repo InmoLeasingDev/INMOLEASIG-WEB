@@ -288,7 +288,7 @@ def mostrar_modulo_inmuebles(supabase):
                             datos_u_edit = df_uni[df_uni['nombre'] == uni_sel].iloc[0]
                             u_id = str(datos_u_edit['id'])
                             
-                            with st.form(key=f"form_editar_uni_{u_id}"):
+                            with st.form(key=f"form_editar_uni_{u_id}", clear_on_submit=True):
                                 st.write("**1. Detalles Básicos**")
                                 e_c1, e_c2, e_c3 = st.columns([2, 1, 1])
                                 e_nom = e_c1.text_input("Nombre de la Unidad", datos_u_edit['nombre'])
@@ -375,8 +375,9 @@ def mostrar_modulo_inmuebles(supabase):
                                 st.rerun()
 
                 # --- 4. CREAR NUEVA UNIDAD (Se mantiene en la base, expandido solo si no hay unidades) ---
+                
                 with st.expander(f"➕ Añadir Nueva Unidad a: {prop_maestra}", expanded=(True if df_uni.empty else False)):
-                    with st.form("form_nueva_unidad"):
+                    with st.form("form_nueva_unidad", clear_on_submit=True):
                         st.write(f"**Propiedad destino:** `{prop_maestra}`") 
                         
                         c1, c2 = st.columns(2)
