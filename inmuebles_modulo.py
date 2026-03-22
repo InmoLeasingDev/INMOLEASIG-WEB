@@ -86,13 +86,16 @@ def generar_pdf_unidades(df):
                 pass # Si hay algún error de texto, lo ignora y sigue
 
         # 2. Dibujar la fila normal
+        # 💡 SOLUCIÓN: Cambiamos el símbolo '€' por 'EUR' solo para el texto del PDF
+        precio_pdf = precio_str.replace("€", "EUR")
+        
         textos = [
             str(row.get('PROPIEDAD', '')), 
             str(row.get('UNIDAD', '')), 
             str(row.get('TIPO', '')),
             str(row.get('ESTADO', '')),
             str(row.get('ÁREA (m2)', '')),
-            precio_str
+            precio_pdf
         ]
         textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
         h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
@@ -105,6 +108,21 @@ def generar_pdf_unidades(df):
             pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
             pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
         pdf.set_xy(10, y + h_fila)
+        
+    # --- 3. DIBUJAR LA GRAN FILA DEL TOTAL ---
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_fill_color(220, 230, 240) # Un sombreado gris claro muy elegante
+    
+    # Unificamos todas las columnas menos la última para hacer espacio
+    ancho_previo = sum(cw[:-1]) 
+    pdf.cell(ancho_previo, 8, "TOTAL PRECIO BASE DE LAS UNIDADES:", 1, 0, "R", True)
+    
+    # 💡 SOLUCIÓN: Si la moneda original era '€', imprimimos 'EUR' en el totalizador
+    simbolo_pdf = "EUR" if simbolo == "€" else simbolo
+    pdf.cell(cw[-1], 8, f"{simbolo_pdf} {total_precio:,.2f}", 1, 0, "L", True)
+    pdf.ln()
+    
+    return pdf.output(dest='S').encode('latin-1')
         
     # --- 3. DIBUJAR LA GRAN FILA DEL TOTAL ---
     pdf.set_font("Arial", "B", 9)
