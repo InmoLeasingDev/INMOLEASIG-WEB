@@ -450,15 +450,15 @@ def mostrar_modulo_inmuebles(supabase):
                             
                             nuevas_fotos = st.file_uploader("Subir imágenes (Max 5MB)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
 
-                            st.markdown("---")
-                            col_btn1, col_btn2, col_btn3 = st.columns([3, 3, 3])
+                            # --- FILA DE ACCIONES MINIMALISTA MODO PRO ---
+                            col_btn1, col_btn2, col_btn3, col_espacio = st.columns([2.5, 0.8, 2.5, 4.2])
+                            
                             btn_guardar = col_btn1.form_submit_button("💾 Guardar y Subir")
+                            btn_cerrar = col_btn2.form_submit_button("❌", help="Cerrar sin guardar")
                             
                             btn_borrar_fotos = False
                             if len(fotos_actuales) > 0:
-                                btn_borrar_fotos = col_btn2.form_submit_button("🗑️ Vaciar Galería")
-                                
-                            btn_cerrar = col_btn3.form_submit_button("❌ Cerrar Panel")
+                                btn_borrar_fotos = col_btn3.form_submit_button("🗑️ Vaciar Galería")
 
                             if btn_cerrar:
                                 st.session_state.modo_unidad = "NADA"
