@@ -412,7 +412,7 @@ def mostrar_modulo_inmuebles(supabase):
                     st.rerun()
                     
                 if not df_uni.empty:
-                    if t_c2.button("✏️ Editar / Fotos", use_container_width=True):
+                    if t_c2.button("⚙️ Editar / Fotos", use_container_width=True):
                         st.session_state.modo_unidad = "EDITAR"
                         st.rerun()
                         
