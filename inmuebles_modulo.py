@@ -753,8 +753,7 @@ def mostrar_modulo_inmuebles(supabase):
         # --- 3. BARRA DE HERRAMIENTAS MODO PRO ---
         st.markdown("---")
         m_c1, m_c2, m_c3, m_c4, m_esp = st.columns([1.5, 1.5, 2.0, 1.5, 3.5])
-        
-        if m_c1.button("➕ Nuevo Mandato", key="btn_nuevo_man", use_container_width=True):
+        if m_c1.button("➕ Nuevo", key="btn_nuevo_man", use_container_width=True):
             st.session_state.modo_mandato = "CREAR"
             st.rerun()
             
