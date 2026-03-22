@@ -612,7 +612,7 @@ def mostrar_modulo_inmuebles(supabase):
                             prefijo_ruta="uni"
                         )    
                # --- PANEL: REPORTES (MÓDULO COMPARTIR CENTRALIZADO) ---
-            elif st.session_state.modo_unidad == "REPORTES": 
+                elif st.session_state.modo_unidad == "REPORTES": 
                     st.markdown("---")
                     st.markdown("**🔍 Configuración del Reporte**")
                     
