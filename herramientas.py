@@ -121,8 +121,7 @@ def panel_reportes_y_compartir(
         st.markdown(f"**📊 Exportar y Compartir Listado de {modulo_origen}**")
         
         # --- 1. FILA SUPERIOR COMPACTA (Formato, Descarga, Espacio vacío, Cerrar) ---
-        col1, col2, col3, col4 = st.columns([3, 2, 3, 2])
-        
+        col1, col2, col3, col4 = st.columns([2.5, 2, 5.5, 2])
         formato = col1.radio("Formato Reporte:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
         
         if formato == "PDF":
