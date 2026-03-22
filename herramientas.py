@@ -344,17 +344,17 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
         nuevas_fotos = st.file_uploader("Subir nuevas imágenes (Max 5MB)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
         
         st.markdown("---")
-        # --- 3. BOTONERA MINIMALISTA (ORDEN TÁCTICO: Guardar | Vaciar | Cerrar) ---
-        # Ajustamos los anchos de columna para este orden
-        col_b1, col_b2, col_b3, col_esp = st.columns([1.8, 1.8, 1.2, 5.2])
+        
+        # --- 3. BOTONERA MINIMALISTA (ORDEN TÁCTICO: Guardar | Borrar | Cerrar) ---
+        # Ajustamos los anchos de columna para el nuevo texto más corto
+        col_b1, col_b2, col_b3, col_esp = st.columns([1.8, 1.5, 1.2, 5.5])
         
         btn_guardar = col_b1.form_submit_button("💾 Guardar Cambios")
         btn_borrar_fotos = False
         if len(fotos_lista) > 0:
-            # Texto más específico para bulk-delete
-            btn_borrar_fotos = col_b2.form_submit_button("🗑️ Vaciar Galería Completamente")
+            btn_borrar_fotos = col_b2.form_submit_button("🗑️ Borrar Galería")
         btn_cerrar = col_b3.form_submit_button("❌ Cerrar")
-
+        
         # --- 4. LÓGICA DE BOTONES ---
         if btn_cerrar:
             st.session_state[clave_estado_cerrar] = "NADA"
