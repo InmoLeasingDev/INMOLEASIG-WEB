@@ -59,7 +59,7 @@ def generar_pdf_propietarios(df, detallado=False):
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================
-# 3. MÓDULO PRINCIPAL CRUD
+# 3. MÓDULO PRINCIPAL CRUD (ESTILO MODO PRO)
 # ==========================================
 def mostrar_modulo_propietarios(supabase):
     st.header("🔑 Gestión de Propietarios")
@@ -69,6 +69,10 @@ def mostrar_modulo_propietarios(supabase):
     var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
     usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
     moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
+
+    # 1. Inicializador de estado para los paneles
+    if 'modo_propietario' not in st.session_state:
+        st.session_state.modo_propietario = "NADA"
 
     # --- Carga de Datos ---
     try:
@@ -85,153 +89,63 @@ def mostrar_modulo_propietarios(supabase):
     if not df_prop.empty and moneda_sesion != "ALL":
         df_prop = df_prop[df_prop['moneda'] == moneda_sesion]
 
-    tab1, tab2, tab3 = st.tabs(["📋 Directorio", "➕ Nuevo Propietario", "⚙️ Gestionar"])
-
-    # ===========================================
-    # TAB 1: DIRECTORIO Y REPORTES
-    # ===========================================
-    with tab1:
-        if not df_prop.empty:
-            busqueda = st.text_input("🔍 Buscar por nombre o ID...").upper().strip()
-            df_display = df_prop.sort_values('nombre')
+    # --- LECTURA DE DATOS (LA CUADRÍCULA) ---
+    if not df_prop.empty:
+        busqueda = st.text_input("🔍 Buscar por nombre o ID...").upper().strip()
+        df_display = df_prop.sort_values('nombre')
+        
+        if busqueda:
+            mask = df_display['nombre'].str.contains(busqueda) | df_display['identificacion'].str.contains(busqueda)
+            df_display = df_display[mask]
             
-            if busqueda:
-                mask = df_display['nombre'].str.contains(busqueda) | df_display['identificacion'].str.contains(busqueda)
-                df_display = df_display[mask]
-                
-            # Mostramos la tabla configurando la columna de URL como un enlace interactivo
-            st.dataframe(
-                df_display[['nombre', 'tipo_id', 'identificacion', 'movil', 'correo', 'moneda', 'url_documento']],
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "nombre": "NOMBRE",
-                    "tipo_id": "TIPO ID",
-                    "identificacion": "IDENTIFICACIÓN",
-                    "movil": "MÓVIL",
-                    "correo": "CORREO",
-                    "moneda": "MON",
-                    "url_documento": st.column_config.LinkColumn(
-                        "📄 DOCUMENTO",
-                        help="Haz clic para abrir el documento de identidad",
-                        display_text="🔍 Ver Archivo"
-                    )
-                }
-            )
-
-# ==========================================
-            # NUEVO PANEL DE EXPORTACIÓN TAB 1 (COMPACTO)
-            # ==========================================
-            st.markdown("---")
-            st.markdown("### 📄 Exportar y Compartir Reportes")
-            
-            # --- Barra de Exportación en 1 sola línea ---
-            col_exp1, col_exp2, col_exp3 = st.columns([2, 1.5, 3])
-            
-            with col_exp1:
-                tipo_contenido = st.selectbox(
-                    "Contenido del reporte:", 
-                    ["Reporte Básico", "Reporte Detallado"], 
-                    key="sel_cont_prop",
-                    label_visibility="collapsed"
+        st.dataframe(
+            df_display[['nombre', 'tipo_id', 'identificacion', 'movil', 'correo', 'moneda', 'url_documento']],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "nombre": "NOMBRE",
+                "tipo_id": "TIPO ID",
+                "identificacion": "IDENTIFICACIÓN",
+                "movil": "MÓVIL",
+                "correo": "CORREO",
+                "moneda": "MON",
+                "url_documento": st.column_config.LinkColumn(
+                    "📄 DOCUMENTO",
+                    help="Haz clic para abrir el documento de identidad",
+                    display_text="🔍 Ver Archivo"
                 )
-            
-            with col_exp2:
-                formato_archivo = st.selectbox(
-                    "Formato:", 
-                    ["PDF", "Excel"], 
-                    key="sel_form_prop",
-                    label_visibility="collapsed"
-                )
+            }
+        )
+    else:
+        st.info("ℹ️ No hay propietarios registrados o activos en tu región.")
 
-            # --- Preparar los datos según la elección ---
-            es_detallado = (tipo_contenido == "Reporte Detallado")
-            nombre_base = "propietarios_detallado" if es_detallado else "propietarios_basico"
-            
-            if formato_archivo == "PDF":
-                archivo_bytes = generar_pdf_propietarios(df_display, detallado=es_detallado)
-                ext, mime = "pdf", "application/pdf"
-            else: # Excel
-                if es_detallado:
-                    df_excel = df_display[['nombre', 'identificacion', 'movil', 'correo', 'moneda', 'banco', 'cuenta_banco']].copy()
-                    df_excel.rename(columns={'nombre':'NOMBRE', 'identificacion':'ID', 'movil':'MOVIL', 'correo':'CORREO', 'moneda':'MONEDA', 'banco':'BANCO', 'cuenta_banco':'CUENTA'}, inplace=True)
-                else:
-                    df_excel = df_display[['nombre', 'identificacion', 'movil', 'correo']].copy()
-                    df_excel.rename(columns={'nombre':'NOMBRE', 'identificacion':'ID', 'movil':'MOVIL', 'correo':'CORREO'}, inplace=True)
-                
-                archivo_bytes = generar_excel_bytes(df_excel, "Propietarios")
-                ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-            nombre_final_archivo = f"{nombre_base}.{ext}"
-
-            # --- Botón de Descarga Directa en la tercera columna ---
-            with col_exp3:
-                st.download_button(
-                    label=f"⬇️ Descargar {formato_archivo} {tipo_contenido.split(' ')[1]}",
-                    data=archivo_bytes,
-                    file_name=nombre_final_archivo,
-                    mime=mime,
-                    use_container_width=True
-                )
-                
-            # --- 4. Compartir ---
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("#### 📤 Compartir a Operadores")
-            st.write(f"*(Se enviará el archivo: **{nombre_final_archivo}**)*")
-            
-            cols_env_t1 = st.columns(2)
-            
-            # Preparar listas de contactos
-            lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if r['correo']]
-            lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if r['telefono']]
-            
-            # Correo
-            with cols_env_t1[0]:
-                st.info("📧 Email")
-                if lista_correos:
-                    sel_em_t1 = st.selectbox("Operador (Correo)", ["-- Seleccione --"] + lista_correos, key="em_prop_t1")
-                    if st.button("Enviar por Correo", use_container_width=True, key="btn_em_prop"):
-                        if sel_em_t1 != "-- Seleccione --":
-                            dest = sel_em_t1.split(" - ")[-1].strip()
-                            with st.spinner(f"Enviando {formato_archivo}..."):
-                                if enviar_reporte_correo(dest, archivo_bytes, nombre_final_archivo, tipo_contenido, ext):
-                                    st.success("¡Enviado!")
-                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"{tipo_contenido} a {dest}")
-                        else: 
-                            st.warning("Elige un operador.")
-                else:
-                    st.warning("No hay operadores con correo.")
-
-            # WhatsApp
-            with cols_env_t1[1]:
-                st.success("💬 WhatsApp")
-                if lista_telefonos:
-                    sel_wa_t1 = st.selectbox("Operador (WhatsApp)", ["-- Seleccione --"] + lista_telefonos, key="wa_prop_t1")
-                    if sel_wa_t1 != "-- Seleccione --":
-                        if st.button("Generar Link WhatsApp", use_container_width=True, key="btn_wa_prop"):
-                            with st.spinner("Subiendo a la nube..."):
-                                tel = re.sub(r'\D', '', sel_wa_t1.split(" - ")[-1].strip())
-                                try:
-                                    ts = int(time.time())
-                                    path = f"{nombre_base}_{ts}.{ext}"
-                                    supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes, file_options={"content-type": mime})
-                                    link = supabase.storage.from_("reportes").get_public_url(path)
-                                    msg = urllib.parse.quote(f"Hola, te comparto el {tipo_contenido} de Propietarios. Puedes descargarlo aquí: {link}")
-                                    st.markdown(f'''<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold;">Abrir WhatsApp</button></a>''', unsafe_allow_html=True)
-                                    log_accion(supabase, usuario_actual, "ENVIO REPORTE", f"{tipo_contenido} WA a {sel_wa_t1}")
-                                except Exception as e: 
-                                    st.error(f"Error al subir: {e}")
-                    else: 
-                        st.button("Generar Link WhatsApp", disabled=True, use_container_width=True, key="btn_wa_prop_dis")
-                else:
-                    st.warning("No hay operadores con teléfono.")
-        else:
-            st.info("ℹ️ No hay propietarios registrados o activos en tu región.")
     # ==========================================
-    # TAB 2: NUEVO PROPIETARIO
+    # 🛠️ BARRA DE HERRAMIENTAS (MODO PRO - 3 BOTONES)
     # ==========================================
-    with tab2:
-        with st.form("form_nuevo_prop"):
+    t_c1, t_c2, t_c3, t_c5 = st.columns([1.5, 1.5, 1.5, 5.5]) 
+    
+    if t_c1.button("➕ Nuevo", key="btn_nuevo_prop", use_container_width=True):
+        st.session_state.modo_propietario = "CREAR"
+        st.rerun()
+        
+    if not df_prop.empty:
+        if t_c2.button("⚙️ Gestionar", key="btn_edit_prop", use_container_width=True):
+            st.session_state.modo_propietario = "EDITAR"
+            st.rerun()
+            
+        if t_c3.button("📊 Reportes", key="btn_rep_prop", use_container_width=True):
+            st.session_state.modo_propietario = "REPORTES"
+            st.rerun()
+
+    # ==========================================
+    # 🗂️ PANELES DINÁMICOS
+    # ==========================================
+    
+    # --- PANEL: CREAR NUEVO PROPIETARIO ---
+    if st.session_state.modo_propietario == "CREAR":
+        st.markdown("---")
+        with st.form("form_nuevo_prop", clear_on_submit=True):
+            st.markdown("**✨ Añadir Nuevo Propietario**")
             st.subheader("Datos Personales")
             c1, c2, c3 = st.columns([2, 1, 1])
             n_nom = c1.text_input("Nombre Completo / Razón Social *")
@@ -244,83 +158,77 @@ def mostrar_modulo_propietarios(supabase):
             
             st.subheader("Datos Financieros")
             c6, c7, c8 = st.columns([1, 2, 2])
-            n_mon = c6.selectbox("Moneda *", ["EUR", "COP"])
+            n_mon = c6.selectbox("Moneda *", ["EUR", "COP"] if moneda_sesion == "ALL" else [moneda_sesion])
             n_ban = c7.text_input("Banco")
             n_tcu = c8.selectbox("Tipo de Cuenta", ["IBAN", "AHORROS", "CORRIENTE", "NEQUI", "DAVIPLATA"])
             n_cba = st.text_input("Número de Cuenta / IBAN")
             
-            # --- NUEVO: GESTIÓN DOCUMENTAL ---
-            st.subheader("📄 Identificacion Propietario")
+            st.subheader("📄 Identificación Propietario")
             doc_subido = st.file_uploader("Escáner de Identificación (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
-            
             st.markdown("*Campos obligatorios marcados con asterisco (*)*")
             
-            if st.form_submit_button("💾 Guardar Propietario"):
+            st.markdown("---")
+            col_b1, col_b2, col_esp = st.columns([1.5, 1.2, 7.3])
+            
+            if col_b1.form_submit_button("💾 Guardar"):
                 if n_nom and n_id:
                     url_doc = None
                     hubo_error_archivo = False
                     
-                    # --- Lógica de subida del archivo ---
                     if doc_subido is not None:
                         if doc_subido.size > 5 * 1024 * 1024:
-                            st.error("❌ El documento supera el límite de 5MB. Por favor, redúcelo.")
+                            st.error("❌ El documento supera el límite de 5MB.")
                             hubo_error_archivo = True
                         else:
-                            with st.spinner("Subiendo documento a la bóveda..."):
+                            with st.spinner("Subiendo..."):
                                 try:
                                     ext = doc_subido.name.split('.')[-1].lower()
-                                    # Detectar el tipo de archivo (MIME)
                                     tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
                                     ruta_doc = f"id_{n_id.strip()}_{int(time.time())}.{ext}"
                                     supabase.storage.from_("documentos").upload(path=ruta_doc, file=doc_subido.getvalue(), file_options={"content-type": tipo_mime})
                                     url_doc = supabase.storage.from_("documentos").get_public_url(ruta_doc)
                                 except Exception as e:
-                                    st.error(f"❌ Error al subir el archivo: {e}")
+                                    st.error(f"❌ Error al subir: {e}")
                                     hubo_error_archivo = True
 
-                    # --- Guardar en Base de Datos (Solo si el archivo subió bien) ---
                     if not hubo_error_archivo:
                         datos_insert = {
-                            "nombre": n_nom.strip().upper(),
-                            "tipo_id": n_tid,
-                            "identificacion": n_id.strip().upper(),
-                            "movil": n_mov.strip(),
-                            "correo": n_cor.strip().lower(),
-                            "moneda": n_mon,
-                            "banco": n_ban.strip().upper(),
-                            "tipo_cuenta": n_tcu,
-                            "cuenta_banco": n_cba.strip().upper(),
-                            "url_documento": url_doc,
-                            "estado": "ACTIVO"
+                            "nombre": n_nom.strip().upper(), "tipo_id": n_tid, "identificacion": n_id.strip().upper(),
+                            "movil": n_mov.strip(), "correo": n_cor.strip().lower(), "moneda": n_mon,
+                            "banco": n_ban.strip().upper(), "tipo_cuenta": n_tcu, "cuenta_banco": n_cba.strip().upper(),
+                            "url_documento": url_doc, "estado": "ACTIVO"
                         }
                         supabase.table("propietarios").insert(datos_insert).execute()
                         log_accion(supabase, usuario_actual, "CREAR PROPIETARIO", n_nom.strip().upper())
-                        st.success("✅ Propietario registrado con éxito.")
+                        st.session_state.modo_propietario = "NADA"
+                        st.success("✅ Propietario registrado.")
                         time.sleep(1)
                         st.rerun()
                 else:
-                    st.warning("⚠️ El Nombre y el Número de Identificación son obligatorios.")
-    # ==========================================
-    # TAB 3: GESTIONAR (Refresh Dinámico y Auto-Limpieza)
-    # ==========================================
-    with tab3:
-        if not df_prop.empty:
-            prop_sel = st.selectbox("🔍 Selecciona un propietario para editar:", df_prop['nombre'].tolist(), key="sel_prop_tab3")
+                    st.warning("⚠️ Nombre e Identificación son obligatorios.")
+                    
+            if col_b2.form_submit_button("❌ Cerrar"):
+                st.session_state.modo_propietario = "NADA"
+                st.rerun()
+
+    # --- PANEL: GESTIONAR PROPIETARIO ---
+    elif st.session_state.modo_propietario == "EDITAR" and not df_prop.empty:
+        st.markdown("---")
+        st.markdown("**⚙️ Gestionar Propietario**")
+        
+        prop_sel = st.selectbox("Selecciona un propietario para editar:", df_prop['nombre'].tolist())
+        if prop_sel:
             datos_p = df_prop[df_prop['nombre'] == prop_sel].iloc[0]
-            p_id = str(datos_p.get('id', '0')) # Obtenemos el ID para forzar el refresco
+            p_id = str(datos_p.get('id', '0'))
             
-            # 1. AL INICIO: Forzamos que cada formulario sea único por propietario
             with st.form(key=f"form_edit_{p_id}"):
-                st.subheader("Editar Información Personal")
+                st.subheader("Información Personal")
                 c1, c2, c3 = st.columns([2, 1, 1])
-                # 2. Atamos cada input al ID del propietario para que se limpie al cambiar
                 e_nom = c1.text_input("Nombre", str(datos_p.get('nombre', '')), key=f"nom_{p_id}")
                 
                 lista_tid = ["CC", "NIT", "DNI", "NIE", "CIF", "OTRO"]
                 val_tid = datos_p.get('tipo_id')
-                idx_tid = lista_tid.index(val_tid) if pd.notna(val_tid) and val_tid in lista_tid else 0
-                e_tid = c2.selectbox("Tipo ID", lista_tid, index=idx_tid, key=f"tid_{p_id}")
-                
+                e_tid = c2.selectbox("Tipo ID", lista_tid, index=lista_tid.index(val_tid) if pd.notna(val_tid) and val_tid in lista_tid else 0, key=f"tid_{p_id}")
                 e_id = c3.text_input("Número de Identificación", str(datos_p.get('identificacion', '')), key=f"id_{p_id}")
                 
                 c4, c5 = st.columns(2)
@@ -329,133 +237,172 @@ def mostrar_modulo_propietarios(supabase):
                 
                 st.subheader("Finanzas")
                 c6, c7 = st.columns([1, 2])
-                
                 lista_mon = ["EUR", "COP"]
                 val_mon = datos_p.get('moneda')
-                idx_mon = lista_mon.index(val_mon) if pd.notna(val_mon) and val_mon in lista_mon else 0
-                e_mon = c6.selectbox("Moneda", lista_mon, index=idx_mon, key=f"mon_{p_id}")
-                
+                e_mon = c6.selectbox("Moneda", lista_mon, index=lista_mon.index(val_mon) if pd.notna(val_mon) and val_mon in lista_mon else 0, key=f"mon_{p_id}")
                 e_ban = c7.text_input("Banco", str(datos_p.get('banco', '')), key=f"ban_{p_id}")
                 
                 c8, c9 = st.columns([1, 2])
                 lista_tcu = ["IBAN", "AHORROS", "CORRIENTE", "NEQUI", "DAVIPLATA"]
                 val_tcu = datos_p.get('tipo_cuenta')
-                idx_tcu = lista_tcu.index(val_tcu) if pd.notna(val_tcu) and val_tcu in lista_tcu else 0
-                e_tcu = c8.selectbox("Tipo de Cuenta", lista_tcu, index=idx_tcu, key=f"tcu_{p_id}")
+                e_tcu = c8.selectbox("Tipo de Cuenta", lista_tcu, index=lista_tcu.index(val_tcu) if pd.notna(val_tcu) and val_tcu in lista_tcu else 0, key=f"tcu_{p_id}")
+                e_cba = c9.text_input("Número de Cuenta", str(datos_p.get('cuenta_banco', '')), key=f"cba_{p_id}")
                 
-                e_cba = c9.text_input("Número de Cuenta / IBAN", str(datos_p.get('cuenta_banco', '')), key=f"cba_{p_id}")
-                
-                # --- GESTIÓN DOCUMENTAL ---
-                st.subheader("📄 Identificacion Propietario")
-                
-                # Limpieza de valores nulos o "NaN" de Pandas para que funcione siempre
+                st.subheader("📄 Identificación")
                 url_actual = datos_p.get('url_documento')
-                if pd.isna(url_actual) or str(url_actual).strip() == "" or str(url_actual).lower() == "nan":
-                    url_actual = None
+                if pd.isna(url_actual) or str(url_actual).strip() == "" or str(url_actual).lower() == "nan": url_actual = None
                 
                 if url_actual:
-                    # Extraemos el nombre real del archivo cortando la URL desde la última barra '/'
                     nombre_archivo = urllib.parse.unquote(url_actual.split('/')[-1])
-                    st.markdown(f"**Documento actual:** `{nombre_archivo}` - [🔍 Abrir y Ver Archivo]({url_actual})")
+                    st.markdown(f"**Documento actual:** `{nombre_archivo}` - [🔍 Abrir]({url_actual})")
                 else:
-                    st.info("ℹ️ No hay documento registrado para este propietario.")
+                    st.info("No hay documento registrado.")
                 
-                               
-                # El file_uploader también atado al ID para que suelte el PDF anterior
-                doc_edit = st.file_uploader("Actualizar/Subir nuevo documento (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"], key=f"doc_{p_id}")
+                doc_edit = st.file_uploader("Actualizar/Subir nuevo", type=["pdf", "jpg", "jpeg", "png"], key=f"doc_{p_id}")
                 
                 st.markdown("---")
-                # Ampliamos a 3 columnas para acomodar el nuevo botón
-                col_btn1, col_btn2, col_btn3 = st.columns([2, 2, 1])
-                
-                # Definimos los botones
-                btn_actualizar = col_btn1.form_submit_button("📝 Actualizar Datos")
+                col_btn1, col_btn2, col_btn3, col_esp = st.columns([2.0, 1.5, 2.5, 4.0])
+                btn_actualizar = col_btn1.form_submit_button("📝 Actualizar")
+                btn_cerrar = col_btn2.form_submit_button("❌ Cerrar")
                 
                 btn_borrar_doc = False
                 if url_actual:
-                    # Este botón solo aparece si el propietario tiene un documento guardado
-                    btn_borrar_doc = col_btn2.form_submit_button("🗑️ Borrar Documento Actual")
+                    btn_borrar_doc = col_btn3.form_submit_button("🗑️ Borrar Doc Actual")
 
-                # --- 1. LÓGICA DE BORRADO DE DOCUMENTO ---
-                if btn_borrar_doc:
-                    with st.spinner("Eliminando documento de la bóveda..."):
-                        # Primero borramos físicamente de Supabase Storage
+                if btn_cerrar:
+                    st.session_state.modo_propietario = "NADA"
+                    st.rerun()
+
+                elif btn_borrar_doc:
+                    with st.spinner("Eliminando..."):
                         try:
-                            ruta_vieja = url_actual.split('/documentos/')[-1]
-                            supabase.storage.from_("documentos").remove([ruta_vieja])
-                        except:
-                            pass # Si ya no existe en la nube, lo ignoramos y seguimos
-                        
-                        # Luego vaciamos el bolsillo en la base de datos
+                            supabase.storage.from_("documentos").remove([url_actual.split('/documentos/')[-1]])
+                        except: pass
                         supabase.table("propietarios").update({"url_documento": None}).eq("id", int(p_id)).execute()
-                        log_accion(supabase, usuario_actual, "ELIMINAR DOC PROPIETARIO", e_nom.strip().upper())
-                        
-                        st.success("✅ Documento eliminado correctamente.")
+                        st.success("✅ Documento eliminado.")
                         time.sleep(1)
                         st.rerun()
 
-                # --- 2. LÓGICA DE ACTUALIZACIÓN DE DATOS ---
                 elif btn_actualizar:
                     if e_nom and e_id:
                         url_doc_upd = url_actual 
-                        hubo_error_archivo = False
-                        
+                        hubo_error = False
                         if doc_edit is not None:
                             if doc_edit.size > 5 * 1024 * 1024:
-                                st.error("❌ El documento supera el límite de 5MB. Por favor, redúcelo.")
-                                hubo_error_archivo = True
+                                st.error("❌ Límite 5MB.")
+                                hubo_error = True
                             else:
-                                with st.spinner("Actualizando documento en la bóveda..."):
+                                with st.spinner("Actualizando..."):
                                     try:
                                         ext = doc_edit.name.split('.')[-1].lower()
                                         tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
-                                        
-                                        ruta_doc_nueva = f"id_{e_id.strip()}_{int(time.time())}.{ext}"
-                                        supabase.storage.from_("documentos").upload(path=ruta_doc_nueva, file=doc_edit.getvalue(), file_options={"content-type": tipo_mime})
-                                        url_doc_upd = supabase.storage.from_("documentos").get_public_url(ruta_doc_nueva)
-                                        
-                                        # Auto-Limpieza del viejo
+                                        ruta_nueva = f"id_{e_id.strip()}_{int(time.time())}.{ext}"
+                                        supabase.storage.from_("documentos").upload(path=ruta_nueva, file=doc_edit.getvalue(), file_options={"content-type": tipo_mime})
+                                        url_doc_upd = supabase.storage.from_("documentos").get_public_url(ruta_nueva)
                                         if url_actual:
-                                            try:
-                                                ruta_vieja = url_actual.split('/documentos/')[-1]
-                                                supabase.storage.from_("documentos").remove([ruta_vieja])
-                                            except:
-                                                pass 
-                                                
+                                            try: supabase.storage.from_("documentos").remove([url_actual.split('/documentos/')[-1]])
+                                            except: pass
                                     except Exception as e:
-                                        st.error(f"❌ Error al subir el archivo: {e}")
-                                        hubo_error_archivo = True
+                                        st.error(f"❌ Error: {e}")
+                                        hubo_error = True
 
-                        if not hubo_error_archivo:
+                        if not hubo_error:
                             datos_upd = {
-                                "nombre": e_nom.strip().upper(),
-                                "tipo_id": e_tid,
-                                "identificacion": e_id.strip().upper(),
-                                "movil": e_mov.strip(),
-                                "correo": e_cor.strip().lower(),
-                                "moneda": e_mon,
-                                "banco": e_ban.strip().upper(),
-                                "tipo_cuenta": e_tcu,
-                                "cuenta_banco": e_cba.strip().upper(),
+                                "nombre": e_nom.strip().upper(), "tipo_id": e_tid, "identificacion": e_id.strip().upper(),
+                                "movil": e_mov.strip(), "correo": e_cor.strip().lower(), "moneda": e_mon,
+                                "banco": e_ban.strip().upper(), "tipo_cuenta": e_tcu, "cuenta_banco": e_cba.strip().upper(),
                                 "url_documento": url_doc_upd
                             }
                             supabase.table("propietarios").update(datos_upd).eq("id", int(p_id)).execute()
                             log_accion(supabase, usuario_actual, "EDITAR PROPIETARIO", e_nom.strip().upper())
-                            st.success("✅ Actualizado correctamente.")
+                            st.session_state.modo_propietario = "NADA"
+                            st.success("✅ Actualizado.")
                             time.sleep(1)
                             st.rerun()
                     else:
-                        st.warning("⚠️ El Nombre y el Número de Identificación son obligatorios.")
-                        
-            # --- SEGURO DE ELIMINACIÓN TAB 3 ---
-            st.markdown("---")
-            st.subheader("🚨 Zona de Peligro")
-            st.warning("⚠️ **Atención:** Dar de baja a este propietario lo ocultará del sistema y afectará los mandatos vinculados.")
-            confirmar_baja_prop = st.checkbox("Confirmo que deseo dar de baja a este propietario.", key=f"conf_prop_{p_id}")
-            
-            if st.button("🗑️ Dar de Baja (Eliminar)", disabled=not confirmar_baja_prop, key=f"btn_baja_{p_id}"):
+                        st.warning("⚠️ Nombre e ID obligatorios.")
+
+            st.write("")
+            c_del1, c_del2 = st.columns([7, 3])
+            confirmar_baja = c_del1.checkbox("⚠️ Confirmo baja.", key=f"del_chk_p_{p_id}")
+            if c_del2.button("🚫 Dar de Baja", disabled=not confirmar_baja, key=f"del_btn_p_{p_id}"):
                 supabase.table("propietarios").update({"estado": "INACTIVO"}).eq("id", int(p_id)).execute()
                 log_accion(supabase, usuario_actual, "ELIMINAR PROPIETARIO", datos_p['nombre'])
-                st.success("✅ Propietario dado de baja.")
+                st.session_state.modo_propietario = "NADA"
+                st.success("✅ Propietario inactivo.")
                 time.sleep(1)
+                st.rerun()
+
+    # --- PANEL: REPORTES ---
+    elif st.session_state.modo_propietario == "REPORTES" and not df_prop.empty:
+        st.markdown("---")
+        st.markdown("### 📄 Exportar y Compartir Reportes")
+        
+        col_exp1, col_exp2, col_exp3 = st.columns([2, 1.5, 3])
+        with col_exp1:
+            tipo_contenido = st.selectbox("Contenido del reporte:", ["Reporte Básico", "Reporte Detallado"], key="sel_cont_prop", label_visibility="collapsed")
+        with col_exp2:
+            formato_archivo = st.selectbox("Formato:", ["PDF", "Excel"], key="sel_form_prop", label_visibility="collapsed")
+
+        es_detallado = (tipo_contenido == "Reporte Detallado")
+        nombre_base = "propietarios_detallado" if es_detallado else "propietarios_basico"
+        
+        if formato_archivo == "PDF":
+            archivo_bytes = generar_pdf_propietarios(df_display, detallado=es_detallado)
+            ext, mime = "pdf", "application/pdf"
+        else:
+            if es_detallado:
+                df_excel = df_display[['nombre', 'identificacion', 'movil', 'correo', 'moneda', 'banco', 'cuenta_banco']].copy()
+                df_excel.rename(columns={'nombre':'NOMBRE', 'identificacion':'ID', 'movil':'MOVIL', 'correo':'CORREO', 'moneda':'MONEDA', 'banco':'BANCO', 'cuenta_banco':'CUENTA'}, inplace=True)
+            else:
+                df_excel = df_display[['nombre', 'identificacion', 'movil', 'correo']].copy()
+                df_excel.rename(columns={'nombre':'NOMBRE', 'identificacion':'ID', 'movil':'MOVIL', 'correo':'CORREO'}, inplace=True)
+            archivo_bytes = generar_excel_bytes(df_excel, "Propietarios")
+            ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        with col_exp3:
+            st.download_button(
+                label=f"⬇️ Descargar {formato_archivo}",
+                data=archivo_bytes,
+                file_name=f"{nombre_base}.{ext}",
+                mime=mime,
+                use_container_width=True
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 📤 Compartir a Operadores")
+        cols_env = st.columns([4, 4, 2])
+        
+        lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_ops.iterrows() if r['correo']]
+        with cols_env[0]:
+            sel_em = st.selectbox("Email", ["-- Seleccione --"] + lista_correos, key="em_prop_t1")
+            if st.button("Enviar por Correo", use_container_width=True):
+                if sel_em != "-- Seleccione --":
+                    dest = sel_em.split(" - ")[-1].strip()
+                    with st.spinner("Enviando..."):
+                        if enviar_reporte_correo(dest, archivo_bytes, f"{nombre_base}.{ext}", tipo_contenido, ext):
+                            st.success("¡Enviado!")
+                else: st.warning("Elige un operador.")
+                
+        lista_tels = [f"{r['nombre']} - {r['telefono']}" for _, r in df_ops.iterrows() if r['telefono']]
+        with cols_env[1]:
+            sel_wa = st.selectbox("WhatsApp", ["-- Seleccione --"] + lista_tels, key="wa_prop_t1")
+            if st.button("Generar Link WA", use_container_width=True):
+                if sel_wa != "-- Seleccione --":
+                    with st.spinner("Subiendo..."):
+                        try:
+                            tel = re.sub(r'\D', '', sel_wa.split(" - ")[-1].strip())
+                            path = f"{nombre_base}_{int(time.time())}.{ext}"
+                            supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes, file_options={"content-type": mime})
+                            link = supabase.storage.from_("reportes").get_public_url(path)
+                            msg = urllib.parse.quote(f"Hola, te comparto el {tipo_contenido}. Descárgalo aquí: {link}")
+                            st.markdown(f'<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%; background:#25D366; color:white; border:none; padding:8px; border-radius:5px;">Abrir WA</button></a>', unsafe_allow_html=True)
+                        except Exception as e: st.error(f"Error: {e}")
+                else: st.warning("Elige un operador.")
+        
+        with cols_env[2]:
+            st.write("")
+            st.write("")
+            if st.button("❌ Cerrar Panel", use_container_width=True):
+                st.session_state.modo_propietario = "NADA"
                 st.rerun()
