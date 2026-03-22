@@ -273,10 +273,10 @@ def mostrar_modulo_inmuebles(supabase):
                     st.session_state.modo_propiedad = "NADA" 
                     st.rerun()
 
-        # --- PANEL: GESTIONAR PROPIEDAD ---
+        # ---- sPANEL: GESTIONAR PROPIEDAD s---s-
         elif st.session_state.modo_propiedad == "EDITAR" and not df_inm.empty:
             st.markdown("---")
-            st.markdown("**⚙️ Gestionar Propiedad**")
+            st.markdown("**⚙️ Gestionar Propiedad y Zonas Comunes**")
             
             prop_sel = st.selectbox("Seleccione la propiedad:", df_display['NOMBRE'].tolist())
             if prop_sel:
@@ -284,6 +284,7 @@ def mostrar_modulo_inmuebles(supabase):
                 p_id = str(datos_p['id'])
                 
                 with st.form(key=f"form_editar_prop_{p_id}"):
+                    st.write("**1. Detalles Básicos**")
                     e_c1, e_c2 = st.columns(2)
                     e_nom = e_c1.text_input("Nombre", datos_p['nombre'])
                     e_ciu = e_c2.text_input("Ciudad", datos_p['ciudad'])
@@ -297,28 +298,78 @@ def mostrar_modulo_inmuebles(supabase):
                     e_ase = e_c5.text_input("Aseguradora", str(datos_p.get('aseguradora', '')))
                     e_pol = e_c6.text_input("Número Póliza", str(datos_p.get('numero_poliza', '')))
                     
+                    # --- NUEVA SECCIÓN DE GALERÍA ---
                     st.markdown("---")
-                    # Botonera Minimalista
-                    col_b1, col_b2, col_esp = st.columns([1.5, 1.2, 7.3])
+                    st.write("**2. Galería de Marketing (Zonas Comunes y Fachada)**")
                     
-                    if col_b1.form_submit_button("💾 Guardar"):
-                        datos_upd = {
-                            "nombre": e_nom.strip().upper(), "ciudad": e_ciu.strip().upper(),
-                            "moneda": e_mon, "referencia_catastral": e_cat.strip().upper(),
-                            "aseguradora": e_ase.strip().upper(), "numero_poliza": e_pol.strip().upper()
-                        }
-                        supabase.table("inmuebles").update(datos_upd).eq("id", int(p_id)).execute()
-                        log_accion(supabase, usuario_actual, "EDITAR PROPIEDAD", e_nom.strip().upper())
-                        st.session_state.modo_propiedad = "NADA"
-                        st.success("✅ Actualizado.")
-                        time.sleep(1)
-                        st.rerun()
-                        
-                    if col_b2.form_submit_button("❌ Cerrar"):
+                    # Prevenir errores si la columna fotos recién se creó y viene como nula (NaN)
+                    fotos_crudas = datos_p.get('fotos', [])
+                    fotos_actuales = fotos_crudas if isinstance(fotos_crudas, list) else []
+                    
+                    if len(fotos_actuales) > 0:
+                        cols_fotos = st.columns(min(len(fotos_actuales), 4))
+                        for i, url_foto in enumerate(fotos_actuales):
+                            with cols_fotos[i % 4]:
+                                st.image(url_foto, width=150)
+                    else:
+                        st.info("No hay fotos registradas de las zonas comunes.")
+                    
+                    nuevas_fotos = st.file_uploader("Subir imágenes (Max 5MB)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+
+                    st.markdown("---")
+                    # --- FILA DE ACCIONES UNIFICADA Y COMPACTA ---
+                    col_b1, col_b2, col_b3, col_esp = st.columns([1.5, 1.2, 1.5, 5.8])
+                    
+                    btn_guardar = col_b1.form_submit_button("💾 Guardar")
+                    btn_cerrar = col_b2.form_submit_button("❌ Cerrar")
+                    
+                    btn_borrar_fotos = False
+                    if len(fotos_actuales) > 0:
+                        btn_borrar_fotos = col_b3.form_submit_button("🗑️ Vaciar Galería")
+
+                    # LÓGICA DE BOsTONES
+                    if btn_cerrar:
                         st.session_state.modo_propiedad = "NADA" 
                         st.rerun()
                         
-                # Zona de eliminación fuera del form (Igual que Tab 2)
+                    elif btn_borrar_fotos:
+                        supabase.table("inmuebles").update({"fotos": []}).eq("id", int(p_id)).execute()
+                        st.success("✅ Galería de zonas comunes vaciada.")
+                        time.sleep(1)
+                        st.rerun()
+                        
+                    elif btn_guardar:
+                        urls_nuevas = []
+                        hubo_error = False
+                        
+                        if nuevas_fotos:
+                            with st.spinner("Subiendo fotos al servidor..."):
+                                for foto in nuevas_fotos:
+                                    try:
+                                        ext = foto.name.split('.')[-1].lower()
+                                        tipo_mime = f"image/{ext.replace('jpg', 'jpeg')}"
+                                        ruta_foto = f"inm_{p_id}_{int(time.time())}_{foto.name}"
+                                        supabase.storage.from_("fotos_inmuebles").upload(path=ruta_foto, file=foto.getvalue(), file_options={"content-type": tipo_mime})
+                                        urls_nuevas.append(supabase.storage.from_("fotos_inmuebles").get_public_url(ruta_foto))
+                                    except Exception as e:
+                                        hubo_error = True
+                                        st.error(f"Error subiendo {foto.name}")
+                        
+                        if not hubo_error:
+                            datos_upd = {
+                                "nombre": e_nom.strip().upper(), "ciudad": e_ciu.strip().upper(),
+                                "moneda": e_mon, "referencia_catastral": e_cat.strip().upper(),
+                                "aseguradora": e_ase.strip().upper(), "numero_poliza": e_pol.strip().upper(),
+                                "fotos": fotos_actuales + urls_nuevas
+                            }
+                            supabase.table("inmuebles").update(datos_upd).eq("id", int(p_id)).execute()
+                            log_accion(supabase, usuario_actual, "EDITAR PROPIEDAD", e_nom.strip().upper())
+                            st.session_state.modo_propiedad = "NADA"
+                            st.success("✅ Propiedad y galería actualizadas con éxito.")
+                            time.sleep(1)
+                            st.rerun()
+                            
+                # Zona de eliminación fuera del form 
                 st.write("")
                 c_del1, c_del2 = st.columns([7, 3])
                 confirmar_baja = c_del1.checkbox("⚠️ Confirmo que deseo dar de baja esta propiedad.", key=f"del_chk_p_{p_id}")
