@@ -771,7 +771,7 @@ def mostrar_modulo_inmuebles(supabase):
         # --- 4. PANELES DINÁMICOS ---
         
         # ==========================================
-        # PANEL: CREAR MANDATO
+        # PANEL: CREAR MANDATO (DISEÑO VERTICAL)
         # ==========================================
         if st.session_state.modo_mandato == "CREAR":
             st.markdown("---")
@@ -782,51 +782,62 @@ def mostrar_modulo_inmuebles(supabase):
                     st.rerun()
             else:
                 with st.form("form_nuevo_mandato", clear_on_submit=False):
-                    st.markdown("**📝 Redactar Nuevo Contrato de Gestión**")
+                    st.markdown("### 📝 Redactar Nuevo Contrato de Gestión")
+                    st.info("💡 Completa todas las secciones desplazándote hacia abajo antes de guardar.")
                     
-                    # Sub-Pestañas internas
-                    tab_fin, tab_cron, tab_doc = st.tabs(["💼 1. Vínculo y Finanzas", "📅 2. Cronograma", "📁 3. Documentos Básicos"])
+                    # --- SECCIÓN 1: FINANZAS ---
+                    st.markdown("#### 💼 1. Vínculo y Finanzas")
+                    c1, c2, c3 = st.columns([2, 2, 1])
+                    m_inm_sel = c1.selectbox("Inmueble *", df_inm_m['nombre'].tolist())
                     
-                    with tab_fin:
-                        c1, c2, c3 = st.columns([2, 2, 1])
-                        m_inm_sel = c1.selectbox("Inmueble *", df_inm_m['nombre'].tolist())
-                        m_prop_sel = c2.selectbox("Propietario Titular *", df_prop_m['nombre'].tolist())
-                        m_porcentaje = c3.number_input("% Propiedad", min_value=1.0, max_value=100.0, value=100.0)
-                        
-                        st.markdown("**Acuerdo Económico**")
-                        c4, c5, c6 = st.columns(3)
-                        m_alquiler = c4.number_input("Ingreso Mensual Garantizado *", min_value=0.0, step=50.0)
-                        m_fianza = c5.number_input("Fianza a Entregar *", min_value=0.0, step=50.0)
-                        m_iban = c6.text_input("IBAN / Cuenta de Pago (Opcional si ya está en perfil)")
-                        
-                        st.markdown("**Actualización Anual**")
-                        c7, c8, c9 = st.columns(3)
-                        m_tipo_act = c7.selectbox("Método de Actualización", ["IPC", "FIJO", "NO APLICA"])
-                        m_porc_act = c8.number_input("% Fijo (Si aplica)", min_value=0.0, step=0.1)
-                        
-                    with tab_cron:
-                        st.info("💡 Consejo: La vigencia del contrato arranca con la Fecha de Entrega de llaves, seguida del Periodo de Carencia.")
-                        cc1, cc2 = st.columns(2)
-                        m_f_suscripcion = cc1.date_input("Fecha de Suscripción (Firma)")
-                        m_f_entrega = cc2.date_input("Fecha de Entrega / Recibo (Llaves)")
-                        
-                        cc3, cc4 = st.columns(2)
-                        m_f_fin_carencia = cc3.date_input("Fecha Fin de Carencia")
-                        m_f_inicio_pago = cc4.date_input("Fecha Inicio de Pagos")
-                        
-                        cc5, cc6 = st.columns(2)
-                        m_f_terminacion = cc5.date_input("Fecha de Terminación (Vencimiento)")
-                        m_f_aviso = cc6.date_input("Fecha Límite Aviso No Renovación")
-                        
-                    with tab_doc:
-                        st.write("Sube los documentos escaneados (Max 5MB c/u. PDF o Imagen).")
-                        cd1, cd2 = st.columns(2)
-                        doc_contrato = cd1.file_uploader("Contrato Firmado", type=["pdf", "jpg", "png"], key="doc_cont")
-                        doc_empadrona = cd2.file_uploader("Autorización Empadronamiento", type=["pdf", "jpg", "png"], key="doc_emp")
-                        
-                        cd3, cd4 = st.columns(2)
-                        doc_inventario = cd3.file_uploader("Acta de Inventario", type=["pdf", "jpg", "png"], key="doc_inv")
-                        doc_suministros = cd4.file_uploader("Recibos Suministros (Agua/Luz)", type=["pdf", "jpg", "png"], key="doc_sum")
+                    # Ayuda visual para múltiples dueños
+                    m_prop_sel = c2.selectbox("Propietario / Representante *", df_prop_m['nombre'].tolist(), 
+                                              help="Si son varios dueños, crea un perfil conjunto en Propietarios (Ej: 'Angel y Antonio') o elige al representante.")
+                    m_porcentaje = c3.number_input("% Propiedad", min_value=1.0, max_value=100.0, value=100.0)
+                    
+                    st.markdown("**Acuerdo Económico**")
+                    c4, c5, c6 = st.columns(3)
+                    m_alquiler = c4.number_input("Ingreso Mensual Garantizado *", min_value=0.0, step=50.0)
+                    m_fianza = c5.number_input("Fianza a Entregar *", min_value=0.0, step=50.0)
+                    
+                    # Campo explícito para la cuenta conjunta
+                    m_iban = c6.text_input("IBAN / Cuenta de Pago *", 
+                                           placeholder="Ej: ES25 2100...", 
+                                           help="Coloca aquí la cuenta bancaria conjunta a la que se transferirá.")
+                    
+                    st.markdown("**Actualización Anual**")
+                    c7, c8, c9 = st.columns(3)
+                    m_tipo_act = c7.selectbox("Método de Actualización", ["IPC", "FIJO", "NO APLICA"])
+                    m_porc_act = c8.number_input("% Fijo (Si aplica)", min_value=0.0, step=0.1)
+                    
+                    st.markdown("---")
+                    
+                    # --- SECCIÓN 2: CRONOGRAMA ---
+                    st.markdown("#### 📅 2. Cronograma del Contrato")
+                    cc1, cc2 = st.columns(2)
+                    m_f_suscripcion = cc1.date_input("Fecha de Suscripción (Firma)")
+                    m_f_entrega = cc2.date_input("Fecha de Entrega / Recibo (Llaves)")
+                    
+                    cc3, cc4 = st.columns(2)
+                    m_f_fin_carencia = cc3.date_input("Fecha Fin de Carencia")
+                    m_f_inicio_pago = cc4.date_input("Fecha Inicio de Pagos")
+                    
+                    cc5, cc6 = st.columns(2)
+                    m_f_terminacion = cc5.date_input("Fecha de Terminación (Vencimiento)")
+                    m_f_aviso = cc6.date_input("Fecha Límite Aviso No Renovación")
+                    
+                    st.markdown("---")
+                    
+                    # --- SECCIÓN 3: DOCUMENTOS ---
+                    st.markdown("#### 📁 3. Documentos Básicos")
+                    st.write("Sube los documentos escaneados (Max 5MB c/u. PDF o Imagen).")
+                    cd1, cd2 = st.columns(2)
+                    doc_contrato = cd1.file_uploader("Contrato Firmado", type=["pdf", "jpg", "png"], key="doc_cont")
+                    doc_empadrona = cd2.file_uploader("Autorización Empadronamiento", type=["pdf", "jpg", "png"], key="doc_emp")
+                    
+                    cd3, cd4 = st.columns(2)
+                    doc_inventario = cd3.file_uploader("Acta de Inventario", type=["pdf", "jpg", "png"], key="doc_inv")
+                    doc_suministros = cd4.file_uploader("Recibos Suministros (Agua/Luz)", type=["pdf", "jpg", "png"], key="doc_sum")
                         
                     st.markdown("---")
                     col_b1, col_b2, col_esp = st.columns([2.0, 1.5, 6.5])
@@ -834,29 +845,24 @@ def mostrar_modulo_inmuebles(supabase):
                     if col_b1.form_submit_button("💾 Generar Mandato"):
                         with st.spinner("Creando mandato y subiendo documentos a la bóveda..."):
                             try:
-                                # 1. Extraer IDs
                                 id_inm = df_inm_m[df_inm_m['nombre'] == m_inm_sel].iloc[0]['id']
                                 id_prop = df_prop_m[df_prop_m['nombre'] == m_prop_sel].iloc[0]['id']
                                 
-                                # 2. Motor de subida de PDFs
                                 def subir_pdf(archivo_st, prefijo_nombre):
                                     if archivo_st is None: return None
                                     ext = archivo_st.name.split('.')[-1].lower()
                                     tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
                                     nombre_nube = f"{prefijo_nombre}_{id_inm}_{id_prop}_{int(time.time())}.{ext}"
-                                    
                                     supabase.storage.from_("documentos_mandatos").upload(
                                         path=nombre_nube, file=archivo_st.getvalue(), file_options={"content-type": tipo_mime}
                                     )
                                     return supabase.storage.from_("documentos_mandatos").get_public_url(nombre_nube)
 
-                                # Subimos los 4 archivos
                                 url_c = subir_pdf(doc_contrato, "contrato")
                                 url_e = subir_pdf(doc_empadrona, "empadronamiento")
                                 url_i = subir_pdf(doc_inventario, "inventario")
                                 url_s = subir_pdf(doc_suministros, "suministros")
 
-                                # 3. Preparar el paquete de datos
                                 datos_mandato = {
                                     "id_inmueble": int(id_inm), "id_propietario": int(id_prop),
                                     "porcentaje_propiedad": m_porcentaje, "ingreso_garantizado": m_alquiler,
@@ -870,11 +876,9 @@ def mostrar_modulo_inmuebles(supabase):
                                     "estado_contrato": "FIRMADO", "estado_financiero": "PENDIENTE_FIANZA"
                                 }
 
-                                # 4. Insertar Mandato Principal
                                 res_insert = supabase.table("mandatos").insert(datos_mandato).execute()
                                 id_nuevo_mandato = res_insert.data[0]['id']
 
-                                # 5. Registrar Historial
                                 supabase.table("historial_mandatos").insert({
                                     "id_mandato": id_nuevo_mandato,
                                     "accion": "CREACIÓN DE MANDATO Y FIRMA DE CONTRATO",
