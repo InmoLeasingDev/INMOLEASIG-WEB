@@ -306,9 +306,9 @@ def panel_reportes_y_compartir(
             else: 
                 st.button("Generar Link WA", disabled=True, use_container_width=True, key=f"btn_wa_dis_{modulo_origen}")
 
-# ==========================================
+# ===========================================
 # GESTOR UNIVERSAL DE GALERÍAS (MODO PRO v2)
-# ==========================================
+# ===========================================
 def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_registro, nombre_registro, fotos_actuales, clave_estado_cerrar, prefijo_ruta="img"):
     """
     Renderiza un panel estandarizado para ver, subir y eliminar fotos de cualquier tabla de la base de datos.
