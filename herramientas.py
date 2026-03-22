@@ -347,7 +347,7 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
         
         # --- 3. BOTONERA MINIMALISTA (ORDEN TÁCTICO: Guardar | Borrar | Cerrar) ---
         # Ajustamos los anchos de columna para el nuevo texto más corto
-        col_b1, col_b2, col_b3, col_esp = st.columns([2.0, 2.0, 1.5, 4.5])
+        col_b1, col_b2, col_b3, col_esp = st.columns([1.6, 1.4, 1.0, 6.0])
         
         btn_guardar = col_b1.form_submit_button("💾 Guardar Cambios")
         btn_borrar_fotos = False
