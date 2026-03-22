@@ -347,7 +347,7 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
         if len(fotos_lista) > 0:
             btn_borrar_fotos = col_b3.form_submit_button("🗑️ Vaciar Galería")
 
-        # --- 4. LÓGICA DE BOTONES ---
+        # --- 4. LÓGICA DE BOTONES ----
         if btn_cerrar:
             st.session_state[clave_estado_cerrar] = "NADA"
             st.rerun()
