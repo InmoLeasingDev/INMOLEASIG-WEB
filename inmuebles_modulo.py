@@ -454,7 +454,7 @@ def mostrar_modulo_inmuebles(supabase):
                             # --- FILA DE ACCIONES UNIFICADA Y COMPACTA ---
                             # Ajustamos anchos para que "❌ Cerrar" quepa perfectamente
                             col_btn1, col_btn2, col_btn3, col_espacio = st.columns([1.5, 1.2, 1.5, 5.8])
-                            btn_guardar = col_btn1.form_submit_button("💾 Guardar y Subir")
+                            btn_guardar = col_btn1.form_submit_button("💾 Guardar")
                             btn_cerrar = col_btn2.form_submit_button("❌ Cerrar")
                             
                             btn_borrar_fotos = False
