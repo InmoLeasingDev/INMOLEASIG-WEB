@@ -771,7 +771,7 @@ def mostrar_modulo_inmuebles(supabase):
         # --- 4. PANELES DINÁMICOS ---
         
         # ==========================================
-        # PANEL: CREAR MANDATO (DISEÑO VERTICAL)
+        # PANEL: CREAR MANDATO (DISEÑO VERTICAL + MULTI-PROPIETARIO)
         # ==========================================
         if st.session_state.modo_mandato == "CREAR":
             st.markdown("---")
@@ -783,32 +783,33 @@ def mostrar_modulo_inmuebles(supabase):
             else:
                 with st.form("form_nuevo_mandato", clear_on_submit=False):
                     st.markdown("### 📝 Redactar Nuevo Contrato de Gestión")
-                    st.info("💡 Completa todas las secciones desplazándote hacia abajo antes de guardar.")
+                    st.info("💡 Completa todas las secciones hacia abajo. Puedes asignar hasta 2 titulares y dividir cómo se paga el dinero.")
                     
-                    # --- SECCIÓN 1: FINANZAS ---
-                    st.markdown("#### 💼 1. Vínculo y Finanzas")
-                    c1, c2, c3 = st.columns([2, 2, 1])
-                    m_inm_sel = c1.selectbox("Inmueble *", df_inm_m['nombre'].tolist())
+                    # --- SECCIÓN 1: VÍNCULO Y FINANZAS ---
+                    st.markdown("#### 💼 1. Titularidad y Distribución de Pagos")
+                    m_inm_sel = st.selectbox("Inmueble a gestionar *", df_inm_m['nombre'].tolist())
                     
-                    # Ayuda visual para múltiples dueños
-                    m_prop_sel = c2.selectbox("Propietario / Representante *", df_prop_m['nombre'].tolist(), 
-                                              help="Si son varios dueños, crea un perfil conjunto en Propietarios (Ej: 'Angel y Antonio') o elige al representante.")
-                    m_porcentaje = c3.number_input("% Propiedad", min_value=1.0, max_value=100.0, value=100.0)
+                    st.write("**Titular 1 (Principal)**")
+                    c1, c2, c3, c4 = st.columns([3, 1.5, 1.5, 4])
+                    m_prop_sel_1 = c1.selectbox("Propietario 1 *", df_prop_m['nombre'].tolist(), key="p1")
+                    m_porc_prop_1 = c2.number_input("% Legal", min_value=0.0, max_value=100.0, value=100.0, step=1.0, key="pp1", help="Porcentaje de propiedad en escrituras.")
+                    m_porc_pago_1 = c3.number_input("% Cobro", min_value=0.0, max_value=100.0, value=100.0, step=1.0, key="pg1", help="Qué porcentaje del alquiler recibe esta persona.")
+                    m_iban_1 = c4.text_input("IBAN / Cuenta Pago 1 *", placeholder="Ej: ES25 2100...", key="ib1")
+                    
+                    st.write("**Titular 2 (Opcional)**")
+                    c5, c6, c7, c8 = st.columns([3, 1.5, 1.5, 4])
+                    opciones_p2 = ["-- Ninguno --"] + df_prop_m['nombre'].tolist()
+                    m_prop_sel_2 = c5.selectbox("Propietario 2", opciones_p2, key="p2")
+                    m_porc_prop_2 = c6.number_input("% Legal 2", min_value=0.0, max_value=100.0, value=0.0, step=1.0, key="pp2")
+                    m_porc_pago_2 = c7.number_input("% Cobro 2", min_value=0.0, max_value=100.0, value=0.0, step=1.0, key="pg2")
+                    m_iban_2 = c8.text_input("IBAN / Cuenta Pago 2", placeholder="Opcional si no cobra nada", key="ib2")
                     
                     st.markdown("**Acuerdo Económico**")
-                    c4, c5, c6 = st.columns(3)
-                    m_alquiler = c4.number_input("Ingreso Mensual Garantizado *", min_value=0.0, step=50.0)
-                    m_fianza = c5.number_input("Fianza a Entregar *", min_value=0.0, step=50.0)
-                    
-                    # Campo explícito para la cuenta conjunta
-                    m_iban = c6.text_input("IBAN / Cuenta de Pago *", 
-                                           placeholder="Ej: ES25 2100...", 
-                                           help="Coloca aquí la cuenta bancaria conjunta a la que se transferirá.")
-                    
-                    st.markdown("**Actualización Anual**")
-                    c7, c8, c9 = st.columns(3)
-                    m_tipo_act = c7.selectbox("Método de Actualización", ["IPC", "FIJO", "NO APLICA"])
-                    m_porc_act = c8.number_input("% Fijo (Si aplica)", min_value=0.0, step=0.1)
+                    c9, c10, c11, c12 = st.columns(4)
+                    m_alquiler = c9.number_input("Ingreso Mensual Garantizado *", min_value=0.0, step=50.0)
+                    m_fianza = c10.number_input("Fianza a Entregar *", min_value=0.0, step=50.0)
+                    m_tipo_act = c11.selectbox("Actualización Anual", ["IPC", "FIJO", "NO APLICA"])
+                    m_porc_act = c12.number_input("% Fijo (Si aplica)", min_value=0.0, step=0.1)
                     
                     st.markdown("---")
                     
@@ -843,61 +844,80 @@ def mostrar_modulo_inmuebles(supabase):
                     col_b1, col_b2, col_esp = st.columns([2.0, 1.5, 6.5])
                     
                     if col_b1.form_submit_button("💾 Generar Mandato"):
-                        with st.spinner("Creando mandato y subiendo documentos a la bóveda..."):
-                            try:
-                                id_inm = df_inm_m[df_inm_m['nombre'] == m_inm_sel].iloc[0]['id']
-                                id_prop = df_prop_m[df_prop_m['nombre'] == m_prop_sel].iloc[0]['id']
-                                
-                                def subir_pdf(archivo_st, prefijo_nombre):
-                                    if archivo_st is None: return None
-                                    ext = archivo_st.name.split('.')[-1].lower()
-                                    tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
-                                    nombre_nube = f"{prefijo_nombre}_{id_inm}_{id_prop}_{int(time.time())}.{ext}"
-                                    supabase.storage.from_("documentos_mandatos").upload(
-                                        path=nombre_nube, file=archivo_st.getvalue(), file_options={"content-type": tipo_mime}
-                                    )
-                                    return supabase.storage.from_("documentos_mandatos").get_public_url(nombre_nube)
+                        # Validaciones lógicas rápidas
+                        if (m_porc_prop_1 + m_porc_prop_2) > 100.1 or (m_porc_pago_1 + m_porc_pago_2) > 100.1:
+                            st.error("❌ Los porcentajes de propiedad o de pago suman más del 100%. Por favor, revísalos.")
+                        elif m_alquiler <= 0:
+                            st.error("❌ El ingreso garantizado no puede ser cero.")
+                        else:
+                            with st.spinner("Creando mandato y subiendo documentos a la bóveda..."):
+                                try:
+                                    id_inm = df_inm_m[df_inm_m['nombre'] == m_inm_sel].iloc[0]['id']
+                                    id_prop_1 = df_prop_m[df_prop_m['nombre'] == m_prop_sel_1].iloc[0]['id']
+                                    
+                                    id_prop_2 = None
+                                    if m_prop_sel_2 != "-- Ninguno --":
+                                        id_prop_2 = int(df_prop_m[df_prop_m['nombre'] == m_prop_sel_2].iloc[0]['id'])
+                                    
+                                    def subir_pdf(archivo_st, prefijo_nombre):
+                                        if archivo_st is None: return None
+                                        ext = archivo_st.name.split('.')[-1].lower()
+                                        tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
+                                        nombre_nube = f"{prefijo_nombre}_{id_inm}_{id_prop_1}_{int(time.time())}.{ext}"
+                                        supabase.storage.from_("documentos_mandatos").upload(
+                                            path=nombre_nube, file=archivo_st.getvalue(), file_options={"content-type": tipo_mime}
+                                        )
+                                        return supabase.storage.from_("documentos_mandatos").get_public_url(nombre_nube)
 
-                                url_c = subir_pdf(doc_contrato, "contrato")
-                                url_e = subir_pdf(doc_empadrona, "empadronamiento")
-                                url_i = subir_pdf(doc_inventario, "inventario")
-                                url_s = subir_pdf(doc_suministros, "suministros")
+                                    url_c = subir_pdf(doc_contrato, "contrato")
+                                    url_e = subir_pdf(doc_empadrona, "empadronamiento")
+                                    url_i = subir_pdf(doc_inventario, "inventario")
+                                    url_s = subir_pdf(doc_suministros, "suministros")
 
-                                datos_mandato = {
-                                    "id_inmueble": int(id_inm), "id_propietario": int(id_prop),
-                                    "porcentaje_propiedad": m_porcentaje, "ingreso_garantizado": m_alquiler,
-                                    "valor_fianza": m_fianza, "cuenta_pago": m_iban.strip() if m_iban else None,
-                                    "tipo_actualizacion": m_tipo_act, "porcentaje_actualizacion": m_porc_act,
-                                    "fecha_suscripcion": str(m_f_suscripcion), "fecha_entrega": str(m_f_entrega),
-                                    "fecha_fin_carencia": str(m_f_fin_carencia), "fecha_inicio_pagos": str(m_f_inicio_pago),
-                                    "fecha_terminacion": str(m_f_terminacion), "fecha_aviso_no_renovacion": str(m_f_aviso),
-                                    "url_contrato": url_c, "url_empadronamiento": url_e,
-                                    "url_inventario": url_i, "url_suministros": url_s,
-                                    "estado_contrato": "FIRMADO", "estado_financiero": "PENDIENTE_FIANZA"
-                                }
+                                    datos_mandato = {
+                                        "id_inmueble": int(id_inm), 
+                                        "id_propietario": int(id_prop_1),
+                                        "id_propietario_2": id_prop_2,
+                                        "porcentaje_propiedad": m_porc_prop_1,
+                                        "porcentaje_propiedad_2": m_porc_prop_2,
+                                        "porcentaje_pago_1": m_porc_pago_1,
+                                        "porcentaje_pago_2": m_porc_pago_2,
+                                        "cuenta_pago": m_iban_1.strip() if m_iban_1 else None,
+                                        "cuenta_pago_2": m_iban_2.strip() if m_iban_2 else None,
+                                        "ingreso_garantizado": m_alquiler,
+                                        "valor_fianza": m_fianza, 
+                                        "tipo_actualizacion": m_tipo_act, 
+                                        "porcentaje_actualizacion": m_porc_act,
+                                        "fecha_suscripcion": str(m_f_suscripcion), "fecha_entrega": str(m_f_entrega),
+                                        "fecha_fin_carencia": str(m_f_fin_carencia), "fecha_inicio_pagos": str(m_f_inicio_pago),
+                                        "fecha_terminacion": str(m_f_terminacion), "fecha_aviso_no_renovacion": str(m_f_aviso),
+                                        "url_contrato": url_c, "url_empadronamiento": url_e,
+                                        "url_inventario": url_i, "url_suministros": url_s,
+                                        "estado_contrato": "FIRMADO", "estado_financiero": "PENDIENTE_FIANZA"
+                                    }
 
-                                res_insert = supabase.table("mandatos").insert(datos_mandato).execute()
-                                id_nuevo_mandato = res_insert.data[0]['id']
+                                    res_insert = supabase.table("mandatos").insert(datos_mandato).execute()
+                                    id_nuevo_mandato = res_insert.data[0]['id']
 
-                                supabase.table("historial_mandatos").insert({
-                                    "id_mandato": id_nuevo_mandato,
-                                    "accion": "CREACIÓN DE MANDATO Y FIRMA DE CONTRATO",
-                                    "usuario": usuario_actual
-                                }).execute()
+                                    supabase.table("historial_mandatos").insert({
+                                        "id_mandato": id_nuevo_mandato,
+                                        "accion": "CREACIÓN DE MANDATO Y FIRMA DE CONTRATO",
+                                        "usuario": usuario_actual
+                                    }).execute()
 
-                                log_accion(supabase, usuario_actual, "NUEVO MANDATO", f"{m_inm_sel} - {m_prop_sel}")
-                                st.success("✅ Mandato generado, documentos encriptados y fechas programadas.")
-                                st.session_state.modo_mandato = "NADA"
-                                time.sleep(1.5)
-                                st.rerun()
+                                    log_accion(supabase, usuario_actual, "NUEVO MANDATO", f"{m_inm_sel} - {m_prop_sel_1}")
+                                    st.success("✅ Mandato generado con esquemas de pago múltiples.")
+                                    st.session_state.modo_mandato = "NADA"
+                                    time.sleep(1.5)
+                                    st.rerun()
 
-                            except Exception as e:
-                                st.error(f"❌ Ocurrió un error en la transacción: {e}")
+                                except Exception as e:
+                                    st.error(f"❌ Ocurrió un error en la transacción: {e}")
                                 
                     if col_b2.form_submit_button("❌ Cancelar"):
                         st.session_state.modo_mandato = "NADA"
-                        st.rerun()
-
+                        st.rerun()      
+        
         # ==========================================
         # PANEL: GESTIONAR (Placeholder para edición)
         # ==========================================
