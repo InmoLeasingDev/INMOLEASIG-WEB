@@ -119,32 +119,32 @@ def mostrar_modulo_propietarios(supabase):
                 }
             )
 
-            # ==========================================
-            # NUEVO PANEL DE EXPORTACIÓN TAB 1 (FLEXIBLE)
+# ==========================================
+            # NUEVO PANEL DE EXPORTACIÓN TAB 1 (COMPACTO)
             # ==========================================
             st.markdown("---")
             st.markdown("### 📄 Exportar y Compartir Reportes")
             
-            # --- 1. Opciones de Generación ---
-            st.write("**1. Selecciona el contenido del reporte:**")
-            tipo_contenido = st.radio(
-                "Contenido:", 
-                ["Reporte Básico", "Reporte Detallado"], 
-                horizontal=True, 
-                label_visibility="collapsed",
-                key="radio_cont_prop"
-            )
+            # --- Barra de Exportación en 1 sola línea ---
+            col_exp1, col_exp2, col_exp3 = st.columns([2, 1.5, 3])
             
-            st.write("**2. Selecciona el formato:**")
-            formato_archivo = st.radio(
-                "Formato:", 
-                ["PDF", "Excel"], 
-                horizontal=True, 
-                label_visibility="collapsed",
-                key="radio_form_prop"
-            )
+            with col_exp1:
+                tipo_contenido = st.selectbox(
+                    "Contenido del reporte:", 
+                    ["Reporte Básico", "Reporte Detallado"], 
+                    key="sel_cont_prop",
+                    label_visibility="collapsed"
+                )
+            
+            with col_exp2:
+                formato_archivo = st.selectbox(
+                    "Formato:", 
+                    ["PDF", "Excel"], 
+                    key="sel_form_prop",
+                    label_visibility="collapsed"
+                )
 
-            # --- 2. Preparar los datos según la elección ---
+            # --- Preparar los datos según la elección ---
             es_detallado = (tipo_contenido == "Reporte Detallado")
             nombre_base = "propietarios_detallado" if es_detallado else "propietarios_basico"
             
@@ -164,16 +164,16 @@ def mostrar_modulo_propietarios(supabase):
 
             nombre_final_archivo = f"{nombre_base}.{ext}"
 
-            # --- 3. Botón de Descarga Directa ---
-            st.write("**3. Descargar al equipo:**")
-            st.download_button(
-                label=f"⬇️ Descargar {tipo_contenido} en {formato_archivo}",
-                data=archivo_bytes,
-                file_name=nombre_final_archivo,
-                mime=mime,
-                use_container_width=True
-            )
-
+            # --- Botón de Descarga Directa en la tercera columna ---
+            with col_exp3:
+                st.download_button(
+                    label=f"⬇️ Descargar {formato_archivo} {tipo_contenido.split(' ')[1]}",
+                    data=archivo_bytes,
+                    file_name=nombre_final_archivo,
+                    mime=mime,
+                    use_container_width=True
+                )
+                
             # --- 4. Compartir ---
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("#### 📤 Compartir a Operadores")
