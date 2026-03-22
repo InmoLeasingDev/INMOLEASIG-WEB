@@ -353,7 +353,7 @@ def mostrar_modulo_inmuebles(supabase):
                                         urls_nuevas.append(supabase.storage.from_("fotos_inmuebles").get_public_url(ruta_foto))
                                     except Exception as e:
                                         hubo_error = True
-                                        st.error(f"Error subiendo {foto.name}")
+                                        st.error(f"Error subiendo {foto.name}: {e}")
                         
                         if not hubo_error:
                             datos_upd = {
