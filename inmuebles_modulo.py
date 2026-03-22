@@ -747,7 +747,7 @@ def mostrar_modulo_inmuebles(supabase):
             
             st.dataframe(df_view_display, use_container_width=True, hide_index=True)
         else:
-            st.session_state.modo_mandato = "NADA" # Escudo anti-crash
+            #st.session_state.modo_mandato = "NADA" # Escudo anti-crash
             st.info("ℹ️ No hay mandatos vigentes. Crea uno nuevo para empezar a gestionar contratos.")
 
         # --- 3. BARRA DE HERRAMIENTAS MODO PRO ---
