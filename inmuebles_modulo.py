@@ -44,10 +44,10 @@ def generar_pdf_propiedades(df):
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================
-# 2. MOTOR PDF UNIDADES
+# 2. MOTOR PDF UNIDADES (CON TOTALIZADOR)
 # ==========================================
 def generar_pdf_unidades(df):
-    pdf = FPDF(orientation="L") # Cambiado a Horizontal (Landscape)
+    pdf = FPDF(orientation="L") # Horizontal (Landscape)
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 10, "INMOLEASING - DIRECTORIO DE UNIDADES", ln=True, align="C")
@@ -55,6 +55,7 @@ def generar_pdf_unidades(df):
 
     pdf.set_font("Arial", "B", 9)
     pdf.set_fill_color(200, 220, 255)
+    
     # Anchos para: PROPIEDAD, UNIDAD, TIPO, ESTADO, ÁREA, PRECIO
     cw = [65, 45, 40, 30, 25, 40] 
     headers = ["PROPIEDAD", "UNIDAD", "TIPO", "ESTADO", "ÁREA (m2)", "PRECIO"]
@@ -63,23 +64,60 @@ def generar_pdf_unidades(df):
     pdf.ln()
 
     pdf.set_font("Arial", "", 8)
+    
+    # Variables maestras para el cálculo del total
+    total_precio = 0.0
+    simbolo = ""
+    
     for _, row in df.iterrows():
+        # 1. Extraer y limpiar el precio para poder sumarlo
+        precio_str = str(row.get('PRECIO', '')).strip()
+        if precio_str and precio_str != "None" and precio_str != "-":
+            # Detectar la moneda automáticamente
+            if not simbolo:
+                if "€" in precio_str: simbolo = "€"
+                elif "$" in precio_str: simbolo = "$"
+            
+            # Quitar símbolos y comas para que Python pueda hacer matemáticas
+            num_str = precio_str.replace("€", "").replace("$", "").replace(",", "").strip()
+            try:
+                total_precio += float(num_str)
+            except ValueError:
+                pass # Si hay algún error de texto, lo ignora y sigue
+
+        # 2. Dibujar la fila normal
         textos = [
             str(row.get('PROPIEDAD', '')), 
             str(row.get('UNIDAD', '')), 
             str(row.get('TIPO', '')),
             str(row.get('ESTADO', '')),
             str(row.get('ÁREA (m2)', '')),
-            str(row.get('PRECIO', ''))
+            precio_str
         ]
         textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
         h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
-        if pdf.get_y() + h_fila > 190: pdf.add_page()
+        
+        if pdf.get_y() + h_fila > 190: 
+            pdf.add_page()
+            
         x, y = pdf.get_x(), pdf.get_y()
         for i, txt in enumerate(textos):
             pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
             pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
         pdf.set_xy(10, y + h_fila)
+        
+    # --- 3. DIBUJAR LA GRAN FILA DEL TOTAL ---
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_fill_color(220, 230, 240) # Un sombreado gris claro muy elegante
+    
+    # Unificamos todas las columnas menos la última para hacer espacio
+    ancho_previo = sum(cw[:-1]) 
+    pdf.cell(ancho_previo, 8, "TOTAL PRECIO BASE DE LAS UNIDADES:", 1, 0, "R", True)
+    
+    # Imprimimos el total con su respectiva moneda y comas
+    pdf.cell(cw[-1], 8, f"{simbolo} {total_precio:,.2f}", 1, 0, "L", True)
+    pdf.ln()
+    
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================
