@@ -200,8 +200,24 @@ def mostrar_modulo_inmuebles(supabase):
         
         if not df_inm.empty:
             df_inm = df_inm.sort_values(by=['moneda', 'nombre'], ascending=[True, True])
-            df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'moneda', 'referencia_catastral']].copy()
-            df_display.rename(columns={'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'moneda': 'MONEDA', 'referencia_catastral': label_catastro.upper()}, inplace=True)
+            
+            # 1. Lógica para el Icono de Fotos en Propiedades
+            def indicador_fotos_inm(fotos_array):
+                if isinstance(fotos_array, list) and len(fotos_array) > 0:
+                    return f"📸 {len(fotos_array)}"
+                return "➖"
+                
+            df_inm['FOTOS'] = df_inm['fotos'].apply(indicador_fotos_inm)
+            
+            # 2. Preparamos el DataFrame de vista (Quitamos 'moneda', añadimos 'FOTOS')
+            df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'referencia_catastral', 'FOTOS']].copy()
+            df_display.rename(columns={
+                'nombre': 'NOMBRE', 
+                'tipo': 'TIPO', 
+                'ciudad': 'CIUDAD', 
+                'referencia_catastral': label_catastro.upper()
+            }, inplace=True)
+            
             st.dataframe(df_display.drop(columns=['id']), use_container_width=True, hide_index=True)
         else:
             st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
