@@ -918,9 +918,9 @@ def mostrar_modulo_inmuebles(supabase):
                         st.session_state.modo_mandato = "NADA"
                         st.rerun()      
         
-        # ============================================
+        # ==========================================
         # PANEL: GESTIONAR (Placeholder para edición)
-        # ============================================
+        # ==========================================
         elif st.session_state.modo_mandato == "EDITAR":
             st.markdown("---")
             st.info("⚙️ Módulo de edición de mandatos en construcción. Aquí cambiaremos estados y renovaremos contratos.")
