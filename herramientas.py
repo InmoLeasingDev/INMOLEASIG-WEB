@@ -224,24 +224,29 @@ def panel_reportes_y_compartir(
     """
     with st.container(border=True):
         # --- ENCABEZADO CON BOTÓN DE CIERRE ---
+        # Usamos una proporción que deje la X bien a la derecha
         c_tit, c_cerrar = st.columns([9.2, 0.8]) 
         
-        # 💡 EL TIRO DE GRACIA: Usamos 'position: relative; top: -3px;' para subir el texto milimétricamente.
+        # 1. Alineamos el texto verticalmente con padding-top
         c_tit.markdown(
-            f"<div style='position: relative; top: -3px; font-size: 16px;'>"
-            f"<b>📊 Exportar y Compartir Listado de {modulo_origen}</b></div>", 
+            f"<div style='padding-top: 10px; font-size: 16px; font-weight: bold;'>"
+            f"📊 Exportar y Compartir Listado de {modulo_origen}</div>", 
             unsafe_allow_html=True
         )
         
-        if c_cerrar.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel", use_container_width=True):
-            st.session_state[clave_estado_cerrar] = "NADA"
-            st.rerun()
+        # 2. El botón de cerrar con un pequeño margen superior para nivelarlo con el texto
+        with c_cerrar:
+            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+            if st.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel", use_container_width=True):
+                st.session_state[clave_estado_cerrar] = "NADA"
+                st.rerun()
             
         # --- 1. FILA SUPERIOR (Formato y Descarga) ---
         col1, col2, col3 = st.columns([1.7, 1.5, 6.8]) 
         
-        formato = col1.radio("Formato Reporte:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
+        formato = col1.radio("Formato:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
         
+        # Generación de archivos
         if formato == "PDF":
             archivo_bytes = funcion_pdf(df_datos)
             ext, mime = "pdf", "application/pdf"
@@ -251,7 +256,7 @@ def panel_reportes_y_compartir(
         
         nombre_final = f"{nombre_base}.{ext}"
         
-        # Alineación vertical perfecta para el botón descargar
+        # Botón Descargar alineado con el radio
         col2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         col2.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}", use_container_width=True)
         
@@ -260,6 +265,8 @@ def panel_reportes_y_compartir(
         # --- 2. FILA INFERIOR: COMPARTIR ---
         st.write("📤 **Compartir a Operadores**")
         cols_env = st.columns(2)
+        
+        # Preparar listas de contactos
         lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_operadores.iterrows() if pd.notna(r.get('correo')) and r['correo']]
         lista_telefonos = [f"{r['nombre']} - {r['telefono']}" for _, r in df_operadores.iterrows() if pd.notna(r.get('telefono')) and r['telefono']]
         
@@ -277,6 +284,8 @@ def panel_reportes_y_compartir(
                     
         with cols_env[1]:
             sel_wa = st.selectbox("💬 WhatsApp:", ["-- Seleccione --"] + lista_telefonos, key=f"sel_wa_{modulo_origen}")
+            
+            # Lógica de WhatsApp mejorada
             if sel_wa != "-- Seleccione --":
                 if st.button("Generar Link WA", use_container_width=True, key=f"btn_wa_{modulo_origen}"):
                     with st.spinner("Generando..."):
@@ -286,9 +295,16 @@ def panel_reportes_y_compartir(
                             supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes, file_options={"content-type": mime})
                             url = supabase.storage.from_("reportes").get_public_url(path)
                             msg = urllib.parse.quote(f"Hola, te comparto el reporte de {modulo_origen}: {url}")
-                            st.markdown(f'<a href="https://wa.me/{tel}?text={msg}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;border:none;padding:5px 10px;border-radius:5px;">Abrir WhatsApp</button></a>', unsafe_allow_html=True)
+                            # Botón verde estilo WhatsApp
+                            st.markdown(f'''
+                                <a href="https://wa.me/{tel}?text={msg}" target="_blank">
+                                    <button style="width:100%;background-color:#25D366;color:white;border:none;padding:8px;border-radius:5px;cursor:pointer;">
+                                        ✅ Abrir Chat de WhatsApp
+                                    </button>
+                                </a>
+                            ''', unsafe_allow_html=True)
                             log_accion(supabase, usuario_actual, "ENVIO WA", f"{modulo_origen} a {sel_wa}")
                         except Exception as e: 
-                            st.error(f"Error al subir a Supabase: {e}")
+                            st.error(f"Error en WhatsApp: {e}")
             else: 
                 st.button("Generar Link WA", disabled=True, use_container_width=True, key=f"btn_wa_dis_{modulo_origen}")
