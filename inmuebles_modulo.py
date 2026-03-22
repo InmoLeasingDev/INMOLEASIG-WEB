@@ -220,6 +220,7 @@ def mostrar_modulo_inmuebles(supabase):
             
             st.dataframe(df_display.drop(columns=['id']), use_container_width=True, hide_index=True)
         else:
+            st.session_state.modo_propiedad = "NADA"  # 🛡️ Cierra los paneles si la tabla se vacía
             st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
 
         
