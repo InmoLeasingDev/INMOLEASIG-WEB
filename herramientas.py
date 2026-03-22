@@ -223,28 +223,19 @@ def panel_reportes_y_compartir(
     Panel universal para exportar DataFrames a PDF/Excel y enviarlos por Email o WhatsApp.
     """
     with st.container(border=True):
-        # --- ENCABEZADO CON BOTÓN DE CIERRE ---
-        # Usamos una proporción que deje la X bien a la derecha
-        c_tit, c_cerrar = st.columns([9.2, 0.8]) 
-        
-        # 1. Alineamos el texto verticalmente con padding-top
-        c_tit.markdown(
-            f"<div style='padding-top: 10px; font-size: 16px; font-weight: bold;'>"
+        # --- ENCABEZADO LIMPIO ---
+        # Quitamos las columnas del título para dejarlo minimalista
+        st.markdown(
+            f"<div style='font-size: 16px; font-weight: bold; margin-bottom: 15px;'>"
             f"📊 Exportar y Compartir Listado de {modulo_origen}</div>", 
             unsafe_allow_html=True
         )
-        
-        # 2. El botón de cerrar con un pequeño margen superior para nivelarlo con el texto
-        with c_cerrar:
-            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
-            if st.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel", use_container_width=True):
-                st.session_state[clave_estado_cerrar] = "NADA"
-                st.rerun()
             
-        # --- 1. FILA SUPERIOR (Formato y Descarga) ---
-        col1, col2, col3 = st.columns([1.7, 1.5, 6.8]) 
+        # --- 1. FILA SUPERIOR (Formato, Descarga y Cerrar) ---
+        # Agregamos una columna más para el botón Cerrar
+        col_fmt, col_dl, col_cerrar, col_esp = st.columns([1.7, 1.5, 1.5, 5.3]) 
         
-        formato = col1.radio("Formato:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
+        formato = col_fmt.radio("Formato:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
         
         # Generación de archivos
         if formato == "PDF":
@@ -256,11 +247,17 @@ def panel_reportes_y_compartir(
         
         nombre_final = f"{nombre_base}.{ext}"
         
-        # Botón Descargar alineado con el radio
-        col2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-        col2.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}", use_container_width=True)
+        # Botón Descargar alineado
+        col_dl.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+        col_dl.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}", use_container_width=True)
         
-        st.markdown("---")
+        # Botón Cerrar idéntico y pegado a su derecha
+        col_cerrar.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+        if col_cerrar.button("❌ Cerrar", key=f"btn_close_{modulo_origen}", use_container_width=True):
+            st.session_state[clave_estado_cerrar] = "NADA"
+            st.rerun()
+        
+        st.markdown("---")    
         
         # --- 2. FILA INFERIOR: COMPARTIR ---
         st.write("📤 **Compartir a Operadores**")
