@@ -703,9 +703,9 @@ def mostrar_modulo_inmuebles(supabase):
                             st.session_state.modo_unidad = "NADA"
                             st.rerun()
 
-    # ========================================
+    # =========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
-    # ========================================
+    # =========================================
     with tab3:
         st.subheader("Distribución de Propiedad (Relación N:M)")
         st.info("💡 Aquí usaremos la tabla puente 'inmuebles_propietarios' para definir qué % de la renta le toca a cada dueño y a qué cuenta se paga.")
