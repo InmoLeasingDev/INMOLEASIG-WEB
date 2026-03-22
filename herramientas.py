@@ -100,9 +100,9 @@ def generar_excel_bytes(df, nombre_hoja="Reporte"):
             
     return output.getvalue()
 
-# ==========================================
+# ===========================================
 # 4. PANEL UNIVERSAL DE REPORTES
-# ==========================================
+# ===========================================
 
 def panel_reportes_y_compartir(
     df_datos, 
