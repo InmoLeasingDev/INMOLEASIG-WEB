@@ -413,9 +413,14 @@ def mostrar_modulo_inmuebles(supabase):
         else:
             opciones_prop = ["-- Seleccione --"] + df_prop['nombre'].tolist()
             
+                
             # --- SELECTOR MAESTRO ---
             st.write("") 
             prop_maestra = st.selectbox("🏢 Elige la propiedad sobre la que deseas trabajar:", opciones_prop, key="sel_maestra_prop")
+            
+            # 🛡️ ESCUDO 1: Si vuelve a "Seleccione", cerramos paneles y reseteamos.
+            if prop_maestra == "-- Seleccione --":
+                st.session_state.modo_unidad = "NADA"
             
             if prop_maestra != "-- Seleccione --":
                 # Extraemos la moneda dinámicamente
@@ -427,7 +432,13 @@ def mostrar_modulo_inmuebles(supabase):
                 res_uni = supabase.table("unidades").select("*").eq("estado", "ACTIVO").eq("id_inmueble", int(id_prop_maestra)).execute()
                 df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
                 
-                               
+                # 🛡️ ESCUDO 2: Inicializamos la variable siempre para que nunca de error
+                df_uni_display = pd.DataFrame()
+                
+                # 🛡️ ESCUDO 3: Si la propiedad no tiene unidades, forzamos cierre de paneles
+                if df_uni.empty:
+                    st.session_state.modo_unidad = "NADA"
+
                 # --- LA CUADRÍCULA (Grid siempre visible) ---
                 if not df_uni.empty:
                     emoji_map = {"DISPONIBLE": "🟢 DISP.", "OCUPADA": "🔴 OCUP.", "EN REPARACIÓN": "🟡 REP."}
