@@ -261,13 +261,16 @@ def mostrar_modulo_propietarios(supabase):
                 doc_edit = st.file_uploader("Actualizar/Subir nuevo", type=["pdf", "jpg", "jpeg", "png"], key=f"doc_{p_id}")
                 
                 st.markdown("---")
-                col_btn1, col_btn2, col_btn3, col_esp = st.columns([2.0, 1.5, 2.5, 4.0])
+                # Nuevo ordens táctico: Actualizar | Borrar | Cerrar
+                col_btn1, col_btn2, col_btn3, col_esp = st.columns([2.0, 2.5, 1.5, 4.0])
+                
                 btn_actualizar = col_btn1.form_submit_button("📝 Actualizar")
-                btn_cerrar = col_btn2.form_submit_button("❌ Cerrar")
                 
                 btn_borrar_doc = False
                 if url_actual:
-                    btn_borrar_doc = col_btn3.form_submit_button("🗑️ Borrar Doc Actual")
+                    btn_borrar_doc = col_btn2.form_submit_button("🗑️ Borrar Documento")
+                    
+                btn_cerrar = col_btn3.form_submit_button("❌ Cerrar")
 
                 if btn_cerrar:
                     st.session_state.modo_propietario = "NADA"
