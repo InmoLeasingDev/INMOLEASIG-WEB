@@ -706,10 +706,157 @@ def mostrar_modulo_inmuebles(supabase):
     # =========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
     # =========================================
+    # ========================================
+    # TAB 3: MANDATOS (Contratos y Finanzas)
+    # ========================================
     with tab3:
-        st.subheader("Distribución de Propiedad (Relación N:M)")
-        st.info("💡 Aquí usaremos la tabla puente 'inmuebles_propietarios' para definir qué % de la renta le toca a cada dueño y a qué cuenta se paga.")
-        st.button("➕ Simular Botón: Asignar Propietario a Inmueble", disabled=True)
+        if 'modo_mandato' not in st.session_state:
+            st.session_state.modo_mandato = "NADA"
+
+        st.markdown("### 🤝 Contratos de Gestión Integral")
+
+        # --- 1. Carga de Datos Base ---
+        try:
+            # Traemos inmuebles y propietarios para los selectores
+            res_inm = supabase.table("inmuebles").select("id, nombre, moneda").eq("estado", "ACTIVO").execute()
+            df_inm_m = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
+            
+            res_prop = supabase.table("propietarios").select("id, nombre, cuenta_banco").eq("estado", "ACTIVO").execute()
+            df_prop_m = pd.DataFrame(res_prop.data) if res_prop.data else pd.DataFrame()
+            
+            # Traemos los mandatos activos (Cruzando IDs con nombres para la Grid)
+            res_man = supabase.table("mandatos").select("*").neq("estado_contrato", "FINALIZADO").execute()
+            df_man = pd.DataFrame(res_man.data) if res_man.data else pd.DataFrame()
+        except Exception as e:
+            # Si las tablas aún no existen en Supabase, evitamos que la app colapse
+            df_inm_m, df_prop_m, df_man = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+            st.warning("⚠️ Asegúrate de haber creado las tablas 'mandatos', 'historial_mandatos' y 'pagos_mandatos' en Supabase.")
+
+        # --- 2. GRID DE MANDATOS (LECTURA) ---
+        if not df_man.empty and not df_inm_m.empty and not df_prop_m.empty:
+            # Hacemos un "Merge" (cruce) para mostrar nombres en vez de números de ID
+            df_view = df_man.merge(df_inm_m[['id', 'nombre']], left_on='id_inmueble', right_on='id', how='left')
+            df_view = df_view.merge(df_prop_m[['id', 'nombre']], left_on='id_propietario', right_on='id', how='left', suffixes=('_inm', '_prop'))
+            
+            df_view_display = df_view[['nombre_inm', 'nombre_prop', 'porcentaje_propiedad', 'ingreso_garantizado', 'estado_contrato', 'estado_financiero']].copy()
+            df_view_display.rename(columns={
+                'nombre_inm': 'INMUEBLE', 'nombre_prop': 'PROPIETARIO', 
+                'porcentaje_propiedad': '% PROP.', 'ingreso_garantizado': 'ALQUILER GARANT.',
+                'estado_contrato': 'ESTADO LEGAL', 'estado_financiero': 'ESTADO FINANZAS'
+            }, inplace=True)
+            
+            st.dataframe(df_view_display, use_container_width=True, hide_index=True)
+        else:
+            st.session_state.modo_mandato = "NADA" # Escudo anti-crash
+            st.info("ℹ️ No hay mandatos vigentes. Crea uno nuevo para empezar a gestionar contratos.")
+
+        # --- 3. BARRA DE HERRAMIENTAS MODO PRO ---
+        st.markdown("---")
+        m_c1, m_c2, m_c3, m_c4, m_esp = st.columns([1.5, 1.5, 2.0, 1.5, 3.5])
+        
+        if m_c1.button("➕ Nuevo Mandato", key="btn_nuevo_man", use_container_width=True):
+            st.session_state.modo_mandato = "CREAR"
+            st.rerun()
+            
+        if not df_man.empty:
+            if m_c2.button("⚙️ Gestionar", key="btn_edit_man", use_container_width=True):
+                st.session_state.modo_mandato = "EDITAR"
+                st.rerun()
+            if m_c3.button("💰 Pagos & Soportes", key="btn_pagos_man", use_container_width=True):
+                st.session_state.modo_mandato = "PAGOS"
+                st.rerun()
+            if m_c4.button("📊 Reportes", key="btn_rep_man", use_container_width=True):
+                st.session_state.modo_mandato = "REPORTES"
+                st.rerun()
+
+        # --- 4. PANELES DINÁMICOS ---
+        
+        # PANEL: CREAR MANDATO
+        if st.session_state.modo_mandato == "CREAR":
+            st.markdown("---")
+            if df_inm_m.empty or df_prop_m.empty:
+                st.error("❌ Necesitas al menos un Inmueble y un Propietario registrados para crear un mandato.")
+                if st.button("❌ Cerrar Panel"):
+                    st.session_state.modo_mandato = "NADA"
+                    st.rerun()
+            else:
+                with st.form("form_nuevo_mandato", clear_on_submit=False):
+                    st.markdown("**📝 Redactar Nuevo Contrato de Gestión**")
+                    
+                    # Sub-Pestañas internas para ordenar el super-formulario
+                    tab_fin, tab_cron, tab_doc = st.tabs(["💼 1. Vínculo y Finanzas", "📅 2. Cronograma", "📁 3. Documentos Básicos"])
+                    
+                    with tab_fin:
+                        c1, c2, c3 = st.columns([2, 2, 1])
+                        m_inm_sel = c1.selectbox("Inmueble *", df_inm_m['nombre'].tolist())
+                        m_prop_sel = c2.selectbox("Propietario Titular *", df_prop_m['nombre'].tolist())
+                        m_porcentaje = c3.number_input("% Propiedad", min_value=1.0, max_value=100.0, value=100.0)
+                        
+                        st.markdown("**Acuerdo Económico**")
+                        c4, c5, c6 = st.columns(3)
+                        m_alquiler = c4.number_input("Ingreso Mensual Garantizado *", min_value=0.0, step=50.0)
+                        m_fianza = c5.number_input("Fianza a Entregar *", min_value=0.0, step=50.0)
+                        m_iban = c6.text_input("IBAN / Cuenta de Pago (Opcional si ya está en perfil)")
+                        
+                        st.markdown("**Actualización Anual**")
+                        c7, c8, c9 = st.columns(3)
+                        m_tipo_act = c7.selectbox("Método de Actualización", ["IPC", "FIJO", "NO APLICA"])
+                        m_porc_act = c8.number_input("% Fijo (Si aplica)", min_value=0.0, step=0.1)
+                        
+                    with tab_cron:
+                        st.info("💡 Consejo: La vigencia del contrato arranca con la Fecha de Entrega de llaves, seguida del Periodo de Carencia.")
+                        cc1, cc2 = st.columns(2)
+                        m_f_suscripcion = cc1.date_input("Fecha de Suscripción (Firma)")
+                        m_f_entrega = cc2.date_input("Fecha de Entrega / Recibo (Llaves)")
+                        
+                        cc3, cc4 = st.columns(2)
+                        m_f_fin_carencia = cc3.date_input("Fecha Fin de Carencia")
+                        m_f_inicio_pago = cc4.date_input("Fecha Inicio de Pagos")
+                        
+                        cc5, cc6 = st.columns(2)
+                        m_f_terminacion = cc5.date_input("Fecha de Terminación (Vencimiento)")
+                        m_f_aviso = cc6.date_input("Fecha Límite Aviso No Renovación")
+                        
+                    with tab_doc:
+                        st.write("Sube los documentos escaneados (Max 5MB c/u. PDF o Imagen).")
+                        cd1, cd2 = st.columns(2)
+                        doc_contrato = cd1.file_uploader("Contrato Firmado", type=["pdf", "jpg", "png"], key="doc_cont")
+                        doc_empadrona = cd2.file_uploader("Autorización Empadronamiento", type=["pdf", "jpg", "png"], key="doc_emp")
+                        
+                        cd3, cd4 = st.columns(2)
+                        doc_inventario = cd3.file_uploader("Acta de Inventario", type=["pdf", "jpg", "png"], key="doc_inv")
+                        doc_suministros = cd4.file_uploader("Recibos Suministros (Agua/Luz)", type=["pdf", "jpg", "png"], key="doc_sum")
+                        
+                    st.markdown("---")
+                    col_b1, col_b2, col_esp = st.columns([2.0, 1.5, 6.5])
+                    
+                    if col_b1.form_submit_button("💾 Generar Mandato"):
+                        # Aquí iría la lógica de subir a Supabase Storage y hacer el INSERT.
+                        # (Por ahora simulamos el éxito para probar la UI)
+                        st.success("✅ Mandato guardado y enlazado exitosamente.")
+                        st.session_state.modo_mandato = "NADA"
+                        time.sleep(1)
+                        st.rerun()
+                        
+                    if col_b2.form_submit_button("❌ Cancelar"):
+                        st.session_state.modo_mandato = "NADA"
+                        st.rerun()
+
+        # PANEL: GESTIONAR (Placeholder para la edición)
+        elif st.session_state.modo_mandato == "EDITAR":
+            st.markdown("---")
+            st.info("⚙️ Módulo de edición de mandatos en construcción. Aquí cambiaremos estados y renovaremos contratos.")
+            if st.button("❌ Cerrar"):
+                st.session_state.modo_mandato = "NADA"
+                st.rerun()
+                
+        # PANEL: PAGOS Y SOPORTES (Placeholder)
+        elif st.session_state.modo_mandato == "PAGOS":
+            st.markdown("---")
+            st.success("💰 Aquí conectaremos con la tabla 'pagos_mandatos' para subir los PDFs del banco mes a mes y enviarlos por WhatsApp.")
+            if st.button("❌ Cerrar"):
+                st.session_state.modo_mandato = "NADA"
+                st.rerun()
 
     # ==========================================
     # TAB 4: INVENTARIOS (Mobiliario)
