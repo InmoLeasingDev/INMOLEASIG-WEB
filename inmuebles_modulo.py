@@ -158,14 +158,23 @@ def mostrar_modulo_inmuebles(supabase):
         "🛋️ 4. Inventarios"
     ])
 
+   
     # ==========================================
     # TAB 1: PROPIEDADES (CRUD + REPORTES)
     # ==========================================
     with tab1:
-        st.subheader("Catálogo de Propiedades Base")
-        st.info("💡 Aquí gestionamos los inmuebles principales (Ej: Piso 2B, Oficina 1202, Local S02).")
-        
-        # Lógica dinámica de región
+        # 1. Inicializador de estado para los paneles
+        if 'modo_propiedad' not in st.session_state:
+            st.session_state.modo_propiedad = "NADA"
+
+        # 2. Cargar Operadores (para uso de reportes)
+        try:
+            res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
+            df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+        except:
+            df_ops = pd.DataFrame()
+
+        # 3. Lógica dinámica de región
         moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
         if moneda_sesion == "EUR": 
             opciones_tipo = ["PISO", "OFICINA", "LOCAL", "NAVE", "BODEGA"]
@@ -180,10 +189,50 @@ def mostrar_modulo_inmuebles(supabase):
             opciones_moneda = ["EUR", "COP"]
             label_catastro = "Ref. Catastral / Matrícula"
 
-        # --- FORMULARIO NUEVA PROPIEDAD ---
-        with st.expander("➕ Añadir Nueva Propiedad", expanded=False):
-            with st.form("form_nueva_propiedad"):
-                st.write("Datos Generales del Inmueble")
+        # --- LECTURA DE DATOS (LA CUADRÍCULA) ---
+        query = supabase.table("inmuebles").select("*").eq("estado", "ACTIVO")
+        if moneda_sesion != "ALL": query = query.eq("moneda", moneda_sesion)
+            
+        res_inm = query.execute()
+        df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
+        
+        st.write("") # Pequeño respiro visual
+        
+        if not df_inm.empty:
+            df_inm = df_inm.sort_values(by=['moneda', 'nombre'], ascending=[True, True])
+            df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'moneda', 'referencia_catastral']].copy()
+            df_display.rename(columns={'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'moneda': 'MONEDA', 'referencia_catastral': label_catastro.upper()}, inplace=True)
+            st.dataframe(df_display.drop(columns=['id']), use_container_width=True, hide_index=True)
+        else:
+            st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
+
+        # ==========================================
+        # 🛠️ BARRA DE HERRAMIENTAS (Igual al Tab 2)
+        # ==========================================
+        t_c1, t_c2, t_c3, t_c4 = st.columns([1.5, 1.5, 1.5, 5.5]) 
+        
+        if t_c1.button("➕ Nueva", key="btn_nueva_prop", use_container_width=True):
+            st.session_state.modo_propiedad = "CREAR"
+            st.rerun()
+            
+        if not df_inm.empty:
+            if t_c2.button("⚙️ Gestionar", key="btn_edit_prop", use_container_width=True):
+                st.session_state.modo_propiedad = "EDITAR"
+                st.rerun()
+                
+            if t_c3.button("📊 Reportes", key="btn_rep_prop", use_container_width=True):
+                st.session_state.modo_propiedad = "REPORTES"
+                st.rerun()
+
+        # ==========================================
+        # 🗂️ PANELES DINÁMICOS
+        # ==========================================
+        
+        # --- PANEL: CREAR NUEVA PROPIEDAD ---
+        if st.session_state.modo_propiedad == "CREAR":
+            st.markdown("---")
+            with st.form("form_nueva_propiedad", clear_on_submit=True):
+                st.markdown("**✨ Añadir Nueva Propiedad**")
                 c1, c2 = st.columns(2)
                 n_nom = c1.text_input("Nombre / Dirección Principal *", placeholder="Ej: Piso 2B Calle Mayor")
                 n_tip = c2.selectbox("Tipo de Propiedad *", opciones_tipo)
@@ -193,13 +242,17 @@ def mostrar_modulo_inmuebles(supabase):
                 n_mon = c4.selectbox("Región / Moneda *", opciones_moneda)
                 n_cat = c5.text_input(label_catastro)
                 
-                st.write("Datos del Seguro (Opcional)")
+                st.write("**Datos del Seguro (Opcional)**")
                 c6, c7, c8 = st.columns(3)
                 n_ase = c6.text_input("Aseguradora")
                 n_pol = c7.text_input("Número de Póliza")
                 n_tel_ase = c8.text_input("Teléfono Aseguradora")
                 
-                if st.form_submit_button("💾 Guardar Propiedad"):
+                st.markdown("---")
+                # Botonera Minimalista
+                col_b1, col_b2, col_esp = st.columns([1.5, 1.2, 7.3])
+                
+                if col_b1.form_submit_button("💾 Guardar"):
                     if n_nom and n_ciu:
                         datos_insert = {
                             "nombre": n_nom.strip().upper(), "tipo": n_tip, "ciudad": n_ciu.strip().upper(),
@@ -209,85 +262,88 @@ def mostrar_modulo_inmuebles(supabase):
                         }
                         supabase.table("inmuebles").insert(datos_insert).execute()
                         log_accion(supabase, usuario_actual, "CREAR PROPIEDAD", n_nom.strip().upper())
-                        st.success("✅ Propiedad registrada con éxito.")
+                        st.session_state.modo_propiedad = "NADA"
+                        st.success("✅ Propiedad registrada.")
                         time.sleep(1)
                         st.rerun()
                     else:
-                        st.warning("⚠️ Los campos con asterisco (*) son obligatorios.")
+                        st.warning("⚠️ Faltan campos obligatorios (*).")
+                        
+                if col_b2.form_submit_button("❌ Cerrar"):
+                    st.session_state.modo_propiedad = "NADA" 
+                    st.rerun()
 
-        # --- LECTURA DE DATOS (READ) ---
-        query = supabase.table("inmuebles").select("*").eq("estado", "ACTIVO")
-        if moneda_sesion != "ALL": query = query.eq("moneda", moneda_sesion)
+        # --- PANEL: GESTIONAR PROPIEDAD ---
+        elif st.session_state.modo_propiedad == "EDITAR" and not df_inm.empty:
+            st.markdown("---")
+            st.markdown("**⚙️ Gestionar Propiedad**")
             
-        res_inm = query.execute()
-        df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
-        
-        if not df_inm.empty:
-            df_inm = df_inm.sort_values(by=['moneda', 'nombre'], ascending=[True, True])
-            
-            df_display = df_inm[['id', 'nombre', 'tipo', 'ciudad', 'moneda', 'referencia_catastral']].copy()
-            df_display.rename(columns={'nombre': 'NOMBRE', 'tipo': 'TIPO', 'ciudad': 'CIUDAD', 'moneda': 'MONEDA', 'referencia_catastral': label_catastro.upper()}, inplace=True)
-            st.dataframe(df_display.drop(columns=['id']), use_container_width=True, hide_index=True)
-            
-            # --- GESTIONAR PROPIEDAD ---
-            with st.expander("⚙️ Gestionar / Editar Propiedad", expanded=False):
-                prop_sel = st.selectbox("Seleccione la propiedad a editar:", df_display['NOMBRE'].tolist())
-                if prop_sel:
-                    datos_p = df_inm[df_inm['nombre'] == prop_sel].iloc[0]
-                    with st.form("form_editar_prop"):
-                        st.write("Actualizar Datos")
-                        e_c1, e_c2 = st.columns(2)
-                        e_nom = e_c1.text_input("Nombre", datos_p['nombre'])
-                        e_ciu = e_c2.text_input("Ciudad", datos_p['ciudad'])
-                        
-                        e_c3, e_c4 = st.columns(2)
-                        idx_mon = 0 if datos_p.get('moneda') == 'EUR' else (1 if datos_p.get('moneda') == 'COP' else 0)
-                        e_mon = e_c3.selectbox("Moneda", ["EUR", "COP"] if moneda_sesion == "ALL" else [moneda_sesion], index=idx_mon if moneda_sesion == "ALL" else 0)
-                        e_cat = e_c4.text_input(label_catastro, str(datos_p.get('referencia_catastral', '')))
-                        
-                        e_c5, e_c6 = st.columns(2)
-                        e_ase = e_c5.text_input("Aseguradora", str(datos_p.get('aseguradora', '')))
-                        e_pol = e_c6.text_input("Número Póliza", str(datos_p.get('numero_poliza', '')))
-                        
-                        if st.form_submit_button("📝 Guardar Cambios"):
-                            datos_upd = {
-                                "nombre": e_nom.strip().upper(), "ciudad": e_ciu.strip().upper(),
-                                "moneda": e_mon, "referencia_catastral": e_cat.strip().upper(),
-                                "aseguradora": e_ase.strip().upper(), "numero_poliza": e_pol.strip().upper()
-                            }
-                            supabase.table("inmuebles").update(datos_upd).eq("id", int(datos_p['id'])).execute()
-                            log_accion(supabase, usuario_actual, "EDITAR PROPIEDAD", e_nom.strip().upper())
-                            st.success("✅ Actualizado correctamente.")
-                            time.sleep(1)
-                            st.rerun()
-                    # --- SEGURO DE ELIMINACIÓN TAB 1 ---
-                    st.markdown("---")
-                    st.warning("⚠️ **Zona de Peligro:** Dar de baja esta propiedad la ocultará del sistema.")
-                    confirmar_baja_prop = st.checkbox("Confirmo que deseo dar de baja esta propiedad.", key=f"conf_prop_{datos_p['id']}")
+            prop_sel = st.selectbox("Seleccione la propiedad:", df_display['NOMBRE'].tolist())
+            if prop_sel:
+                datos_p = df_inm[df_inm['nombre'] == prop_sel].iloc[0]
+                p_id = str(datos_p['id'])
+                
+                with st.form(key=f"form_editar_prop_{p_id}"):
+                    e_c1, e_c2 = st.columns(2)
+                    e_nom = e_c1.text_input("Nombre", datos_p['nombre'])
+                    e_ciu = e_c2.text_input("Ciudad", datos_p['ciudad'])
                     
-                    if st.button("🚫 Dar de Baja (Eliminar)", disabled=not confirmar_baja_prop):
-                        supabase.table("inmuebles").update({"estado": "INACTIVO"}).eq("id", int(datos_p['id'])).execute()
-                        log_accion(supabase, usuario_actual, "ELIMINAR PROPIEDAD", datos_p['nombre'])
-                        st.success("✅ Propiedad dada de baja.")
+                    e_c3, e_c4 = st.columns(2)
+                    idx_mon = 0 if datos_p.get('moneda') == 'EUR' else (1 if datos_p.get('moneda') == 'COP' else 0)
+                    e_mon = e_c3.selectbox("Moneda", ["EUR", "COP"] if moneda_sesion == "ALL" else [moneda_sesion], index=idx_mon if moneda_sesion == "ALL" else 0)
+                    e_cat = e_c4.text_input(label_catastro, str(datos_p.get('referencia_catastral', '')))
+                    
+                    e_c5, e_c6 = st.columns(2)
+                    e_ase = e_c5.text_input("Aseguradora", str(datos_p.get('aseguradora', '')))
+                    e_pol = e_c6.text_input("Número Póliza", str(datos_p.get('numero_poliza', '')))
+                    
+                    st.markdown("---")
+                    # Botonera Minimalista
+                    col_b1, col_b2, col_esp = st.columns([1.5, 1.2, 7.3])
+                    
+                    if col_b1.form_submit_button("💾 Guardar"):
+                        datos_upd = {
+                            "nombre": e_nom.strip().upper(), "ciudad": e_ciu.strip().upper(),
+                            "moneda": e_mon, "referencia_catastral": e_cat.strip().upper(),
+                            "aseguradora": e_ase.strip().upper(), "numero_poliza": e_pol.strip().upper()
+                        }
+                        supabase.table("inmuebles").update(datos_upd).eq("id", int(p_id)).execute()
+                        log_accion(supabase, usuario_actual, "EDITAR PROPIEDAD", e_nom.strip().upper())
+                        st.session_state.modo_propiedad = "NADA"
+                        st.success("✅ Actualizado.")
                         time.sleep(1)
                         st.rerun()
-                            
-                    
-            # --- EXPORTAR ---
+                        
+                    if col_b2.form_submit_button("❌ Cerrar"):
+                        st.session_state.modo_propiedad = "NADA" 
+                        st.rerun()
+                        
+                # Zona de eliminación fuera del form (Igual que Tab 2)
+                st.write("")
+                c_del1, c_del2 = st.columns([7, 3])
+                confirmar_baja = c_del1.checkbox("⚠️ Confirmo que deseo dar de baja esta propiedad.", key=f"del_chk_p_{p_id}")
+                if c_del2.button("🚫 Eliminar Propiedad", disabled=not confirmar_baja, key=f"del_btn_p_{p_id}"):
+                    supabase.table("inmuebles").update({"estado": "INACTIVO"}).eq("id", int(p_id)).execute()
+                    log_accion(supabase, usuario_actual, "ELIMINAR PROPIEDAD", datos_p['nombre'])
+                    st.success("✅ Propiedad dada de baja.")
+                    st.session_state.modo_propiedad = "NADA" 
+                    time.sleep(1)
+                    st.rerun()
+
+        # --- PANEL: REPORTES INTEGRADOS ---
+        elif st.session_state.modo_propiedad == "REPORTES" and not df_inm.empty:
             st.markdown("---")
-            st.markdown("### 📄 Exportar Listado")
-            formato_archivo = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True, key="radio_form_inm")
-            if formato_archivo == "PDF":
-                archivo_bytes = generar_pdf_propiedades(df_display) # Usa tu misma función de arriba
-                ext, mime = "pdf", "application/pdf"
-            else:
-                archivo_bytes = generar_excel_bytes(df_display.drop(columns=['id']), "Propiedades")
-                ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            st.download_button(f"⬇️ Descargar en {formato_archivo}", data=archivo_bytes, file_name=f"directorio_propiedades.{ext}", mime=mime, use_container_width=True)
-
-        else:
-            st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
-
+            # Llamamos a nuestra super herramienta de reportes
+            panel_reportes_y_compartir(
+                df_datos=df_display.drop(columns=['id']), 
+                nombre_base=f"propiedades_activas",
+                modulo_origen="Propiedades",
+                funcion_pdf=generar_pdf_propiedades,
+                df_operadores=df_ops,
+                supabase=supabase,
+                usuario_actual=usuario_actual,
+                clave_estado_cerrar="modo_propiedad" 
+            )
     # ==========================================
     # TAB 2: UNIDADES (Subdivisión de Propiedades)
     # ==========================================
