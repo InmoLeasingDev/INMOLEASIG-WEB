@@ -118,10 +118,19 @@ def panel_reportes_y_compartir(
     Panel universal para exportar DataFrames a PDF/Excel y enviarlos por Email o WhatsApp.
     """
     with st.container(border=True):
-        st.markdown(f"**📊 Exportar y Compartir Listado de {modulo_origen}**")
+        # --- ENCABEZADO CON BOTÓN DE CIERRE (Estilo Ventana / Modal) ---
+        c_tit, c_cerrar = st.columns([9.3, 0.7]) # El 0.7 empuja la X al extremo derecho
+        c_tit.markdown(f"**📊 Exportar y Compartir Listado de {modulo_origen}**")
         
-        # --- 1. FILA SUPERIOR COMPACTA (Formato, Descarga, Espacio vacío, Cerrar) ---
-        col1, col2, col3, col4 = st.columns([2.5, 2, 5.5, 2])
+        # El botón X arriba a la derecha
+        if c_cerrar.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel"):
+            st.session_state[clave_estado_cerrar] = "NADA"
+            st.rerun()
+        
+        # --- 1. FILA SUPERIOR (Formato y Descarga muy juntos) ---
+        # Redujimos el primer número a 1.5 para pegar el botón a la opción "Excel"
+        col1, col2, col3 = st.columns([1.5, 2, 6.5]) 
+        
         formato = col1.radio("Formato Reporte:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
         
         if formato == "PDF":
@@ -133,14 +142,9 @@ def panel_reportes_y_compartir(
         
         nombre_final = f"{nombre_base}.{ext}"
         
-        # Truco de CSS (margin-top) para alinear perfectamente los botones con el texto del Radio Button
+        # Alineación vertical perfecta
         col2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         col2.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}", use_container_width=True)
-        
-        col4.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-        if col4.button("❌ Cerrar Panel", key=f"btn_close_{modulo_origen}", use_container_width=True):
-            st.session_state[clave_estado_cerrar] = "NADA"
-            st.rerun()
         
         st.markdown("---")
         
