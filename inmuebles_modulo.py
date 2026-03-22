@@ -530,8 +530,8 @@ def mostrar_modulo_inmuebles(supabase):
                             e_precio = e_c5.number_input(f"Precio ({simbolo_mon})", min_value=0.0, step=100.0, value=val_precio)
                             
                             st.markdown("---")
-                            # --- FILA DE ACCIONES COMPACTA ---
-                            col_btn1, col_btn2, col_espacio = st.columns([1.5, 1.2, 7.3])
+                            # --- FILA DE ACCIONES COMPACTA (AJUSTE PERFECTO) ---
+                            col_btn1, col_btn2, col_espacio = st.columns([2.0, 1.5, 6.5])
                             btn_guardar = col_btn1.form_submit_button("💾 Guardar Cambios")
                             btn_cerrar = col_btn2.form_submit_button("❌ Cerrar")
                             
