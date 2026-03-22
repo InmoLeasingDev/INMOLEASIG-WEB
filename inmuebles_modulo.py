@@ -510,23 +510,98 @@ def mostrar_modulo_inmuebles(supabase):
                         time.sleep(1)
                         st.rerun()
 
-                # --- PANEL: REPORTES (MÓDULO COMPARTIR CENTRALIZADO) ----
-                elif st.session_state.modo_unidad == "REPORTES" and not df_uni.empty:
+               # --- PANEL: REPORTES (MÓDULO COMPARTIR CENTRALIZADO) ---
+                elif st.session_state.modo_unidad == "REPORTES": 
+                    st.markdown("---")
+                    st.markdown("**🔍 Configuración del Reporte**")
                     
-                    # 💡 SOLUCIÓN: Creamos una copia solo para exportar y le inyectamos la Propiedad
-                    df_exportar = df_uni_display.copy()
-                    df_exportar.insert(0, 'PROPIEDAD', prop_maestra) 
-                    
-                    panel_reportes_y_compartir(
-                        df_datos=df_exportar, # Pasamos la tabla enriquecida
-                        nombre_base=f"unidades_{prop_maestra.replace(' ', '_')}",
-                        modulo_origen="Unidades",
-                        funcion_pdf=generar_pdf_unidades,
-                        df_operadores=df_ops,
-                        supabase=supabase,
-                        usuario_actual=st.session_state.usuario.get("nombre", "ADMIN"),
-                        clave_estado_cerrar="modo_unidad"
+                    # 1. Filtro de Alcance (Propiedades)
+                    alcance = st.radio(
+                        "1. Alcance geográfico:", 
+                        [f"Solo {prop_maestra}", "Todas las propiedades activas"], 
+                        horizontal=True
                     )
+                    
+                    # 2. Filtro de Estado (Unidades)
+                    filtro_estado = st.radio(
+                        "2. Estado de las unidades:", 
+                        ["TODAS", "🟢 DISP.", "🔴 OCUP.", "🟡 REP."], 
+                        horizontal=True
+                    )
+                    
+                    st.markdown("---")
+                    
+                    # --- PASO A: CONSTRUIR LA BASE SEGÚN EL ALCANCE ---
+                    if alcance == "Todas las propiedades activas":
+                        with st.spinner("Recopilando inventario global..."):
+                            # Traer TODAS las unidades activas de la base de datos
+                            res_all = supabase.table("unidades").select("*").eq("estado", "ACTIVO").execute()
+                            df_all = pd.DataFrame(res_all.data) if res_all.data else pd.DataFrame()
+                            
+                            if not df_all.empty and not df_prop.empty:
+                                # Cruzar unidades con propiedades para heredar el nombre del edificio y su moneda
+                                df_cruce = df_all.merge(df_prop[['id', 'nombre', 'moneda']], left_on='id_inmueble', right_on='id', how='left')
+                                
+                                # Aplicar formatos visuales
+                                df_cruce['ESTADO'] = df_cruce['disponibilidad'].map(lambda x: emoji_map.get(str(x).upper(), "⚪ DESC."))
+                                df_cruce['ÁREA (m2)'] = pd.to_numeric(df_cruce['area_m2']).fillna(0).apply(lambda x: f"{x:,.2f}" if x > 0 else "-")
+                                
+                                # Formato de precio inteligente (detecta si el edificio es EUR o COP)
+                                def formatear_precio_global(row):
+                                    val = pd.to_numeric(row.get('precio_base', 0))
+                                    if pd.isna(val) or val <= 0: return "-"
+                                    simb = "€" if row.get('moneda', 'EUR') == "EUR" else "$"
+                                    return f"{simb} {val:,.2f}"
+                                    
+                                df_cruce['PRECIO'] = df_cruce.apply(formatear_precio_global, axis=1)
+                                
+                                # Organizar columnas finales
+                                df_base = df_cruce[['nombre_y', 'nombre_x', 'tipo', 'ESTADO', 'ÁREA (m2)', 'PRECIO']].copy()
+                                df_base.rename(columns={'nombre_y': 'PROPIEDAD', 'nombre_x': 'UNIDAD', 'tipo': 'TIPO'}, inplace=True)
+                                df_base = df_base.sort_values(by=['PROPIEDAD', 'UNIDAD'])
+                                
+                                etiqueta_prop = "GLOBAL"
+                            else:
+                                df_base = pd.DataFrame()
+                                etiqueta_prop = "Vacio"
+                    else:
+                        # Si es solo la propiedad actual, usamos la tabla visual que ya está en pantalla
+                        df_base = df_uni_display.copy()
+                        df_base.insert(0, 'PROPIEDAD', prop_maestra)
+                        etiqueta_prop = prop_maestra.replace(' ', '_')
+                        
+                    # --- PASO B: APLICAR FILTRO DE ESTADO A LA BASE ---
+                    if not df_base.empty:
+                        if filtro_estado != "TODAS":
+                            df_final = df_base[df_base['ESTADO'] == filtro_estado].copy()
+                            etiqueta_est = filtro_estado.split(" ")[1].lower().replace(".", "")
+                        else:
+                            df_final = df_base.copy()
+                            etiqueta_est = "todas"
+                            
+                        # Si tras filtrar queda vacía, avisamos
+                        if df_final.empty:
+                            st.warning(f"⚠️ No hay unidades con estado '{filtro_estado}' para este alcance.")
+                            if st.button("❌ Cerrar Panel"):
+                                st.session_state.modo_unidad = "NADA"
+                                st.rerun()
+                        else:
+                            # 🚀 LÁNZALO A NUESTRO MOTOR CENTRAL
+                            panel_reportes_y_compartir(
+                                df_datos=df_final, 
+                                nombre_base=f"unidades_{etiqueta_prop}_{etiqueta_est}",
+                                modulo_origen=f"Unidades",
+                                funcion_pdf=generar_pdf_unidades,
+                                df_operadores=df_ops,
+                                supabase=supabase,
+                                usuario_actual=st.session_state.usuario.get("nombre", "ADMIN"),
+                                clave_estado_cerrar="modo_unidad"
+                            )
+                    else:
+                        st.info("No hay datos registrados en el sistema para exportar.")
+                        if st.button("❌ Cerrar Panel"):
+                            st.session_state.modo_unidad = "NADA"
+                            st.rerun()
 
     # =========================================
     # TAB 3: MANDATOS (Dueños y Porcentajes)
