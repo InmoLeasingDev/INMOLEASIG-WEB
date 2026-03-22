@@ -119,19 +119,16 @@ def panel_reportes_y_compartir(
     """
     with st.container(border=True):
         # --- ENCABEZADO CON BOTÓN DE CIERRE ---
-        # 💡 Ajuste: [8.2, 1.8] le da el espacio exacto a la X para no romper el borde
-        c_tit, c_cerrar = st.columns([8.2, 1.8]) 
+        # 💡 Ratio ultra-seguro y SIN trucos de HTML para la X
+        c_tit, c_cerrar = st.columns([8.5, 1.5]) 
         
         c_tit.markdown(f"**📊 Exportar y Compartir Listado de {modulo_origen}**")
         
-        # 💡 Ajuste: Lo bajamos un par de píxeles para que se centre con el título
-        c_cerrar.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
         if c_cerrar.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel"):
             st.session_state[clave_estado_cerrar] = "NADA"
             st.rerun()
         
         # --- 1. FILA SUPERIOR (Formato y Descarga) ---
-        # 💡 Ajuste: 1.7 es el número mágico. Mantiene a Excel en su línea y pega la descarga.
         col1, col2, col3 = st.columns([1.7, 1.5, 6.8]) 
         
         formato = col1.radio("Formato Reporte:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
@@ -145,7 +142,7 @@ def panel_reportes_y_compartir(
         
         nombre_final = f"{nombre_base}.{ext}"
         
-        # Alineación vertical perfecta
+        # Alineación vertical perfecta para el botón de descargar
         col2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         col2.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}", use_container_width=True)
         
