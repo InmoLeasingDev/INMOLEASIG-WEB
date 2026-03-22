@@ -307,11 +307,12 @@ def panel_reportes_y_compartir(
                 st.button("Generar Link WA", disabled=True, use_container_width=True, key=f"btn_wa_dis_{modulo_origen}")
 
 # ==========================================
-# GESTOR UNIVERSAL DE GALERÍAS (MODO PRO)
+# GESTOR UNIVERSAL DE GALERÍAS (MODO PRO v2)
 # ==========================================
 def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_registro, nombre_registro, fotos_actuales, clave_estado_cerrar, prefijo_ruta="img"):
     """
     Renderiza un panel estandarizado para ver, subir y eliminar fotos de cualquier tabla de la base de datos.
+    Permite el borrado individual o masivo.
     """
     import time # Asegurarnos de que time esté disponible localmente
     
@@ -319,15 +320,21 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
     st.markdown(f"**📸 Galería de Marketing: {nombre_registro}**")
     
     with st.form(key=f"form_galeria_{tabla_db}_{id_registro}"):
-        # --- 1. MOSTRAR FOTOS ACTUALES ---
-        st.write("**Fotos Registradas:**")
+        # --- 1. MOSTRAR FOTOS ACTUALES Y CONTROLES DE BORRADO INDIVIDUAL ---
+        st.write("**Fotos Registradas (Seleccione para BORRAR):**")
         fotos_lista = fotos_actuales if isinstance(fotos_actuales, list) else []
-        
+        borrar_indices = [] # Guardaremos los índices que el usuario quiera borrar
+
         if len(fotos_lista) > 0:
-            cols_fotos = st.columns(min(len(fotos_lista), 4))
+            # Usamos columnas fijas para la vista de cuadrícula
+            cols_fotos = st.columns(4) 
             for i, url_foto in enumerate(fotos_lista):
                 with cols_fotos[i % 4]:
                     st.image(url_foto, width=150)
+                    # Control Individual: Checkbox único para esta foto
+                    key_borrar = f"chk_borrar_{tabla_db}_{id_registro}_{i}"
+                    if st.checkbox(f"Borrar", key=key_borrar):
+                        borrar_indices.append(i) # Marcada para borrar
         else:
             st.info("No hay fotos registradas para este elemento.")
         
@@ -337,45 +344,47 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
         nuevas_fotos = st.file_uploader("Subir nuevas imágenes (Max 5MB)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
         
         st.markdown("---")
-        # --- 3. BOTONERA MINIMALISTA ---
-        col_b1, col_b2, col_b3, col_esp = st.columns([1.8, 1.2, 1.8, 5.2])
+        # --- 3. BOTONERA MINIMALISTA (ORDEN TÁCTICO: Guardar | Vaciar | Cerrar) ---
+        # Ajustamos los anchos de columna para este orden
+        col_b1, col_b2, col_b3, col_esp = st.columns([1.8, 1.8, 1.2, 5.2])
         
-        btn_guardar = col_b1.form_submit_button("💾 Guardar Fotos")
-        btn_cerrar = col_b2.form_submit_button("❌ Cerrar")
-        
+        btn_guardar = col_b1.form_submit_button("💾 Guardar Cambios")
         btn_borrar_fotos = False
         if len(fotos_lista) > 0:
-            btn_borrar_fotos = col_b3.form_submit_button("🗑️ Vaciar Galería")
+            # Texto más específico para bulk-delete
+            btn_borrar_fotos = col_b2.form_submit_button("🗑️ Vaciar Galería Completamente")
+        btn_cerrar = col_b3.form_submit_button("❌ Cerrar")
 
-        # --- 4. LÓGICA DE BOTONES ----
+        # --- 4. LÓGICA DE BOTONES ---
         if btn_cerrar:
             st.session_state[clave_estado_cerrar] = "NADA"
             st.rerun()
             
         elif btn_borrar_fotos:
             supabase.table(tabla_db).update({"fotos": []}).eq("id", int(id_registro)).execute()
-            # Asumiendo que tu función log_accion está disponible en herramientas.py
             try:
                 log_accion(supabase, usuario_actual, f"VACIAR GALERÍA {tabla_db.upper()}", nombre_registro)
-            except:
-                pass
-            st.success("✅ Galería vaciada con éxito.")
+            except: pass
+            st.success("✅ Galería vaciada COMPLETAMENTE con éxito.")
             time.sleep(1)
             st.rerun()
             
         elif btn_guardar:
+            # A) Procesar Borrado Individual
+            fotos_filtradas = [foto for idx, foto in enumerate(fotos_lista) if idx not in borrar_indices]
+            
+            # B) Procesar Nuevas Subidas
             urls_nuevas = []
             hubo_error = False
             
             if nuevas_fotos:
-                with st.spinner("Subiendo fotos al servidor..."):
+                with st.spinner("Subiendo fotos nuevas..."):
                     for foto in nuevas_fotos:
                         try:
                             ext = foto.name.split('.')[-1].lower()
                             tipo_mime = f"image/{ext.replace('jpg', 'jpeg')}"
                             ruta_foto = f"{prefijo_ruta}_{id_registro}_{int(time.time())}_{foto.name}"
                             
-                            # Magia de Supabase: Subir y obtener URL
                             supabase.storage.from_(bucket_storage).upload(
                                 path=ruta_foto, 
                                 file=foto.getvalue(), 
@@ -387,19 +396,20 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
                             hubo_error = True
                             st.error(f"Error subiendo {foto.name}: {e}")
             
-            if not hubo_error and nuevas_fotos:
-                # Guardar el Array de textos en la base de datos
-                fotos_finales = fotos_lista + urls_nuevas
-                supabase.table(tabla_db).update({"fotos": fotos_finales}).eq("id", int(id_registro)).execute()
+            # C) Guardar el resultado final si no hay errores
+            if not hubo_error:
+                fotos_finales = fotos_filtradas + urls_nuevas
+                
+                # Candado para prevenir errores al guardar array vacío
+                array_db = fotos_finales if len(fotos_finales) > 0 else '{}'
+                
+                supabase.table(tabla_db).update({"fotos": array_db}).eq("id", int(id_registro)).execute()
                 
                 try:
-                    log_accion(supabase, usuario_actual, f"EDITAR GALERÍA {tabla_db.upper()}", nombre_registro)
-                except:
-                    pass
+                    log_accion(supabase, usuario_actual, f"GUARDAR CAMBIOS GALERÍA {tabla_db.upper()}", nombre_registro)
+                except: pass
                 
-                st.success("✅ Galería actualizada con éxito.")
+                st.success("✅ Cambios en la galería guardados con éxito.")
                 st.session_state[clave_estado_cerrar] = "NADA"
                 time.sleep(1)
                 st.rerun()
-            elif not nuevas_fotos and not hubo_error:
-                st.info("No seleccionaste nuevas fotos para guardar.")
