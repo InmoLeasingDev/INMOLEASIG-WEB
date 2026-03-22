@@ -268,7 +268,7 @@ def mostrar_modulo_propietarios(supabase):
                 
                 btn_borrar_doc = False
                 if url_actual:
-                    btn_borrar_doc = col_btn2.form_submit_button("🗑️ Borrar Documento")
+                    btn_borrar_doc = col_btn2.form_submit_button("🗑️ Borrar Identificación")
                     
                 btn_cerrar = col_btn3.form_submit_button("❌ Cerrar")
 
