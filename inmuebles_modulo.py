@@ -528,9 +528,8 @@ def mostrar_modulo_inmuebles(supabase):
                         ["TODAS", "🟢 DISP.", "🔴 OCUP.", "🟡 REP."], 
                         horizontal=True
                     )
-                    
-                    st.markdown("---")
-                    
+                   
+                 
                     # --- PASO A: CONSTRUIR LA BASE SEGÚN EL ALCANCE ---
                     if alcance == "Todas las propiedades activas":
                         with st.spinner("Recopilando inventario global..."):
