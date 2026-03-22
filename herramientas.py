@@ -118,18 +118,19 @@ def panel_reportes_y_compartir(
     Panel universal para exportar DataFrames a PDF/Excel y enviarlos por Email o WhatsApp.
     """
     with st.container(border=True):
-        # --- ENCABEZADO CON BOTÓN DE CIERRE (Estilo Ventana / Modal) ---
-        c_tit, c_cerrar = st.columns([9.3, 0.7]) # El 0.7 empuja la X al extremo derecho
+        # --- ENCABEZADO CON BOTÓN DE CIERRE ---
+        # Ampliamos un poco a [9, 1] para que la X respire y no rompa el marco
+        c_tit, c_cerrar = st.columns([9, 1]) 
         c_tit.markdown(f"**📊 Exportar y Compartir Listado de {modulo_origen}**")
         
-        # El botón X arriba a la derecha
-        if c_cerrar.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel"):
+        # Alineamos la X para que quede perfecta en la esquina
+        if c_cerrar.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel", use_container_width=True):
             st.session_state[clave_estado_cerrar] = "NADA"
             st.rerun()
         
-        # --- 1. FILA SUPERIOR (Formato y Descarga muy juntos) ---
-        # Redujimos el primer número a 1.5 para pegar el botón a la opción "Excel"
-        col1, col2, col3 = st.columns([1.5, 2, 6.5]) 
+        # --- 1. FILA SUPERIOR (Formato y Descarga) ---
+        # Subimos de 1.5 a 2.3. Esto da el espacio exacto para "Excel" sin alejar "Descargar"
+        col1, col2, col3 = st.columns([2.3, 2, 5.7]) 
         
         formato = col1.radio("Formato Reporte:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
         
