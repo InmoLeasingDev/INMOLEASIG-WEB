@@ -247,12 +247,12 @@ def panel_reportes_y_compartir(
         
         nombre_final = f"{nombre_base}.{ext}"
         
-        # Botón Descargar alineado
+        # Botón Descargar alineado (Este se queda en 28px)
         col_dl.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         col_dl.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}", use_container_width=True)
         
-        # Botón Cerrar idéntico y pegado a su derecha
-        col_cerrar.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+        # Botón Cerrar idéntico (Le sumamos 5px al margen para bajarlo al nivel de Descargar)
+        col_cerrar.markdown("<div style='margin-top: 33px;'></div>", unsafe_allow_html=True)
         if col_cerrar.button("❌ Cerrar", key=f"btn_close_{modulo_origen}", use_container_width=True):
             st.session_state[clave_estado_cerrar] = "NADA"
             st.rerun()
