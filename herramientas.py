@@ -119,14 +119,17 @@ def panel_reportes_y_compartir(
     """
     with st.container(border=True):
         # --- ENCABEZADO CON BOTÓN DE CIERRE ---
-        # 💡 Usamos 3 columnas: [Título, Espacio Fantasma, Botón X]. 
-        # El 0.8 es exacto para el tamaño de la X.
-        c_tit, c_fantasma, c_cerrar = st.columns([7.5, 1.7, 0.8]) 
+        c_tit, c_cerrar = st.columns([9.3, 0.7]) 
         
-        # 💡 CSS Mágico: Quitamos márgenes por defecto y bajamos el texto 8px para alinear con el botón
-        c_tit.markdown(f"<div style='margin: 0; padding-top: 8px; font-size: 16px; font-weight: bold;'>📊 Exportar y Compartir Listado de {modulo_origen}</div>", unsafe_allow_html=True)
+        # 💡 EL ARMA SECRETA: Flexbox para forzar que el texto se centre verticalmente con el botón
+        c_tit.markdown(
+            f"<div style='display: flex; align-items: center; min-height: 42px; font-size: 16px;'>"
+            f"<b>📊 Exportar y Compartir Listado de {modulo_origen}</b></div>", 
+            unsafe_allow_html=True
+        )
         
-        if c_cerrar.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel"):
+        # Le devolvemos use_container_width para que la X ocupe su columna 0.7 de forma elegante
+        if c_cerrar.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel", use_container_width=True):
             st.session_state[clave_estado_cerrar] = "NADA"
             st.rerun()
         
