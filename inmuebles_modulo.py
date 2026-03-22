@@ -143,7 +143,7 @@ def generar_pdf_unidades(df):
 # ==========================================
 def mostrar_modulo_inmuebles(supabase):
     st.header("🏢 Gestión de Inmuebles e Inventarios")
-    MOD_VERSION = "v1.0 (Esqueleto)"
+    MOD_VERSION = "v1.0  )"
     st.caption(f"⚙️ Módulo Inmuebles {MOD_VERSION} | Control de Propiedades, Unidades, Mandatos e Inventarios.")
 
     # --- Identificar al usuario para los logs ---
