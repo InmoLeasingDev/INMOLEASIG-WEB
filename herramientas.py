@@ -119,10 +119,12 @@ def panel_reportes_y_compartir(
     """
     with st.container(border=True):
         # --- ENCABEZADO CON BOTÓN DE CIERRE ---
-        # 💡 Ratio ultra-seguro y SIN trucos de HTML para la X
-        c_tit, c_cerrar = st.columns([8.5, 1.5]) 
+        # 💡 Usamos 3 columnas: [Título, Espacio Fantasma, Botón X]. 
+        # El 0.8 es exacto para el tamaño de la X.
+        c_tit, c_fantasma, c_cerrar = st.columns([7.5, 1.7, 0.8]) 
         
-        c_tit.markdown(f"**📊 Exportar y Compartir Listado de {modulo_origen}**")
+        # 💡 CSS Mágico: Quitamos márgenes por defecto y bajamos el texto 8px para alinear con el botón
+        c_tit.markdown(f"<div style='margin: 0; padding-top: 8px; font-size: 16px; font-weight: bold;'>📊 Exportar y Compartir Listado de {modulo_origen}</div>", unsafe_allow_html=True)
         
         if c_cerrar.button("❌", key=f"btn_close_{modulo_origen}", help="Cerrar panel"):
             st.session_state[clave_estado_cerrar] = "NADA"
@@ -142,7 +144,7 @@ def panel_reportes_y_compartir(
         
         nombre_final = f"{nombre_base}.{ext}"
         
-        # Alineación vertical perfecta para el botón de descargar
+        # Alineación vertical perfecta para el botón descargar
         col2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         col2.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}", use_container_width=True)
         
