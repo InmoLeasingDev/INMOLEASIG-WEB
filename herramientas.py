@@ -100,9 +100,9 @@ def generar_excel_bytes(df, nombre_hoja="Reporte"):
             
     return output.getvalue()
 
-
-# (Asegúrate de poner esto al final de tu archivo herramientas.py, 
-# asumiendo que ya tienes ahí log_accion, enviar_reporte_correo y generar_excel_bytes)
+# ==========================================
+# 4. PANEL UNIVERSAL DE REPORTES
+# ==========================================
 
 def panel_reportes_y_compartir(
     df_datos, 
@@ -119,7 +119,11 @@ def panel_reportes_y_compartir(
     """
     with st.container(border=True):
         st.markdown(f"**📊 Exportar y Compartir Listado de {modulo_origen}**")
-        formato = st.radio("Formato de Exportación:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
+        
+        # --- 1. FILA SUPERIOR COMPACTA (Formato, Descarga, Espacio vacío, Cerrar) ---
+        col1, col2, col3, col4 = st.columns([3, 2, 3, 2])
+        
+        formato = col1.radio("Formato Reporte:", ["PDF", "Excel"], horizontal=True, key=f"radio_fmt_{modulo_origen}")
         
         if formato == "PDF":
             archivo_bytes = funcion_pdf(df_datos)
@@ -129,9 +133,19 @@ def panel_reportes_y_compartir(
             ext, mime = "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         
         nombre_final = f"{nombre_base}.{ext}"
-        st.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}")
+        
+        # Truco de CSS (margin-top) para alinear perfectamente los botones con el texto del Radio Button
+        col2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+        col2.download_button("⬇️ Descargar", data=archivo_bytes, file_name=nombre_final, mime=mime, key=f"btn_dl_{modulo_origen}", use_container_width=True)
+        
+        col4.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+        if col4.button("❌ Cerrar Panel", key=f"btn_close_{modulo_origen}", use_container_width=True):
+            st.session_state[clave_estado_cerrar] = "NADA"
+            st.rerun()
         
         st.markdown("---")
+        
+        # --- 2. FILA INFERIOR: COMPARTIR ---
         st.write("📤 **Compartir a Operadores**")
         cols_env = st.columns(2)
         lista_correos = [f"{r['nombre']} - {r['correo']}" for _, r in df_operadores.iterrows() if pd.notna(r.get('correo')) and r['correo']]
@@ -156,7 +170,6 @@ def panel_reportes_y_compartir(
                     with st.spinner("Generando..."):
                         tel = re.sub(r'\D', '', sel_wa.split(" - ")[-1].strip())
                         try:
-                            # Subimos al bucket general de reportes
                             path = f"reporte_{modulo_origen.lower()}_{int(time.time())}.{ext}"
                             supabase.storage.from_("reportes").upload(path=path, file=archivo_bytes, file_options={"content-type": mime})
                             url = supabase.storage.from_("reportes").get_public_url(path)
@@ -167,8 +180,3 @@ def panel_reportes_y_compartir(
                             st.error(f"Error al subir a Supabase: {e}")
             else: 
                 st.button("Generar Link WA", disabled=True, use_container_width=True, key=f"btn_wa_dis_{modulo_origen}")
-        
-        st.markdown("---")
-        if st.button("❌ Cerrar Panel", key=f"btn_close_{modulo_origen}"):
-            st.session_state[clave_estado_cerrar] = "NADA"
-            st.rerun()
