@@ -411,16 +411,25 @@ def mostrar_modulo_inmuebles(supabase):
                 res_uni = supabase.table("unidades").select("*").eq("estado", "ACTIVO").eq("id_inmueble", int(id_prop_maestra)).execute()
                 df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
                 
+                               
                 # --- LA CUADRÍCULA (Grid siempre visible) ---
                 if not df_uni.empty:
                     emoji_map = {"DISPONIBLE": "🟢 DISP.", "OCUPADA": "🔴 OCUP.", "EN REPARACIÓN": "🟡 REP."}
                     df_uni['ESTADO'] = df_uni['disponibilidad'].map(lambda x: emoji_map.get(str(x).upper(), "⚪ DESC."))
                     
-                    # Formateo visual: quitamos 'None' y aplicamos moneda real de la propiedad
+                    # Formateo visual
                     df_uni['area_m2'] = pd.to_numeric(df_uni['area_m2']).fillna(0).apply(lambda x: f"{x:,.2f}" if x > 0 else "-")
                     df_uni['PRECIO'] = pd.to_numeric(df_uni['precio_base']).fillna(0).apply(lambda x: f"{simbolo_mon} {x:,.2f}" if x > 0 else "-")
                     
-                    df_uni_display = df_uni[['nombre', 'tipo', 'ESTADO', 'area_m2', 'PRECIO']].copy()
+                    # Lógica para el Icono de Fotos
+                    def indicador_fotos(fotos_array):
+                        if isinstance(fotos_array, list) and len(fotos_array) > 0:
+                            return f"📸 {len(fotos_array)}"
+                        return "➖"
+                        
+                    df_uni['FOTOS'] = df_uni['fotos'].apply(indicador_fotos)
+                    
+                    df_uni_display = df_uni[['nombre', 'tipo', 'ESTADO', 'area_m2', 'PRECIO', 'FOTOS']].copy()
                     df_uni_display.rename(columns={'nombre': 'UNIDAD', 'tipo': 'TIPO', 'area_m2': 'ÁREA (m2)'}, inplace=True)
                     df_uni_display = df_uni_display.sort_values(by=['UNIDAD'])
                     
@@ -428,21 +437,25 @@ def mostrar_modulo_inmuebles(supabase):
                 else:
                     st.info(f"ℹ️ El edificio {prop_maestra} aún no tiene unidades. Usa la barra de herramientas para añadir la primera.")
 
+            # ==========================================
+                # 🛠️ BARRA DE HERRAMIENTAS (MODO PRO - 4 BOTONES)
                 # ==========================================
-                # 🛠️ BARRA DE HERRAMIENTAS (COMPACTA Y PEGADA)
-                # ==========================================
-                t_c1, t_c2, t_c3, t_c4 = st.columns([1.5, 1.5, 1.5, 5.5]) 
+                t_c1, t_c2, t_c3, t_c4, t_c5 = st.columns([1.5, 1.5, 1.5, 1.5, 4.0]) 
                 
-                if t_c1.button("➕ Nueva", use_container_width=True):
+                if t_c1.button("➕ Nueva", key="btn_nueva_uni", use_container_width=True):
                     st.session_state.modo_unidad = "CREAR"
                     st.rerun()
                     
                 if not df_uni.empty:
-                    if t_c2.button("⚙️ Editar / Fotos", use_container_width=True):
+                    if t_c2.button("⚙️ Gestionar", key="btn_edit_uni", use_container_width=True):
                         st.session_state.modo_unidad = "EDITAR"
                         st.rerun()
                         
-                    if t_c3.button("📊 Reportes", use_container_width=True):
+                    if t_c3.button("📸 Galería", key="btn_gal_uni", use_container_width=True):
+                        st.session_state.modo_unidad = "GALERIA"
+                        st.rerun()
+                        
+                    if t_c4.button("📊 Reportes", key="btn_rep_uni", use_container_width=True):
                         st.session_state.modo_unidad = "REPORTES"
                         st.rerun()
 
@@ -473,7 +486,7 @@ def mostrar_modulo_inmuebles(supabase):
                                     "area_m2": u_area, "precio_base": u_precio, "fotos": []
                                 }
                                 supabase.table("unidades").insert(datos_u).execute()
-                                log_accion(supabase, st.session_state.usuario.get("nombre", "ADMIN"), "CREAR UNIDAD", f"{u_nom.upper()} en {prop_maestra}")
+                                log_accion(supabase, usuario_actual, "CREAR UNIDAD", f"{u_nom.upper()} en {prop_maestra}")
                                 st.session_state.modo_unidad = "NADA"
                                 st.success("✅ Unidad registrada.")
                                 time.sleep(1)
@@ -485,21 +498,19 @@ def mostrar_modulo_inmuebles(supabase):
                             st.session_state.modo_unidad = "NADA" 
                             st.rerun()
 
-                # --- PANEL: GESTIONAR Y GALERÍA ---
+                # --- PANEL: GESTIONAR UNIDAD (SIN FOTOS) ---
                 elif st.session_state.modo_unidad == "EDITAR" and not df_uni.empty:
                     st.markdown("---")
-                    st.markdown("**🛠️ Editor de Unidad y Galería**")
+                    st.markdown("**⚙️ Gestionar Unidad**")
                     
-                    # 💡 EL CAMBIO CLAVE: Selector fuera del formulario
                     uni_sel = st.selectbox("Selecciona la unidad:", df_uni['nombre'].sort_values().tolist())
                     
                     if uni_sel:
                         datos_u_edit = df_uni[df_uni['nombre'] == uni_sel].iloc[0]
                         u_id = str(datos_u_edit['id'])
                         
-                        # 💡 EL CAMBIO CLAVE 2: La llave del formulario ahora es dinámica (tiene el u_id)
                         with st.form(key=f"form_editor_dinamico_{u_id}", clear_on_submit=True):
-                            st.write("**1. Detalles Básicos**")
+                            st.write("**Detalles Básicos**")
                             e_c1, e_c2 = st.columns([2, 1])
                             e_nom = e_c1.text_input("Nombre *", datos_u_edit['nombre'])
                             
@@ -519,68 +530,26 @@ def mostrar_modulo_inmuebles(supabase):
                             e_precio = e_c5.number_input(f"Precio ({simbolo_mon})", min_value=0.0, step=100.0, value=val_precio)
                             
                             st.markdown("---")
-                            st.write("**2. Galería de Marketing**")
-                            
-                            fotos_actuales = datos_u_edit.get('fotos', [])
-                            if isinstance(fotos_actuales, list) and len(fotos_actuales) > 0:
-                                cols_fotos = st.columns(min(len(fotos_actuales), 4))
-                                for i, url_foto in enumerate(fotos_actuales):
-                                    with cols_fotos[i % 4]:
-                                        st.image(url_foto, width=150)
-                            else:
-                                st.info("No hay fotos registradas.")
-                            
-                            nuevas_fotos = st.file_uploader("Subir imágenes (Max 5MB)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
-
-                            st.markdown("---")
-                            # --- FILA DE ACCIONES UNIFICADA Y COMPACTA ---
-                            # Ajustamos anchos para que "❌ Cerrar" quepa perfectamente
-                            col_btn1, col_btn2, col_btn3, col_espacio = st.columns([1.5, 1.2, 1.5, 5.8])
-                            btn_guardar = col_btn1.form_submit_button("💾 Guardar")
+                            # --- FILA DE ACCIONES COMPACTA ---
+                            col_btn1, col_btn2, col_espacio = st.columns([1.5, 1.2, 7.3])
+                            btn_guardar = col_btn1.form_submit_button("💾 Guardar Cambios")
                             btn_cerrar = col_btn2.form_submit_button("❌ Cerrar")
                             
-                            btn_borrar_fotos = False
-                            if len(fotos_actuales) > 0:
-                                btn_borrar_fotos = col_btn3.form_submit_button("🗑️ Vaciar Galería")
-
                             if btn_cerrar:
                                 st.session_state.modo_unidad = "NADA"
                                 st.rerun()
 
-                            elif btn_borrar_fotos:
-                                supabase.table("unidades").update({"fotos": []}).eq("id", int(u_id)).execute()
-                                st.success("✅ Galería vaciada.")
+                            elif btn_guardar:
+                                datos_upd = {
+                                    "nombre": e_nom.strip().upper(), "tipo": e_tip, 
+                                    "area_m2": e_area, "precio_base": e_precio
+                                }
+                                supabase.table("unidades").update(datos_upd).eq("id", int(u_id)).execute()
+                                log_accion(supabase, usuario_actual, "EDITAR UNIDAD", e_nom.strip().upper())
+                                st.success("✅ Guardado.")
+                                st.session_state.modo_unidad = "NADA" 
                                 time.sleep(1)
                                 st.rerun()
-                                
-                            elif btn_guardar:
-                                urls_nuevas = []
-                                hubo_error = False
-                                
-                                if nuevas_fotos:
-                                    with st.spinner("Subiendo..."):
-                                        for foto in nuevas_fotos:
-                                            try:
-                                                ext = foto.name.split('.')[-1].lower()
-                                                tipo_mime = f"image/{ext.replace('jpg', 'jpeg')}"
-                                                ruta_foto = f"uni_{u_id}_{int(time.time())}_{foto.name}"
-                                                supabase.storage.from_("fotos_unidades").upload(path=ruta_foto, file=foto.getvalue(), file_options={"content-type": tipo_mime})
-                                                urls_nuevas.append(supabase.storage.from_("fotos_unidades").get_public_url(ruta_foto))
-                                            except Exception as e:
-                                                hubo_error = True
-                                
-                                if not hubo_error:
-                                    datos_upd = {
-                                        "nombre": e_nom.strip().upper(), "tipo": e_tip, 
-                                        "area_m2": e_area, "precio_base": e_precio, 
-                                        "fotos": fotos_actuales + urls_nuevas
-                                    }
-                                    supabase.table("unidades").update(datos_upd).eq("id", int(u_id)).execute()
-                                    log_accion(supabase, st.session_state.usuario.get("nombre", "ADMIN"), "EDITAR UNIDAD", e_nom.strip().upper())
-                                    st.success("✅ Guardado.")
-                                    st.session_state.modo_unidad = "NADA" 
-                                    time.sleep(1)
-                                    st.rerun()
 
                     # Eliminar Unidad (fuera del form)
                     st.write("")
@@ -593,8 +562,29 @@ def mostrar_modulo_inmuebles(supabase):
                         time.sleep(1)
                         st.rerun()
 
+                # --- PANEL: GALERÍA DE FOTOS UNIDADES (NUEVO) ---
+                elif st.session_state.modo_unidad == "GALERIA" and not df_uni.empty:
+                    st.markdown("---")
+                    uni_sel = st.selectbox("Seleccione la unidad para ver/editar su galería:", df_uni['nombre'].sort_values().tolist(), key="sel_gal_uni_panel")
+                    if uni_sel:
+                        datos_u = df_uni[df_uni['nombre'] == uni_sel].iloc[0]
+                        u_id = str(datos_u['id'])
+                        fotos_array = datos_u.get('fotos', [])
+                        
+                        # ¡LA MAGIA DE LA HERRAMIENTA UNIVERSAL!
+                        panel_gestor_galeria(
+                            supabase=supabase,
+                            usuario_actual=usuario_actual,
+                            tabla_db="unidades",
+                            bucket_storage="fotos_unidades",
+                            id_registro=u_id,
+                            nombre_registro=f"{uni_sel} ({prop_maestra})",
+                            fotos_actuales=fotos_array,
+                            clave_estado_cerrar="modo_unidad",
+                            prefijo_ruta="uni"
+                        )    
                # --- PANEL: REPORTES (MÓDULO COMPARTIR CENTRALIZADO) ---
-                elif st.session_state.modo_unidad == "REPORTES": 
+            elif st.session_state.modo_unidad == "REPORTES": 
                     st.markdown("---")
                     st.markdown("**🔍 Configuración del Reporte**")
                     
