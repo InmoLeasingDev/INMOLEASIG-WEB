@@ -1021,21 +1021,49 @@ def mostrar_modulo_inmuebles(supabase):
                                         nuevo_saldo = saldo_anterior - monto
                                         supabase.table("fin_cuentas_bancarias").update({"saldo_actual": nuevo_saldo}).eq("id", int(id_cta)).execute()
 
+                                        # 4.5 ¡MAGIA ERP! GENERAR ASIENTO CONTABLE AUTOMÁTICO (Partida Doble)
+                                        id_cta_banco = supabase.table("fin_cuentas_contables").select("id").eq("codigo", "1110").execute().data[0]['id']
+                                        # Lógica básica: Si es fianza a la 2505, si es alquiler a la 4105 (Ingresos)
+                                        codigo_contra = "2505" if "FIANZA" in conc.upper() else "4105"
+                                        id_cta_contra = supabase.table("fin_cuentas_contables").select("id").eq("codigo", codigo_contra).execute().data[0]['id']
+                                        
+                                        # A. Cabecera (Enviando doble concepto para evitar error NOT NULL)
+                                        res_ast = supabase.table("fin_asientos").insert({
+                                            "fecha_contable": str(fecha_pago),
+                                            "descripcion": f"{conc} - MANDATO {id_m}",
+                                            "concepto_general": f"{conc} - MANDATO {id_m}",
+                                            "origen": "MODULO_PAGOS",
+                                            "estado": "CONTABILIZADO"
+                                        }).execute()
+                                        id_ast_nuevo = res_ast.data[0]['id']
+                                        
+                                        # B. Apuntes
+                                        supabase.table("fin_apuntes").insert({
+                                            "id_asiento": id_ast_nuevo, "id_cuenta_contable": id_cta_banco,
+                                            "debito": 0.0, "credito": float(monto), "descripcion_linea": "Salida de Tesorería"
+                                        }).execute()
+                                        supabase.table("fin_apuntes").insert({
+                                            "id_asiento": id_ast_nuevo, "id_cuenta_contable": id_cta_contra,
+                                            "debito": float(monto), "credito": 0.0, "descripcion_linea": conc
+                                        }).execute()
+
                                         # 5. Actualizar Estado del Mandato
                                         supabase.table("mandatos").update({"estado_financiero": "AL_DIA"}).eq("id", int(id_m)).execute()
                                         
-                                        # 6. ReSgistrar en Historial de Auditoría
+                                        # 6. Registrar en Historial Específico
                                         supabase.table("historial_mandatos").insert({
                                             "id_mandato": int(id_m), 
-                                            "accion": f"PAGO REGISTRADO: {conc} ({monto}). Saldo de {df_cuentas.iloc[idx_cta]['banco']} actualizado.",
+                                            "accion": f"PAGO REGISTRADO: {conc} ({monto}). Saldo banco actualizado y Asiento generado.",
                                             "usuario": usuario_actual
                                         }).execute()
-                                        # ✨ LÍNEA NUEVA: Registrar en el Log General de Usuarios
+                                        
+                                        # 7. Registrar en el Log General de Usuarios
                                         log_accion(supabase, usuario_actual, "PAGO REGISTRADO", f"{conc} - Mandato ID: {id_m}")
 
-                                        st.success("✅ ¡Cascada Financiera ejecutada! Saldo bancario actualizado.")
+                                        st.success("✅ ¡Cascada Financiera ejecutada! Banco y Contabilidad actualizados.")
                                         time.sleep(2); st.rerun()
-                                    except Exception as e: st.error(f"Error: {e}")
+                                    except Exception as e: 
+                                        st.error(f"Error en la Cascada Financiera: {e}")
 
                 with c_h:
                     st.subheader("📚 Historial")
