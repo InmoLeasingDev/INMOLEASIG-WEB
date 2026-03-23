@@ -759,8 +759,8 @@ def mostrar_modulo_inmuebles(supabase):
 
         # --- 3. BARRA DE HERRAMIENTAS ---
         st.markdown("---")
-        # Ajustamos las columnas para que quepan 5 botones elegantemente
-        m_c1, m_c2, m_c3, m_c4, m_c5, _ = st.columns([1.5, 1.5, 1.8, 2.0, 1.5, 1.7])
+        # Ajustamos las columnas para que quepan 6 botones elegantemente
+        m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns([1.5, 1.5, 1.8, 1.5, 1.6, 1.7])
         
         if m_c1.button("➕ Nuevo", key="btn_nuevo_man", use_container_width=True):
             st.session_state.modo_mandato = "CREAR"
@@ -776,7 +776,10 @@ def mostrar_modulo_inmuebles(supabase):
             if m_c4.button("💰 Pagos", key="btn_pagos_man", use_container_width=True):
                 st.session_state.modo_mandato = "PAGOS"
                 st.rerun()
-            if m_c5.button("📊 Reportes", key="btn_rep_man", use_container_width=True):
+            if m_c5.button("📜 Historial", key="btn_hist_man", use_container_width=True):
+                st.session_state.modo_mandato = "HISTORIAL"
+                st.rerun()
+            if m_c6.button("📊 Reportes", key="btn_rep_man", use_container_width=True):
                 st.session_state.modo_mandato = "REPORTES"
                 st.rerun()
 
@@ -1018,6 +1021,41 @@ def mostrar_modulo_inmuebles(supabase):
                 
             st.markdown("---")
             if st.button("❌ Cerrar Bóveda", key="btn_cerrar_docs"): 
+                st.session_state.modo_mandato = "NADA"
+                st.rerun()
+        # --- PANEL: HISTORIAL DE MANDATOS ---
+        elif st.session_state.modo_mandato == "HISTORIAL" and not df_man.empty:
+            st.markdown("---")
+            st.markdown("### 📜 Historial y Auditoría del Contrato")
+            
+            # Selector del Contrato
+            op_man_hist = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
+            m_sel_hist = st.selectbox("Selecciona el Mandato para ver su actividad:", op_man_hist)
+            
+            if m_sel_hist:
+                idx = op_man_hist.index(m_sel_hist)
+                id_m = df_man.iloc[idx]['id']
+                
+                try:
+                    # Extraer el historial ordenado por el más reciente primero
+                    res_hist = supabase.table("historial_mandatos").select("created_at, accion, usuario").eq("id_mandato", int(id_m)).order("created_at", desc=True).execute()
+                    df_h = pd.DataFrame(res_hist.data) if res_hist.data else pd.DataFrame()
+                except Exception as e:
+                    df_h = pd.DataFrame()
+                    st.error("Error al cargar historial.")
+                    
+                if not df_h.empty:
+                    # Darle formato a la fecha para que sea legible
+                    df_h['FECHA'] = pd.to_datetime(df_h['created_at']).dt.strftime('%d/%m/%Y %H:%M')
+                    df_h_display = df_h[['FECHA', 'accion', 'usuario']].copy()
+                    df_h_display.rename(columns={'accion': 'ACCIÓN REGISTRADA', 'usuario': 'USUARIO'}, inplace=True)
+                    
+                    st.dataframe(df_h_display, use_container_width=True, hide_index=True)
+                else:
+                    st.info("ℹ️ No hay registros en el historial para este mandato todavía.")
+            
+            st.markdown("---")
+            if st.button("❌ Cerrar Historial", key="btn_cerrar_hist"):
                 st.session_state.modo_mandato = "NADA"
                 st.rerun()
 
