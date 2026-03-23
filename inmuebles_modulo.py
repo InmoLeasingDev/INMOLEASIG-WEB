@@ -1030,6 +1030,8 @@ def mostrar_modulo_inmuebles(supabase):
                                             "accion": f"PAGO REGISTRADO: {conc} ({monto}). Saldo de {df_cuentas.iloc[idx_cta]['banco']} actualizado.",
                                             "usuario": usuario_actual
                                         }).execute()
+                                        # ✨ LÍNEA NUEVA: Registrar en el Log General de Usuarios
+                                        log_accion(supabase, usuario_actual, "PAGO REGISTRADO", f"{conc} - Mandato ID: {id_m}")
 
                                         st.success("✅ ¡Cascada Financiera ejecutada! Saldo bancario actualizado.")
                                         time.sleep(2); st.rerun()
