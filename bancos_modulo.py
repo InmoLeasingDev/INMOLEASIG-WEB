@@ -48,12 +48,13 @@ def mostrar_modulo_bancos(supabase):
                 c1, c2 = st.columns(2)
                 b_nombre = c1.text_input("Nombre Interno *", placeholder="Ej: BBVA Operaciones")
                 b_entidad = c2.text_input("Entidad Bancaria *", placeholder="Ej: BBVA")
+              
                 
-                c3, c4, c5 = st.columns([2, 1, 1])
+                c3, c4, c5, c6 = st.columns([2, 1, 1.5, 1])
                 b_iban = c3.text_input("IBAN / Número de Cuenta *")
-                b_moneda = c4.selectbox("Moneda", ["EUR", "COP", "USD"])
-                b_saldo = c5.number_input("Saldo Inicial", min_value=0.0, step=100.0)
-                
+                b_moneda = c4.selectbox("Moneda", ["EUR", "COP"])
+                b_fecha_ap = c5.date_input("Fecha Saldo Inicial")
+                b_saldo = c6.number_input("Saldo Inicial", min_value=0.0, step=50.0)
                 st.caption("💡 Esta cuenta se vinculará automáticamente a la cuenta contable NIIF '1110 - Bancos Nacionales'.")
                 
                 if st.form_submit_button("💾 Registrar Banco"):
@@ -67,11 +68,27 @@ def mostrar_modulo_bancos(supabase):
                                 "banco": b_entidad.strip().upper(),
                                 "iban": b_iban.strip().upper().replace(" ", ""),
                                 "moneda": b_moneda,
-                                "saldo_actual": b_saldo,
+                                "saldo_actual": float(b_saldo),
+                                "fecha_apertura": str(b_fecha_ap), # <-- LÍNEA NUEVA
                                 "id_cuenta_contable": id_cta_banco
                             }
-                            supabase.table("fin_cuentas_bancarias").insert(datos_banco).execute()
-                            st.success("✅ Cuenta bancaria registrada con éxito.")
+                            # 1. Guardar la cuenta bancaria y capturar su ID
+                            res_insert = supabase.table("fin_cuentas_bancarias").insert(datos_banco).execute()
+                            nueva_cuenta_id = res_insert.data[0]['id']
+
+                            # 2. Registrar el "Movimiento Cero" (El ingreso del saldo inicial)
+                            if float(b_saldo) > 0:
+                                mov_inicial = {
+                                    "id_cuenta_bancaria": nueva_cuenta_id,
+                                    "fecha_movimiento": str(b_fecha_ap),
+                                    "tipo": "INGRESO",
+                                    "monto": float(b_saldo),
+                                    "concepto": "SALDO INICIAL - APERTURA ERP",
+                                    "estado_conciliacion": "CONCILIADO"
+                                }
+                                supabase.table("fin_movimientos_banco").insert(mov_inicial).execute()
+
+                            st.success("✅ Cuenta registrada y Movimiento Inicial asentado en Tesorería.")
                             st.rerun()
                         except Exception as e:
                             st.error(f"❌ Error al guardar: {e}")

@@ -938,10 +938,18 @@ def mostrar_modulo_inmuebles(supabase):
                     st.session_state.modo_mandato = "NADA"; st.rerun()
 
         # --- 5. PANEL PAGOS ---
+        # --- 5. PANEL PAGOS (VERSIÓN ERP CON CASCADA FINANCIERA) ---
         elif st.session_state.modo_mandato == "PAGOS" and not df_man.empty:
             st.markdown("---")
             st.markdown("### 💰 Gestión de Pagos y Soportes Bancarios")
             
+            # 1. Cargar Cuentas Bancarias Activas (Para elegir de dónde sale el dinero)
+            try:
+                res_bancos = supabase.table("fin_cuentas_bancarias").select("id, nombre_interno, banco, saldo_actual").eq("estado", "ACTIVO").execute()
+                df_cuentas = pd.DataFrame(res_bancos.data) if res_bancos.data else pd.DataFrame()
+            except:
+                df_cuentas = pd.DataFrame()
+
             op_man = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel = st.selectbox("Selecciona el Mandato a pagar:", op_man)
             
@@ -955,25 +963,77 @@ def mostrar_modulo_inmuebles(supabase):
                 c_f, c_h = st.columns([1.2, 1])
                 with c_f:
                     with st.form(f"form_pago_{id_m}", clear_on_submit=True):
-                        st.subheader("📤 Registrar Nuevo Pago")
-                        conc = st.text_input("Concepto", value="PAGO FIANZA" if d_m['estado_financiero'] == "PENDIENTE_FIANZA" else "ALQUILER MES")
-                        monto = st.number_input("Monto Transferido", value=float(d_m['valor_fianza'] if d_m['estado_financiero'] == "PENDIENTE_FIANZA" else d_m['ingreso_garantizado']))
+                        st.subheader("📤 Registrar Egreso / Pago")
+                        
+                        p_c1, p_c2 = st.columns(2)
+                        conc = p_c1.text_input("Concepto", value="PAGO FIANZA" if d_m['estado_financiero'] == "PENDIENTE_FIANZA" else "ALQUILER MES")
+                        fecha_pago = p_c2.date_input("Fecha del Pago") # <- IMPORTANTE PARA BACKDATING (Ej: 18/03/2026)
+                        
+                        p_c3, p_c4 = st.columns(2)
+                        monto = p_c3.number_input("Monto (€/$)", value=float(d_m['valor_fianza'] if d_m['estado_financiero'] == "PENDIENTE_FIANZA" else d_m['ingreso_garantizado']))
+                        
+                        # Selector de cuenta bancaria
+                        if not df_cuentas.empty:
+                            opciones_cta = [f"{r['nombre_interno']} ({r['banco']}) - Saldo: {r['saldo_actual']}" for _, r in df_cuentas.iterrows()]
+                            cta_sel = p_c4.selectbox("Cuenta de Origen *", opciones_cta)
+                        else:
+                            cta_sel = p_c4.selectbox("Cuenta de Origen *", ["No hay cuentas registradas"])
+                            
                         sop = st.file_uploader("Adjuntar Soporte del Banco", type=["pdf", "jpg", "png"])
                         
-                        if st.form_submit_button("💾 Guardar y Subir Soporte"):
-                            with st.spinner("Procesando pago..."):
-                                try:
-                                    u_s = None
-                                    if sop:
-                                        ext = sop.name.split('.')[-1].lower()
-                                        n_s = f"soporte_{id_m}_{int(time.time())}.{ext}"
-                                        supabase.storage.from_("soportes_pagos").upload(n_s, sop.getvalue())
-                                        u_s = supabase.storage.from_("soportes_pagos").get_public_url(n_s)
+                        if st.form_submit_button("💾 Ejecutar Pago y Actualizar Bancos"):
+                            if df_cuentas.empty:
+                                st.error("❌ Debes crear una cuenta bancaria primero en el módulo Tesorería.")
+                            else:
+                                with st.spinner("Procesando cascada financiera..."):
+                                    try:
+                                        # Identificar la cuenta seleccionada
+                                        idx_cta = opciones_cta.index(cta_sel)
+                                        id_cta = df_cuentas.iloc[idx_cta]['id']
+                                        saldo_anterior = float(df_cuentas.iloc[idx_cta]['saldo_actual'])
                                         
-                                    supabase.table("pagos_mandatos").insert({"id_mandato": int(id_m), "concepto": conc, "monto": monto, "fecha_pago": str(time.strftime('%Y-%m-%d')), "url_soporte_bancario": u_s, "estado_envio": "PENDIENTE"}).execute()
-                                    supabase.table("mandatos").update({"estado_financiero": "AL_DIA"}).eq("id", int(id_m)).execute()
-                                    st.success("✅ Transferencia registrada."); time.sleep(1); st.rerun()
-                                except Exception as e: st.error(f"Error: {e}")
+                                        # 1. Subir soporte al Bucket
+                                        u_s = None
+                                        if sop:
+                                            ext = sop.name.split('.')[-1].lower()
+                                            n_s = f"soporte_{id_m}_{int(time.time())}.{ext}"
+                                            supabase.storage.from_("soportes_pagos").upload(n_s, sop.getvalue())
+                                            u_s = supabase.storage.from_("soportes_pagos").get_public_url(n_s)
+                                            
+                                        # 2. Registrar en pagos_mandatos (Historial de la propiedad)
+                                        supabase.table("pagos_mandatos").insert({
+                                            "id_mandato": int(id_m), "concepto": conc, "monto": monto, 
+                                            "fecha_pago": str(fecha_pago), "url_soporte_bancario": u_s, 
+                                            "estado_envio": "PENDIENTE"
+                                        }).execute()
+                                        
+                                        # 3. Registrar Movimiento Bancario (EGRESO EN TESORERÍA)
+                                        supabase.table("fin_movimientos_banco").insert({
+                                            "id_cuenta_bancaria": int(id_cta),
+                                            "fecha_movimiento": str(fecha_pago),
+                                            "tipo": "EGRESO",
+                                            "monto": monto,
+                                            "concepto": f"{conc} - MANDATO {id_m}",
+                                            "estado_conciliacion": "PENDIENTE"
+                                        }).execute()
+                                        
+                                        # 4. Actualizar Saldo de la Cuenta Bancaria (La matemática real)
+                                        nuevo_saldo = saldo_anterior - monto
+                                        supabase.table("fin_cuentas_bancarias").update({"saldo_actual": nuevo_saldo}).eq("id", int(id_cta)).execute()
+
+                                        # 5. Actualizar Estado del Mandato
+                                        supabase.table("mandatos").update({"estado_financiero": "AL_DIA"}).eq("id", int(id_m)).execute()
+                                        
+                                        # 6. ReSgistrar en Historial de Auditoría
+                                        supabase.table("historial_mandatos").insert({
+                                            "id_mandato": int(id_m), 
+                                            "accion": f"PAGO REGISTRADO: {conc} ({monto}). Saldo de {df_cuentas.iloc[idx_cta]['banco']} actualizado.",
+                                            "usuario": usuario_actual
+                                        }).execute()
+
+                                        st.success("✅ ¡Cascada Financiera ejecutada! Saldo bancario actualizado.")
+                                        time.sleep(2); st.rerun()
+                                    except Exception as e: st.error(f"Error: {e}")
 
                 with c_h:
                     st.subheader("📚 Historial")
@@ -991,7 +1051,6 @@ def mostrar_modulo_inmuebles(supabase):
                     else: st.info("Sin pagos registrados.")
             st.markdown("---")
             if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
-        
         # --- PANEL: BÓVEDA DE DOCUMENTOS ---
         elif st.session_state.modo_mandato == "DOCUMENTOS" and not df_man.empty:
             st.markdown("---")

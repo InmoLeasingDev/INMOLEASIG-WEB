@@ -3,7 +3,7 @@ import pandas as pd
 
 def mostrar_modulo_contabilidad(supabase):
     # 1. ¡Ícono corregido para que haga match con el menú lateral!
-    st.header("🏦 Contabilidad y Finanzas")
+    st.header("📖 Contabilidad y Finanzas")
     st.caption("Control de Facturación, Tesorería, Impuestos y Libros Contables.")
 
     # --- Identificar al usuario ---
