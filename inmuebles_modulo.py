@@ -922,10 +922,12 @@ def mostrar_modulo_inmuebles(supabase):
                                 res = supabase.table("mandatos").insert(datos).execute()
                                 
                                 # Usamos la variable 'usuario_actual' global que definimos al inicio del módulo
+                                # Inyectamos la fecha legal de suscripción en el texto descriptivo del historial
                                 supabase.table("historial_mandatos").insert({
-                                    "id_mandato": res.data[0]['id'], "accion": "CREACIÓN DE MANDATO Y FIRMA DE CONTRATO",
-                                    "usuario": usuario_actual
-                                }).execute()
+                                "id_mandato": res.data[0]['id'], 
+                                "accion": f"CREACIÓN DE MANDATO (Firma Legal: {f_suscripcion})",
+                                "usuario": usuario_actual
+                            }).execute()
 
                                 st.success("✅ Mandato registrado con éxito.")
                                 st.session_state.modo_mandato = "NADA"
