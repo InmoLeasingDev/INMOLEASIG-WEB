@@ -95,10 +95,64 @@ def mostrar_modulo_bancos(supabase):
                     else:
                         st.warning("⚠️ Rellena los campos obligatorios (*).")
 
+    
     with tab2:
-        st.subheader("Extractos y Notas de Ajuste")
-        st.info("Aquí subiremos el Excel/CSV del banco y registraremos las Notas de Débito (Comisiones) o Crédito.")
-
+        st.subheader("📝 Extractos y Auditoría de Movimientos")
+        st.caption("Consulta todos los ingresos y egresos registrados en cada cuenta.")
+        
+        # 1. Selector de Cuenta
+        try:
+            res_cta_ext = supabase.table("fin_cuentas_bancarias").select("id, nombre_interno, banco, moneda, saldo_actual").eq("estado", "ACTIVO").execute()
+            df_cta_ext = pd.DataFrame(res_cta_ext.data) if res_cta_ext.data else pd.DataFrame()
+        except:
+            df_cta_ext = pd.DataFrame()
+            
+        if not df_cta_ext.empty:
+            opciones_bancos = [f"{r['nombre_interno']} ({r['banco']}) - Saldo: {r['saldo_actual']} {r['moneda']}" for _, r in df_cta_ext.iterrows()]
+            banco_seleccionado = st.selectbox("Selecciona la cuenta a auditar:", opciones_bancos)
+            
+            if banco_seleccionado:
+                # Extraemos el ID de la cuenta elegida
+                idx_b = opciones_bancos.index(banco_seleccionado)
+                id_banco_elegido = df_cta_ext.iloc[idx_b]['id']
+                simbolo_moneda = "€" if df_cta_ext.iloc[idx_b]['moneda'] == "EUR" else "$"
+                
+                # 2. Consultar Movimientos
+                st.markdown("---")
+                try:
+                    # Traemos los movimientos ordenados por fecha de más reciente a más antiguo
+                    res_movs = supabase.table("fin_movimientos_banco").select("*").eq("id_cuenta_bancaria", int(id_banco_elegido)).order("fecha_movimiento", desc=True).execute()
+                    df_movs = pd.DataFrame(res_movs.data) if res_movs.data else pd.DataFrame()
+                except Exception as e:
+                    df_movs = pd.DataFrame()
+                    st.error(f"Error al cargar extractos: {e}")
+                    
+                if not df_movs.empty:
+                    # Preparar vista para el usuario
+                    df_movs_view = df_movs[['fecha_movimiento', 'concepto', 'tipo', 'monto', 'estado_conciliacion']].copy()
+                    
+                    # Formatear el monto con el símbolo de la moneda y color visual
+                    def formatear_monto_tipo(row):
+                        monto_str = f"{simbolo_moneda} {float(row['monto']):,.2f}"
+                        if row['tipo'] == 'INGRESO': return f"🟢 +{monto_str}"
+                        elif row['tipo'] == 'EGRESO': return f"🔴 -{monto_str}"
+                        return monto_str
+                        
+                    df_movs_view['VALOR'] = df_movs_view.apply(formatear_monto_tipo, axis=1)
+                    
+                    # Limpiar columnas finales
+                    df_movs_view.rename(columns={
+                        'fecha_movimiento': 'FECHA', 
+                        'concepto': 'CONCEPTO / DESCRIPCIÓN',
+                        'estado_conciliacion': 'ESTADO'
+                    }, inplace=True)
+                    
+                    # Mostramos solo las columnas relevantes
+                    st.dataframe(df_movs_view[['FECHA', 'CONCEPTO / DESCRIPCIÓN', 'VALOR', 'ESTADO']], use_container_width=True, hide_index=True)
+                else:
+                    st.info("No hay movimientos registrados en esta cuenta bancaria.")
+        else:
+            st.warning("No hay cuentas bancarias creadas. Ve a la primera pestaña.")
     with tab3:
         st.subheader("Conciliación Bancaria Mensual")
-        st.info("Aquí cruzaremos los movimientos del banco (Tab 2) con las facturas cobradas/pagadas (Módulo Contabilidad).")
+        st.info("Aquí cruzaremos los movimientos del banco con las facturas cobradas/pagadas (Módulo Contabilidad).")
