@@ -88,7 +88,6 @@ def mostrar_modulo_contabilidad(supabase):
         st.info("Aquí registraremos salidas de dinero, comisiones y haremos la conciliación.")
 
     with tab4:
-        with tab4:
         st.subheader("📚 Libro Diario (Asientos Contables)")
         st.caption("Auditoría en tiempo real de Débitos y Créditos (Partida Doble).")
         
