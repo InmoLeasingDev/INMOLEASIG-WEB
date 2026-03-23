@@ -2,6 +2,7 @@ import usuarios_modulo
 import operadores_modulo
 import propietarios_modulo 
 import inmuebles_modulo
+import bancos_modulo
 import contabilidad_modulo
 import time
 import streamlit as st
@@ -45,8 +46,8 @@ DICCIONARIO_MENU_FACULTADES = {
     "Propietarios": "MODULO PROPIETARIOS",
     "Inmuebles": "MODULO INMUEBLES",
     "Arrendamientos": "MODULO ARRENDAMIENTOS",
-    "Contabilidad": "MODULO CONTABILIDAD",
-    "Informes": "MODULO INFORMES"
+    "Bancos": "MODULO BANCOS",          # <--- REEMPLAZADO
+    "Contabilidad": "MODULO CONTABILIDAD" 
 }
 
 # ================================================
@@ -173,8 +174,9 @@ with st.sidebar:
         if fac in texto_facs or "ADMINISTRADOR" in rol_actual:
             st.session_state.opciones_permitidas.append(item)
 
-    opciones = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Contabilidad", "Informes"]
-    iconos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "graph-up-arrow"]
+
+    opciones = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Bancos", "Contabilidad"]
+    iconos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "journal-bookmark"]
 
     # Menú sin paddings internos extraños
     selected = option_menu(
@@ -245,11 +247,10 @@ else:
     elif selected == "Arrendamientos":
         st.header("📝 Arrendamientos")
         st.info("🚧 Módulo en construcción.")
+   
+    elif selected == "Bancos":
+        bancos_modulo.mostrar_modulo_bancos(supabase)
         
     elif selected == "Contabilidad":
         contabilidad_modulo.mostrar_modulo_contabilidad(supabase)
-    
         
-    elif selected == "Informes":
-        st.header("📊 Informes de Gestión")
-        st.info("🚧 Módulo en construcción.")
