@@ -824,19 +824,16 @@ def mostrar_modulo_inmuebles(supabase):
                 d4, d5, d6 = st.columns(3)
                 f_entrega = d4.date_input("Fecha Entrega Llaves *")
                 meses_carencia = d5.number_input("Meses de Carencia", 0, 12, 0)
-                # Columna vacía para cuadrar el diseño
-                
-                # CÁLCULOS EN TIEMPO REAL (Usando las variables ingresadas por el usuario)
-                # El vencimiento se cuenta desde la fecha de firma (suscripción)
                 f_vencimiento = f_suscripcion + relativedelta(years=duracion_anos)
-                
-                # El inicio de pagos se cuenta desde que se entregan las llaves + carencia
                 f_inicio_pagos = f_entrega + relativedelta(months=meses_carencia)
-                
-                # El preaviso se resta a la fecha de vencimiento calculada
                 f_limite_aviso = f_vencimiento - relativedelta(months=meses_aviso)
 
-                st.success(f"🗓️ **Resumen:** Pagos inician: **{f_inicio_pagos}** | Vence: **{f_vencimiento}** | Preaviso: **{f_limite_aviso}**")
+                # --- FILA DE RESUMEN CON BOTÓN DE RECÁLCULO ---
+                c_res1, c_res2 = st.columns([8.5, 1.5])
+                c_res1.success(f"🗓️ **Resumen:** Pagos inician: **{f_inicio_pagos}** | Vence: **{f_vencimiento}** | Preaviso: **{f_limite_aviso}**")
+                
+                # Este botón de "form_submit_button" actualiza la pantalla sin guardar nada
+                c_res2.form_submit_button("🔄 Recalcular")
                 # SECCIÓN 3: ACUERDO ECONÓMICO Y PENALIZACIÓN
                 st.markdown("#### 💰 3. Acuerdo Económico")
                 e1, e2, e3 = st.columns(3)
