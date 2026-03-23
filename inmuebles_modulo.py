@@ -921,9 +921,10 @@ def mostrar_modulo_inmuebles(supabase):
                                 }
                                 res = supabase.table("mandatos").insert(datos).execute()
                                 
+                                # Usamos la variable 'usuario_actual' global que definimos al inicio del módulo
                                 supabase.table("historial_mandatos").insert({
                                     "id_mandato": res.data[0]['id'], "accion": "CREACIÓN DE MANDATO Y FIRMA DE CONTRATO",
-                                    "usuario": st.session_state.get("usuario_actual", "ADMIN")
+                                    "usuario": usuario_actual
                                 }).execute()
 
                                 st.success("✅ Mandato registrado con éxito.")
@@ -1037,19 +1038,17 @@ def mostrar_modulo_inmuebles(supabase):
                 id_m = df_man.iloc[idx]['id']
                 
                 try:
-                    # Extraer el historial ordenado por el más reciente primero
-                    res_hist = supabase.table("historial_mandatos").select("created_at, accion, usuario").eq("id_mandato", int(id_m)).order("created_at", desc=True).execute()
+                    # Extraemos usando la columna real 'fecha_evento'
+                    res_hist = supabase.table("historial_mandatos").select("fecha_evento, accion, usuario").eq("id_mandato", int(id_m)).order("fecha_evento", desc=True).execute()
                     df_h = pd.DataFrame(res_hist.data) if res_hist.data else pd.DataFrame()
                 except Exception as e:
                     df_h = pd.DataFrame()
-                    st.error("Error al cargar historial.")
+                    st.error(f"Error técnico al cargar historial: {e}")
                     
                 if not df_h.empty:
-                    # Darle formato a la fecha para que sea legible
-                    df_h['FECHA'] = pd.to_datetime(df_h['created_at']).dt.strftime('%d/%m/%Y %H:%M')
-                    df_h_display = df_h[['FECHA', 'accion', 'usuario']].copy()
-                    df_h_display.rename(columns={'accion': 'ACCIÓN REGISTRADA', 'usuario': 'USUARIO'}, inplace=True)
-                    
+                    # Formateamos la fecha correctamente
+                    df_h['FECHA'] = pd.to_datetime(df_h['fecha_evento']).dt.strftime('%d/%m/%Y %H:%M')
+                    df_h_display = df_h[['FECHA', 'accion', 'usuario']].copy()    
                     st.dataframe(df_h_display, use_container_width=True, hide_index=True)
                 else:
                     st.info("ℹ️ No hay registros en el historial para este mandato todavía.")
