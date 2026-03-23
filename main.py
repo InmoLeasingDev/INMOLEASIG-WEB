@@ -9,7 +9,6 @@ from streamlit_option_menu import option_menu
 from supabase import create_client
 import hashlib
 from datetime import datetime
-from contabilidad_modulo import mostrar_modulo_contabilidad
 # ==========================================
 # FUNCIONES DE INTERFAZ Y SONIDO
 # ==========================================
