@@ -759,7 +759,9 @@ def mostrar_modulo_inmuebles(supabase):
 
         # --- 3. BARRA DE HERRAMIENTAS ---
         st.markdown("---")
-        m_c1, m_c2, m_c3, m_c4, _ = st.columns([1.5, 1.5, 2.0, 1.5, 3.5])
+        # Ajustamos las columnas para que quepan 5 botones elegantemente
+        m_c1, m_c2, m_c3, m_c4, m_c5, _ = st.columns([1.5, 1.5, 1.8, 2.0, 1.5, 1.7])
+        
         if m_c1.button("➕ Nuevo", key="btn_nuevo_man", use_container_width=True):
             st.session_state.modo_mandato = "CREAR"
             st.rerun()
@@ -768,10 +770,13 @@ def mostrar_modulo_inmuebles(supabase):
             if m_c2.button("⚙️ Gestionar", key="btn_edit_man", use_container_width=True):
                 st.session_state.modo_mandato = "EDITAR"
                 st.rerun()
-            if m_c3.button("💰 Pagos & Soportes", key="btn_pagos_man", use_container_width=True):
+            if m_c3.button("📁 Documentos", key="btn_docs_man", use_container_width=True):
+                st.session_state.modo_mandato = "DOCUMENTOS"
+                st.rerun()
+            if m_c4.button("💰 Pagos", key="btn_pagos_man", use_container_width=True):
                 st.session_state.modo_mandato = "PAGOS"
                 st.rerun()
-            if m_c4.button("📊 Reportes", key="btn_rep_man", use_container_width=True):
+            if m_c5.button("📊 Reportes", key="btn_rep_man", use_container_width=True):
                 st.session_state.modo_mandato = "REPORTES"
                 st.rerun()
 
@@ -805,24 +810,33 @@ def mostrar_modulo_inmuebles(supabase):
                 m_porc_pago_2 = c7.number_input("% Cobro 2", 0.0, 100.0, 0.0, key="pg2")
                 m_iban_2 = c8.text_input("IBAN / Cuenta Pago 2", key="ib2")
 
+                
                 # SECCIÓN 2: CRONOGRAMA AUTOMÁTICO
                 st.markdown("#### 📅 2. Cronograma Automático (Smart Dates)")
+                
+                # Fila 1: Lo primero que ocurre es la Firma
                 d1, d2, d3 = st.columns(3)
-                f_entrega = d1.date_input("Fecha Entrega Llaves *")
-                meses_carencia = d2.number_input("Meses de Carencia", 0, 12, 0)
-                duracion_anos = d3.number_input("Duración Contrato (Años)", 1, 20, 5)
-
-                d4, d5 = st.columns(2)
-                meses_aviso = d4.number_input("Meses Preaviso No Renovación", 1, 12, 3)
-                f_suscripcion = d5.date_input("Fecha de Suscripción / Firma")
-
-                # Cálculos en tiempo real
+                f_suscripcion = d1.date_input("Fecha de Suscripción / Firma *")
+                duracion_anos = d2.number_input("Duración Contrato (Años)", 1, 20, 5)
+                meses_aviso = d3.number_input("Meses Preaviso No Renovación", 1, 12, 2)
+                
+                # Fila 2: Luego se entregan las llaves y empiezan a contar los pagos/carencia
+                d4, d5, d6 = st.columns(3)
+                f_entrega = d4.date_input("Fecha Entrega Llaves *")
+                meses_carencia = d5.number_input("Meses de Carencia", 0, 12, 0)
+                # Columna vacía para cuadrar el diseño
+                
+                # CÁLCULOS EN TIEMPO REAL (Usando las variables ingresadas por el usuario)
+                # El vencimiento se cuenta desde la fecha de firma (suscripción)
+                f_vencimiento = f_suscripcion + relativedelta(years=duracion_anos)
+                
+                # El inicio de pagos se cuenta desde que se entregan las llaves + carencia
                 f_inicio_pagos = f_entrega + relativedelta(months=meses_carencia)
-                f_vencimiento = f_entrega + relativedelta(years=duracion_anos)
+                
+                # El preaviso se resta a la fecha de vencimiento calculada
                 f_limite_aviso = f_vencimiento - relativedelta(months=meses_aviso)
 
                 st.success(f"🗓️ **Resumen:** Pagos inician: **{f_inicio_pagos}** | Vence: **{f_vencimiento}** | Preaviso: **{f_limite_aviso}**")
-
                 # SECCIÓN 3: ACUERDO ECONÓMICO Y PENALIZACIÓN
                 st.markdown("#### 💰 3. Acuerdo Económico")
                 e1, e2, e3 = st.columns(3)
@@ -974,6 +988,41 @@ def mostrar_modulo_inmuebles(supabase):
                     else: st.info("Sin pagos registrados.")
             st.markdown("---")
             if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
+        
+        # --- PANEL: BÓVEDA DE DOCUMENTOS ---
+        elif st.session_state.modo_mandato == "DOCUMENTOS" and not df_man.empty:
+            st.markdown("---")
+            st.markdown("### 📁 Bóveda de Documentos Legales")
+            
+            # Selector del Contrato
+            op_man_docs = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
+            m_sel_doc = st.selectbox("Selecciona el Mandato para ver sus archivos:", op_man_docs)
+            
+            if m_sel_doc:
+                idx = op_man_docs.index(m_sel_doc)
+                d_m = df_man.iloc[idx]
+                
+                st.write("") # Espaciador
+                c1, c2, c3, c4 = st.columns(4)
+                
+                def tarjeta_doc(columna, titulo, url_doc, icono):
+                    with columna:
+                        st.markdown(f"**{icono} {titulo}**")
+                        if url_doc and str(url_doc).strip() != "None" and str(url_doc).strip() != "":
+                            st.success("✅ Guardado en Nube")
+                            st.markdown(f"[📥 Abrir / Ver Documento]({url_doc})")
+                        else:
+                            st.warning("❌ Pendiente")
+                            
+                tarjeta_doc(c1, "Contrato Firmado", d_m.get('url_contrato'), "📄")
+                tarjeta_doc(c2, "Empadronamiento", d_m.get('url_empadronamiento'), "🏠")
+                tarjeta_doc(c3, "Acta Inventario", d_m.get('url_inventario'), "📦")
+                tarjeta_doc(c4, "Suministros", d_m.get('url_suministros'), "💧")
+                
+            st.markdown("---")
+            if st.button("❌ Cerrar Bóveda", key="btn_cerrar_docs"): 
+                st.session_state.modo_mandato = "NADA"
+                st.rerun()
 
         # --- 6. PANELES EDITAR Y REPORTES ---
         elif st.session_state.modo_mandato == "EDITAR":
