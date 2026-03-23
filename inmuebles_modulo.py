@@ -1150,9 +1150,83 @@ def mostrar_modulo_inmuebles(supabase):
                 st.rerun()
 
         # --- 6. PANELES EDITAR Y REPORTES ---
-        elif st.session_state.modo_mandato == "EDITAR":
-            st.info("⚙️ Módulo de edición y renovaciones en construcción.")
-            if st.button("❌ Cerrar"): st.session_state.modo_mandato = "NADA"; st.rerun()
+        elif st.session_state.modo_mandato == "EDITAR" and not df_man.empty:
+            st.markdown("---")
+            st.markdown("### ⚙️ Gestionar y Modificar Contrato")
+            
+            # Selector
+            op_man_edit = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
+            m_sel_edit = st.selectbox("Selecciona el Mandato a gestionar:", op_man_edit)
+
+            if m_sel_edit:
+                idx = op_man_edit.index(m_sel_edit)
+                d_m = df_man.iloc[idx]
+                id_m = str(d_m['id'])
+
+                with st.form(f"form_edit_man_{id_m}", clear_on_submit=False):
+                    st.write("**Actualizar Condiciones Financieras**")
+                    c1, c2, c3 = st.columns(3)
+                    e_renta = c1.number_input("Renta Garantizada (€/$)", value=float(d_m.get('ingreso_garantizado', 0.0)), step=50.0)
+                    e_fianza = c2.number_input("Fianza (€/$)", value=float(d_m.get('valor_fianza', 0.0)), step=50.0)
+                    
+                    lista_act = ["IPC", "FIJO", "NO APLICA"]
+                    idx_act = lista_act.index(d_m.get('tipo_actualizacion', 'IPC')) if d_m.get('tipo_actualizacion') in lista_act else 0
+                    e_act = c3.selectbox("Actualización Anual", lista_act, index=idx_act)
+
+                    st.write("**Actualizar Cuentas de Pago (IBAN)**")
+                    c4, c5 = st.columns(2)
+                    e_cta1 = c4.text_input("Cuenta / IBAN Principal", value=str(d_m.get('cuenta_pago', '')))
+                    e_cta2 = c5.text_input("Cuenta / IBAN Secundaria", value=str(d_m.get('cuenta_pago_2', '')).replace("None", ""))
+
+                    st.markdown("---")
+                    col_b1, col_b2, _ = st.columns([2, 1.5, 6.5])
+                    
+                    if col_b1.form_submit_button("💾 Guardar Cambios"):
+                        datos_upd = {
+                            "ingreso_garantizado": e_renta,
+                            "valor_fianza": e_fianza,
+                            "tipo_actualizacion": e_act,
+                            "cuenta_pago": e_cta1.strip(),
+                            "cuenta_pago_2": e_cta2.strip()
+                        }
+                        supabase.table("mandatos").update(datos_upd).eq("id", int(id_m)).execute()
+                        
+                        # Guardar historial
+                        supabase.table("historial_mandatos").insert({
+                            "id_mandato": int(id_m), 
+                            "accion": f"CONDICIONES ACTUALIZADAS: Renta {e_renta}, Fianza {e_fianza}, Act: {e_act}",
+                            "usuario": usuario_actual
+                        }).execute()
+                        log_accion(supabase, usuario_actual, "EDITAR MANDATO", m_sel_edit)
+                        
+                        st.success("✅ Contrato actualizado correctamente.")
+                        st.session_state.modo_mandato = "NADA"
+                        time.sleep(1)
+                        st.rerun()
+                        
+                    if col_b2.form_submit_button("❌ Cerrar"):
+                        st.session_state.modo_mandato = "NADA"
+                        st.rerun()
+
+                # --- ZONA DE PELIGRO (Fuera del form para evitar clicks accidentales) ---
+                st.write("")
+                st.error("🚨 Zona de Peligro: Finalización de Contrato")
+                c_del1, c_del2 = st.columns([7, 3])
+                confirmar_fin = c_del1.checkbox("⚠️ Confirmo que deseo FINALIZAR este contrato (Pasará a histórico y no generará más pagos).", key=f"chk_fin_{id_m}")
+                
+                if c_del2.button("🛑 Finalizar Contrato", disabled=not confirmar_fin, use_container_width=True):
+                    # Actualizamos el estado a FINALIZADO
+                    supabase.table("mandatos").update({"estado_contrato": "FINALIZADO"}).eq("id", int(id_m)).execute()
+                    
+                    supabase.table("historial_mandatos").insert({
+                        "id_mandato": int(id_m), "accion": "CONTRATO FINALIZADO POR EL USUARIO", "usuario": usuario_actual
+                    }).execute()
+                    log_accion(supabase, usuario_actual, "FINALIZAR MANDATO", m_sel_edit)
+                    
+                    st.success("✅ El contrato ha sido finalizado y archivado.")
+                    st.session_state.modo_mandato = "NADA"
+                    time.sleep(1.5)
+                    st.rerun()
 
         elif st.session_state.modo_mandato == "REPORTES":
             st.info("📊 Módulo de Reportes de Mandatos.")
