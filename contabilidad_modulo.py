@@ -16,7 +16,7 @@ def mostrar_modulo_contabilidad(supabase):
         "🧾 Facturación (CxC)", 
         "💸 Tesorería (CxP y Bancos)", 
         "📚 Libro Diario",
-        "🏛️ Estados Financieros y Cierres"  # <--- NUEVO ESPACIO ESTRATÉGICO
+        "🏛️ Estados Financieros y Cierres"
     ])
 
     with tab1:
@@ -35,7 +35,7 @@ def mostrar_modulo_contabilidad(supabase):
         st.subheader("Libro Diario (Asientos Contables)")
         st.info("Aquí veremos los asientos automáticos del Debe y Haber en tiempo real.")
 
-    # --- LA NUEVA PESTAÑA PARA EsL CFO ---
+    # --- LA NUEVA PESTAÑA PARA EL CFO ---
     with tab5:
         st.subheader("Reportes Oficiales y Cierres de Periodo")
         
@@ -49,4 +49,4 @@ def mostrar_modulo_contabilidad(supabase):
             st.markdown("#### 🔒 Cierres Contables")
             st.button("🔐 Ejecutar Cierre de Mes", disabled=True)
             st.button("📆 Ejecutar Cierre de Año", disabled=True)
-            st.info("Un mes cerrado bloqueará cualquier modificación pasada para proteger la contabilidad.")los asientos automáticos del Debe y Haber.")
+            st.info("Un mes cerrado bloqueará cualquier modificación pasada para proteger la contabilidad.")
