@@ -184,10 +184,14 @@ def generar_pdf_mandatos(df):
 # ==========================================
 # 4. MOTOR PDF FICHA DETALLADA DE MANDATO
 # ==========================================
-def generar_pdf_ficha_mandato(datos):
+def generar_pdf_ficha_mandato(df):
+    # 💡 EL TRUCO: Extraemos la única fila del DataFrame y la volvemos diccionario
+    datos = df.iloc[0].to_dict()
+    
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 15)
+
     pdf.cell(0, 10, "INMOLEASING - FICHA TECNICA DE CONTRATO", ln=True, align="C")
     pdf.ln(5)
 
