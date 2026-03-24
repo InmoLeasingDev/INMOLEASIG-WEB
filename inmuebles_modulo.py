@@ -181,7 +181,83 @@ def generar_pdf_mandatos(df):
         pdf.set_xy(10, y + h_fila)
         
     return pdf.output(dest='S').encode('latin-1')
+# ==========================================
+# 4. MOTOR PDF FICHA DETALLADA DE MANDATO
+# ==========================================
+def generar_pdf_ficha_mandato(datos):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 15)
+    pdf.cell(0, 10, "INMOLEASING - FICHA TECNICA DE CONTRATO", ln=True, align="C")
+    pdf.ln(5)
 
+    def limpiar(texto):
+        return str(texto).encode('latin-1', 'ignore').decode('latin-1')
+
+    def seccion(titulo):
+        pdf.set_font("Arial", "B", 11)
+        pdf.set_fill_color(41, 128, 185) # Azul corporativo elegante
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(0, 7, limpiar(titulo), 0, 1, "L", True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(2)
+
+    def fila(etiqueta, valor):
+        pdf.set_font("Arial", "B", 9)
+        pdf.cell(50, 6, limpiar(f"{etiqueta}:"), 0, 0)
+        pdf.set_font("Arial", "", 9)
+        pdf.multi_cell(0, 6, limpiar(valor))
+
+    # --- 1. TITULARIDAD ---
+    seccion("1. TITULARIDAD Y VINCULACION")
+    fila("Propiedad / Unidad", datos.get('inmueble', 'N/A'))
+    fila("Titular Principal", f"{datos.get('propietario_1', 'N/A')} (% Propiedad: {datos.get('porc_prop_1', 0)}% | % Cobro: {datos.get('porc_pago_1', 0)}%)")
+    fila("IBAN Principal", datos.get('iban_1', 'N/A'))
+    if datos.get('porc_prop_2', 0) > 0:
+        fila("Titular Secundario", f"Registrado (% Propiedad: {datos.get('porc_prop_2', 0)}% | % Cobro: {datos.get('porc_pago_2', 0)}%)")
+        fila("IBAN Secundario", datos.get('iban_2', 'N/A'))
+
+    pdf.ln(3)
+    # --- 2. CRONOGRAMA ---
+    seccion("2. CRONOGRAMA LEGAL (SMART DATES)")
+    fila("Fecha Suscripcion", datos.get('f_suscripcion', 'N/A'))
+    fila("Fecha Entrega Llaves", datos.get('f_entrega', 'N/A'))
+    fila("Inicio de Pagos", datos.get('f_pagos', 'N/A'))
+    fila("Vencimiento", datos.get('f_vence', 'N/A'))
+    fila("Limite de Preaviso", datos.get('f_aviso', 'N/A'))
+
+    pdf.ln(3)
+    # --- 3. FINANZAS ---
+    seccion("3. ACUERDO FINANCIERO")
+    fila("Renta Garantizada", f"{datos.get('renta', 0)} (Actualizacion: {datos.get('actualizacion', 'N/A')})")
+    fila("Fianza Acordada", str(datos.get('fianza', 0)))
+    fila("Penalizacion", f"{datos.get('tipo_ind', 'N/A')} - Base: {datos.get('monto_ind', 0)}")
+    fila("Estado Actual", datos.get('estado_fin', 'N/A'))
+
+    pdf.ln(3)
+    # --- 4. BÓVEDA DOCUMENTAL (LINKS ACTIVOS) ---
+    seccion("4. ENLACES A BOVEDA DE DOCUMENTOS")
+    pdf.set_font("Arial", "U", 9)
+
+    def link_doc(nombre, url):
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", "B", 9)
+        pdf.cell(50, 6, limpiar(nombre), 0, 0)
+        
+        if url and str(url) != "None" and str(url).strip() != "":
+            pdf.set_text_color(0, 0, 255) # Azul Link
+            pdf.set_font("Arial", "U", 9)
+            pdf.cell(0, 6, limpiar("Click aqui para abrir documento en la nube"), 0, 1, link=str(url))
+        else:
+            pdf.set_font("Arial", "", 9)
+            pdf.cell(0, 6, "Pendiente de subir", 0, 1)
+
+    link_doc("Contrato Firmado:", datos.get('url_c'))
+    link_doc("Empadronamiento:", datos.get('url_e'))
+    link_doc("Acta Inventario:", datos.get('url_i'))
+    link_doc("Suministros:", datos.get('url_s'))
+
+    return pdf.output(dest='S').encode('latin-1')
 # ==========================================
 # MÓDULO PRINCIPAL: INMUEBLES
 # ==========================================
@@ -1190,7 +1266,7 @@ def mostrar_modulo_inmuebles(supabase):
                 st.session_state.modo_mandato = "NADA"
                 st.rerun()
 
-        # --- 6. PANELES EDITAR Y REPORTES ---
+        # --- 6. PANELES EDITAR  ---
         elif st.session_state.modo_mandato == "EDITAR" and not df_man.empty:
             st.markdown("---")
             st.markdown("### ⚙️ Gestionar y Modificar Contrato")
@@ -1269,31 +1345,72 @@ def mostrar_modulo_inmuebles(supabase):
                     time.sleep(1.5)
                     st.rerun()
 
+        # --- 6.1 PANELES  REPORTES ---
         elif st.session_state.modo_mandato == "REPORTES" and not df_man.empty:
             st.markdown("---")
-            # 1. Traemos a los operadores para el envío por correo
-            try:
-                res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
-                df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
-            except:
-                df_ops = pd.DataFrame()
+            st.markdown("### 📊 Centro de Reportes de Mandatos")
 
-            # 2. Preparamos la base de datos limpia (sin la columna DOCS que tiene emojis)
-            df_rep = df_view_display.copy()
-            if 'DOCS' in df_rep.columns:
-                df_rep = df_rep.drop(columns=['DOCS'])
+            tipo_rep = st.radio("Elige el tipo de reporte:", ["📄 Ficha Detallada (Un Contrato)", "📑 Directorio Global (Todos los Contratos)"], horizontal=True)
 
-            # 3. Llamamos al motor centralizado
-            panel_reportes_y_compartir(
-                df_datos=df_rep,
-                nombre_base="directorio_mandatos_activos",
-                modulo_origen="Mandatos",
-                funcion_pdf=generar_pdf_mandatos,
-                df_operadores=df_ops,
-                supabase=supabase,
-                usuario_actual=usuario_actual,
-                clave_estado_cerrar="modo_mandato"
-            )
+            if tipo_rep == "📑 Directorio Global (Todos los Contratos)":
+                try:
+                    res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
+                    df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+                except: df_ops = pd.DataFrame()
+
+                df_rep = df_view_display.copy()
+                if 'DOCS' in df_rep.columns: df_rep = df_rep.drop(columns=['DOCS'])
+
+                panel_reportes_y_compartir(
+                    df_datos=df_rep,
+                    nombre_base="directorio_mandatos_activos",
+                    modulo_origen="Mandatos",
+                    funcion_pdf=generar_pdf_mandatos,
+                    df_operadores=df_ops,
+                    supabase=supabase,
+                    usuario_actual=usuario_actual,
+                    clave_estado_cerrar="modo_mandato"
+                )
+            else:
+                # --- LÓGICA DE FICHA DETALLADA INDIVIDUAL ---
+                op_man_rep = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
+                m_sel_rep = st.selectbox("Selecciona el Mandato a exportar:", op_man_rep)
+
+                if m_sel_rep:
+                    idx = op_man_rep.index(m_sel_rep)
+                    d_m = df_man.iloc[idx]
+                    d_v = df_view_display.iloc[idx]
+
+                    # Mapeamos los datos crudos de la base de datos al diccionario del PDF
+                    datos_ficha = {
+                        'inmueble': d_v['INMUEBLE'], 'propietario_1': d_v['TITULAR'],
+                        'porc_prop_1': d_m.get('porcentaje_propiedad', 0), 'porc_pago_1': d_m.get('porcentaje_pago_1', 0),
+                        'iban_1': d_m.get('cuenta_pago', ''), 'porc_prop_2': d_m.get('porcentaje_propiedad_2', 0),
+                        'porc_pago_2': d_m.get('porcentaje_pago_2', 0), 'iban_2': d_m.get('cuenta_pago_2', ''),
+                        'f_suscripcion': d_m.get('fecha_suscripcion', ''), 'f_entrega': d_m.get('fecha_entrega', ''),
+                        'f_pagos': d_m.get('fecha_inicio_pagos', ''), 'f_vence': d_m.get('fecha_terminacion', ''),
+                        'f_aviso': d_m.get('fecha_aviso_no_renovacion', ''), 'renta': d_m.get('ingreso_garantizado', 0),
+                        'actualizacion': d_m.get('tipo_actualizacion', ''), 'fianza': d_m.get('valor_fianza', 0),
+                        'tipo_ind': d_m.get('tipo_indemnizacion', ''), 'monto_ind': d_m.get('indemnizacion_anticipada', 0),
+                        'estado_fin': d_m.get('estado_financiero', ''), 'url_c': d_m.get('url_contrato', ''),
+                        'url_e': d_m.get('url_empadronamiento', ''), 'url_i': d_m.get('url_inventario', ''),
+                        'url_s': d_m.get('url_suministros', '')
+                    }
+
+                    pdf_bytes = generar_pdf_ficha_mandato(datos_ficha)
+
+                    c1, c2 = st.columns([3, 7])
+                    c1.download_button(
+                        label="📥 Descargar Ficha (PDF)",
+                        data=pdf_bytes,
+                        file_name=f"Ficha_Mandato_{d_v['INMUEBLE'].replace(' ', '_')}.pdf",
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True
+                    )
+
+            st.markdown("---")
+            if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
 
     # ==========================================
     # TAB 4: INVENTARIOS (Mobiliario)
