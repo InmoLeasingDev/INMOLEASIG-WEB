@@ -1146,10 +1146,11 @@ def mostrar_modulo_inmuebles(supabase):
                                         u_s = None
                                         if sop:
                                             ext = sop.name.split('.')[-1].lower()
+                                            # 💡 SOLUCIÓN: Le decimos explícitamente al navegador qué tipo de archivo es
+                                            tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
                                             n_s = f"soporte_{id_m}_{int(time.time())}.{ext}"
-                                            supabase.storage.from_("soportes_pagos").upload(n_s, sop.getvalue())
-                                            u_s = supabase.storage.from_("soportes_pagos").get_public_url(n_s)
-                                            
+                                            supabase.storage.from_("soportes_pagos").upload(n_s, sop.getvalue(), file_options={"content-type": tipo_mime})
+                                            u_s = supabase.storage.from_("soportes_pagos").get_public_url(n_s)                                            
                                         # 2. Registrar en pagos_mandatos (Historial de la propiedad)
                                         supabase.table("pagos_mandatos").insert({
                                             "id_mandato": int(id_m), "concepto": conc, "monto": monto, 
@@ -1216,19 +1217,21 @@ def mostrar_modulo_inmuebles(supabase):
                                         st.error(f"Error en la Cascada Financiera: {e}")
 
                 with c_h:
-                    st.subheader("📚 Historial")
-                    try:
-                        res_p = supabase.table("pagos_mandatos").select("*").eq("id_mandato", int(id_m)).order("fecha_pago", desc=True).execute()
-                        df_p = pd.DataFrame(res_p.data) if res_p.data else pd.DataFrame()
-                    except: df_p = pd.DataFrame()
-                        
-                    if not df_p.empty:
-                        for _, p in df_p.iterrows():
-                            with st.expander(f"✅ {p['fecha_pago']} - {p['concepto']} ({p['monto']})"):
-                                if p['url_soporte_bancario']: st.markdown(f"**[🔍 Ver PDF del Banco]({p['url_soporte_bancario']})**")
-                                if st.button("📲 Compartir a Propietario", key=f"btn_comp_{p['id']}", use_container_width=True):
-                                    st.toast("Módulo de envío en construcción 🚧", icon="⏳")
-                    else: st.info("Sin pagos registrados.")
+                    # 💡 AÑADIMOS EL CONTENEDOR CON BORDE (La magia del recuadro)
+                    with st.container(border=True):
+                        st.subheader("📚 Historial de Pagos")
+                        try:
+                            res_p = supabase.table("pagos_mandatos").select("*").eq("id_mandato", int(id_m)).order("fecha_pago", desc=True).execute()
+                            df_p = pd.DataFrame(res_p.data) if res_p.data else pd.DataFrame()
+                        except: df_p = pd.DataFrame()
+                            
+                        if not df_p.empty:
+                            for _, p in df_p.iterrows():
+                                with st.expander(f"✅ {p['fecha_pago']} - {p['concepto']} ({p['monto']})"):
+                                    if p['url_soporte_bancario']: st.markdown(f"**[🔍 Ver PDF del Banco]({p['url_soporte_bancario']})**")
+                                    if st.button("📲 Compartir a Propietario", key=f"btn_comp_{p['id']}", use_container_width=True):
+                                        st.toast("Módulo de envío en construcción 🚧", icon="⏳")
+                        else: st.info("Sin pagos registrados.")
             st.markdown("---")
             if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
         # --- PANEL: BÓVEDA DE DOCUMENTOS ---
