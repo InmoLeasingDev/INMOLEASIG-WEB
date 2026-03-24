@@ -1381,7 +1381,7 @@ def mostrar_modulo_inmuebles(supabase):
         # --- 6.1 PANELES  REPORTES ---
         elif st.session_state.modo_mandato == "REPORTES" and not df_man.empty:
             st.markdown("---")
-            st.markdown("### 📊 Centro de Reportes de Mandatos")
+            st.markdown("## Centro de Reportes de Mandatos")
 
             # 💡 CAMBIO A SELECTBOX (Más elegante y escalable)
             tipo_rep = st.selectbox("Elige el tipo de reporte:", [
@@ -1390,7 +1390,7 @@ def mostrar_modulo_inmuebles(supabase):
                 "📑 Directorio Global (Todos los Contratos)"
             ])
 
-            if tipo_rep == "📑 Directorio Global (Todos los Contratos)":
+            if tipo_rep == "Directorio Global (Todos los Contratos)":
                 try:
                     res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
                     df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
@@ -1410,7 +1410,7 @@ def mostrar_modulo_inmuebles(supabase):
                     clave_estado_cerrar="modo_mandato"
                 )
 
-            elif tipo_rep == "📄 Ficha Detallada (Un Contrato)":
+            elif tipo_rep == "Ficha Detallada (Un Contrato)":
                 op_man_rep = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
                 m_sel_rep = st.selectbox("Selecciona el Mandato a exportar:", op_man_rep)
 
