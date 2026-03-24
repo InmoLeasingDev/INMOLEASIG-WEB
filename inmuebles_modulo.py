@@ -263,6 +263,36 @@ def generar_pdf_ficha_mandato(df):
 
     return pdf.output(dest='S').encode('latin-1')
 # ==========================================
+# 5. MOTOR PDF HISTORIAL DE MANDATO
+# ==========================================
+def generar_pdf_historial_mandato(df):
+    pdf = FPDF(orientation="L")
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - HISTORIAL DE AUDITORIA DEL CONTRATO", ln=True, align="C")
+    pdf.ln(5)
+
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [35, 190, 45] # FECHA, ACCION, USUARIO
+    headers = ["FECHA", "ACCION REGISTRADA", "USUARIO"]
+    for i, h in enumerate(headers):
+        pdf.cell(cw[i], 8, h, 1, 0, "C", True)
+    pdf.ln()
+
+    pdf.set_font("Arial", "", 8)
+    for _, row in df.iterrows():
+        textos = [str(row.get('FECHA', '')), str(row.get('ACCION REGISTRADA', '')), str(row.get('USUARIO', ''))]
+        textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
+        h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
+        if pdf.get_y() + h_fila > 190: pdf.add_page()
+        x, y = pdf.get_x(), pdf.get_y()
+        for i, txt in enumerate(textos):
+            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
+        pdf.set_xy(10, y + h_fila)
+    return pdf.output(dest='S').encode('latin-1')
+# ==========================================
 # MÓDULO PRINCIPAL: INMUEBLES
 # ==========================================
 def mostrar_modulo_inmuebles(supabase):
@@ -1058,7 +1088,6 @@ def mostrar_modulo_inmuebles(supabase):
                 if col_b2.form_submit_button("❌ Cancelar"):
                     st.session_state.modo_mandato = "NADA"; st.rerun()
 
-        # --- 5. PANEL PAGOS ---
         # --- 5. PANEL PAGOS (VERSIÓN ERP CON CASCADA FINANCIERA) ---
         elif st.session_state.modo_mandato == "PAGOS" and not df_man.empty:
             st.markdown("---")
@@ -1354,7 +1383,12 @@ def mostrar_modulo_inmuebles(supabase):
             st.markdown("---")
             st.markdown("### 📊 Centro de Reportes de Mandatos")
 
-            tipo_rep = st.radio("Elige el tipo de reporte:", ["📄 Ficha Detallada (Un Contrato)", "📑 Directorio Global (Todos los Contratos)"], horizontal=True)
+            # 💡 CAMBIO A SELECTBOX (Más elegante y escalable)
+            tipo_rep = st.selectbox("Elige el tipo de reporte:", [
+                "📄 Ficha Detallada (Un Contrato)", 
+                "📜 Historial de Auditoría (Un Contrato)",
+                "📑 Directorio Global (Todos los Contratos)"
+            ])
 
             if tipo_rep == "📑 Directorio Global (Todos los Contratos)":
                 try:
@@ -1375,8 +1409,8 @@ def mostrar_modulo_inmuebles(supabase):
                     usuario_actual=usuario_actual,
                     clave_estado_cerrar="modo_mandato"
                 )
-            else:
-                # ---- LÓGICA DE FICHA DETALLADA INDIVIDUAL ----
+
+            elif tipo_rep == "📄 Ficha Detallada (Un Contrato)":
                 op_man_rep = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
                 m_sel_rep = st.selectbox("Selecciona el Mandato a exportar:", op_man_rep)
 
@@ -1385,7 +1419,6 @@ def mostrar_modulo_inmuebles(supabase):
                     d_m = df_man.iloc[idx]
                     d_v = df_view_display.iloc[idx]
 
-                    # Mapeamos los datos crudos de la base de datos al diccionario
                     datos_ficha = {
                         'inmueble': d_v['INMUEBLE'], 'propietario_1': d_v['TITULAR'],
                         'porc_prop_1': d_m.get('porcentaje_propiedad', 0), 'porc_pago_1': d_m.get('porcentaje_pago_1', 0),
@@ -1401,16 +1434,13 @@ def mostrar_modulo_inmuebles(supabase):
                         'url_s': d_m.get('url_suministros', '')
                     }
 
-                    # 💡 EL TRUCO: Convertimos el diccionario en un DataFrame de 1 fila
                     df_ficha_unica = pd.DataFrame([datos_ficha])
 
-                    # Traemos los operadores para poder enviar los correos
                     try:
                         res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
                         df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
                     except: df_ops = pd.DataFrame()
 
-                    # 🚀 Llamamos a la herramienta universal para que muestre la botonera completa
                     panel_reportes_y_compartir(
                         df_datos=df_ficha_unica,
                         nombre_base=f"Ficha_Mandato_{d_v['INMUEBLE'].replace(' ', '_')}",
@@ -1422,8 +1452,46 @@ def mostrar_modulo_inmuebles(supabase):
                         clave_estado_cerrar="modo_mandato"
                     )
 
-            #st.markdown("---")
-            #if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
+            elif tipo_rep == "📜 Historial de Auditoría (Un Contrato)":
+                op_man_aud = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
+                m_sel_aud = st.selectbox("Selecciona el Mandato para auditar:", op_man_aud)
+
+                if m_sel_aud:
+                    idx = op_man_aud.index(m_sel_aud)
+                    id_m = df_man.iloc[idx]['id']
+                    
+                    try:
+                        res_hist = supabase.table("historial_mandatos").select("fecha_evento, accion, usuario").eq("id_mandato", int(id_m)).order("fecha_evento", desc=True).execute()
+                        df_h = pd.DataFrame(res_hist.data) if res_hist.data else pd.DataFrame()
+                    except Exception as e:
+                        df_h = pd.DataFrame()
+
+                    if not df_h.empty:
+                        df_h['FECHA'] = pd.to_datetime(df_h['fecha_evento']).dt.strftime('%d/%m/%Y %H:%M')
+                        df_h_rep = df_h[['FECHA', 'accion', 'usuario']].copy()
+                        df_h_rep.rename(columns={'accion': 'ACCION REGISTRADA', 'usuario': 'USUARIO'}, inplace=True)
+
+                        try:
+                            res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
+                            df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+                        except: df_ops = pd.DataFrame()
+
+                        panel_reportes_y_compartir(
+                            df_datos=df_h_rep,
+                            nombre_base=f"Auditoria_Mandato_{id_m}",
+                            modulo_origen="Historial Mandato",
+                            funcion_pdf=generar_pdf_historial_mandato,
+                            df_operadores=df_ops,
+                            supabase=supabase,
+                            usuario_actual=usuario_actual,
+                            clave_estado_cerrar="modo_mandato"
+                        )
+                    else:
+                        st.info("ℹ️ No hay registros de auditoría para este contrato todavía.")
+
+            st.markdown("---")
+            if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
+
     # ==========================================
     # TAB 4: INVENTARIOS (Mobiliario)
     # ==========================================
