@@ -1385,7 +1385,7 @@ def mostrar_modulo_inmuebles(supabase):
                     d_m = df_man.iloc[idx]
                     d_v = df_view_display.iloc[idx]
 
-                    # Mapeamos los datos crudos de la base de datos al diccionario del PDF
+                    # Mapeamos los datos crudos de la base de datos al diccionario
                     datos_ficha = {
                         'inmueble': d_v['INMUEBLE'], 'propietario_1': d_v['TITULAR'],
                         'porc_prop_1': d_m.get('porcentaje_propiedad', 0), 'porc_pago_1': d_m.get('porcentaje_pago_1', 0),
@@ -1401,21 +1401,29 @@ def mostrar_modulo_inmuebles(supabase):
                         'url_s': d_m.get('url_suministros', '')
                     }
 
-                    pdf_bytes = generar_pdf_ficha_mandato(datos_ficha)
+                    # 💡 EL TRUCO: Convertimos el diccionario en un DataFrame de 1 fila
+                    df_ficha_unica = pd.DataFrame([datos_ficha])
 
-                    c1, c2 = st.columns([3, 7])
-                    c1.download_button(
-                        label="📥 Descargar Ficha (PDF)",
-                        data=pdf_bytes,
-                        file_name=f"Ficha_Mandato_{d_v['INMUEBLE'].replace(' ', '_')}.pdf",
-                        mime="application/pdf",
-                        type="primary",
-                        use_container_width=True
+                    # Traemos los operadores para poder enviar los correos
+                    try:
+                        res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
+                        df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+                    except: df_ops = pd.DataFrame()
+
+                    # 🚀 Llamamos a la herramienta universal para que muestre la botonera completa
+                    panel_reportes_y_compartir(
+                        df_datos=df_ficha_unica,
+                        nombre_base=f"Ficha_Mandato_{d_v['INMUEBLE'].replace(' ', '_')}",
+                        modulo_origen="Ficha de Mandato",
+                        funcion_pdf=generar_pdf_ficha_mandato,
+                        df_operadores=df_ops,
+                        supabase=supabase,
+                        usuario_actual=usuario_actual,
+                        clave_estado_cerrar="modo_mandato"
                     )
 
             st.markdown("---")
             if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
-
     # ==========================================
     # TAB 4: INVENTARIOS (Mobiliario)
     # ==========================================
