@@ -139,6 +139,50 @@ def generar_pdf_unidades(df):
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================
+# 3. MOTOR PDF MANDATOS / CONTRATOS
+# ==========================================
+def generar_pdf_mandatos(df):
+    pdf = FPDF(orientation="L")
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - DIRECTORIO DE MANDATOS Y CONTRATOS", ln=True, align="C")
+    pdf.ln(5)
+
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_fill_color(200, 220, 255)
+    
+    # Anchos: INMUEBLE, TITULAR, % COBRO, RENTA, FINANZAS
+    cw = [80, 70, 25, 40, 45] 
+    headers = ["INMUEBLE", "TITULAR", "% COBRO", "RENTA GARANTIZADA", "ESTADO FINANZAS"]
+    for i, h in enumerate(headers):
+        pdf.cell(cw[i], 8, h, 1, 0, "C", True)
+    pdf.ln()
+
+    pdf.set_font("Arial", "", 8)
+    for _, row in df.iterrows():
+        # Limpiamos el texto para evitar errores de codificación
+        textos = [
+            str(row.get('INMUEBLE', '')), 
+            str(row.get('TITULAR', '')), 
+            str(row.get('% COBRO', '')),
+            str(row.get('RENTA', '')),
+            str(row.get('FINANZAS', ''))
+        ]
+        textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
+        h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
+        
+        if pdf.get_y() + h_fila > 190: 
+            pdf.add_page()
+            
+        x, y = pdf.get_x(), pdf.get_y()
+        for i, txt in enumerate(textos):
+            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
+        pdf.set_xy(10, y + h_fila)
+        
+    return pdf.output(dest='S').encode('latin-1')
+
+# ==========================================
 # MÓDULO PRINCIPAL: INMUEBLES
 # ==========================================
 def mostrar_modulo_inmuebles(supabase):
@@ -703,11 +747,8 @@ def mostrar_modulo_inmuebles(supabase):
                             st.session_state.modo_unidad = "NADA"
                             st.rerun()
 
-    # =========================================
-    # TAB 3: MANDATOS (Dueños y Porcentajes)
-    # =========================================
 
-# ========================================
+    # ========================================
     # TAB 3: MANDATOS (Contratos y Finanzas)
     # ========================================
     with tab3:
@@ -1228,9 +1269,31 @@ def mostrar_modulo_inmuebles(supabase):
                     time.sleep(1.5)
                     st.rerun()
 
-        elif st.session_state.modo_mandato == "REPORTES":
-            st.info("📊 Módulo de Reportes de Mandatos.")
-            if st.button("❌ Cerrar"): st.session_state.modo_mandato = "NADA"; st.rerun()
+        elif st.session_state.modo_mandato == "REPORTES" and not df_man.empty:
+            st.markdown("---")
+            # 1. Traemos a los operadores para el envío por correo
+            try:
+                res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
+                df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+            except:
+                df_ops = pd.DataFrame()
+
+            # 2. Preparamos la base de datos limpia (sin la columna DOCS que tiene emojis)
+            df_rep = df_view_display.copy()
+            if 'DOCS' in df_rep.columns:
+                df_rep = df_rep.drop(columns=['DOCS'])
+
+            # 3. Llamamos al motor centralizado
+            panel_reportes_y_compartir(
+                df_datos=df_rep,
+                nombre_base="directorio_mandatos_activos",
+                modulo_origen="Mandatos",
+                funcion_pdf=generar_pdf_mandatos,
+                df_operadores=df_ops,
+                supabase=supabase,
+                usuario_actual=usuario_actual,
+                clave_estado_cerrar="modo_mandato"
+            )
 
     # ==========================================
     # TAB 4: INVENTARIOS (Mobiliario)
