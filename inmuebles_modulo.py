@@ -1422,8 +1422,8 @@ def mostrar_modulo_inmuebles(supabase):
                         clave_estado_cerrar="modo_mandato"
                     )
 
-            st.markdown("---")
-            if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
+            #st.markdown("---")
+            #if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
     # ==========================================
     # TAB 4: INVENTARIOS (Mobiliario)
     # ==========================================
