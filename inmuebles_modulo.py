@@ -1217,7 +1217,7 @@ def mostrar_modulo_inmuebles(supabase):
                                         st.error(f"Error en la Cascada Financiera: {e}")
 
                 with c_h:
-                    # 💡 AÑADIMOS EL CONTENEDOR CON BORDE (La magia del recuadro)
+                    # 💡 AÑADIMOS EL CONTENEDOR CON BORDE 
                     with st.container(border=True):
                         st.subheader("📚 Historial de Pagos")
                         try:
