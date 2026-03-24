@@ -1385,9 +1385,9 @@ def mostrar_modulo_inmuebles(supabase):
 
             # 💡 CAMBIO A SELECTBOX (Más elegante y escalable)
             tipo_rep = st.selectbox("Elige el tipo de reporte:", [
-                "📄 Ficha Detallada (Un Contrato)", 
-                "📜 Historial de Auditoría (Un Contrato)",
-                "📑 Directorio Global (Todos los Contratos)"
+                "Ficha Detallada (Un Contrato)", 
+                "Historial de Auditoría (Un Contrato)",
+                "Directorio Global (Todos los Contratos)"
             ])
 
             if tipo_rep == "Directorio Global (Todos los Contratos)":
@@ -1452,7 +1452,7 @@ def mostrar_modulo_inmuebles(supabase):
                         clave_estado_cerrar="modo_mandato"
                     )
 
-            elif tipo_rep == "📜 Historial de Auditoría (Un Contrato)":
+            elif tipo_rep == "Historial de Auditoría (Un Contrato)":
                 op_man_aud = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
                 m_sel_aud = st.selectbox("Selecciona el Mandato para auditar:", op_man_aud)
 
