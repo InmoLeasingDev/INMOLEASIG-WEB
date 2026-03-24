@@ -1376,7 +1376,7 @@ def mostrar_modulo_inmuebles(supabase):
                     clave_estado_cerrar="modo_mandato"
                 )
             else:
-                # --- LÓGICA DE FICHA DETALLADA INDIVIDUAL ---
+                # ---- LÓGICA DE FICHA DETALLADA INDIVIDUAL ----
                 op_man_rep = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
                 m_sel_rep = st.selectbox("Selecciona el Mandato a exportar:", op_man_rep)
 
