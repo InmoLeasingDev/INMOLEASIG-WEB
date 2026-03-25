@@ -693,24 +693,38 @@ def mostrar_modulo_usuarios(supabase):
             df_l = pd.DataFrame(res_l.data) if res_l.data else pd.DataFrame()
             
             if not df_l.empty:
-                df_l['fecha'] = pd.to_datetime(df_l['fecha'])
-                c_f1, c_f2, c_f3 = st.columns(3)
-                f_r = c_f1.date_input("Rango", [])
-                u_f = c_f2.selectbox("Usuario", ["Todos"] + sorted(df_l['usuario'].unique().tolist()))
-                t_f = c_f3.text_input("Buscar").upper()
+                # 🛡️ BLINDAJE DE AUDITORÍA: Filtrar logs para que solo muestre la actividad de los usuarios de mi región
+                if not df_raw.empty:
+                    usuarios_mi_region = df_raw['nombre'].tolist()
+                    df_l = df_l[df_l['usuario'].isin(usuarios_mi_region)]
                 
-                if len(f_r) == 2: 
-                    df_l = df_l[(df_l['fecha'].dt.date >= f_r[0]) & (df_l['fecha'].dt.date <= f_r[1])]
-                if u_f != "Todos": 
-                    df_l = df_l[df_l['usuario'] == u_f]
-                if t_f: 
-                    df_l = df_l[df_l['accion'].str.contains(t_f) | df_l['detalle'].str.contains(t_f)]
+                # Si después de filtrar sigue habiendo logs...
+                if not df_l.empty:
+                    df_l['fecha'] = pd.to_datetime(df_l['fecha'])
+                    c_f1, c_f2, c_f3 = st.columns(3)
+                    f_r = c_f1.date_input("Rango", [])
                     
-                df_visual = df_l[['fecha', 'usuario', 'accion', 'detalle']].copy()
-                df_visual['fecha'] = df_visual['fecha'].dt.strftime('%Y-%m-%d %H:%M')
-                
-                st.dataframe(df_visual, use_container_width=True, hide_index=True)
-                st.download_button("Descargar Auditoría", generar_pdf_logs(df_l), "auditoria.pdf")
+                    # Actualizamos el selector para que solo muestre los usuarios filtrados
+                    lista_usuarios_logs = ["Todos"] + sorted(df_l['usuario'].unique().tolist())
+                    u_f = c_f2.selectbox("Usuario", lista_usuarios_logs)
+                    
+                    t_f = c_f3.text_input("Buscar").upper()
+                    
+                    if len(f_r) == 2: 
+                        df_l = df_l[(df_l['fecha'].dt.date >= f_r[0]) & (df_l['fecha'].dt.date <= f_r[1])]
+                    if u_f != "Todos": 
+                        df_l = df_l[df_l['usuario'] == u_f]
+                    if t_f: 
+                        df_l = df_l[df_l['accion'].str.contains(t_f) | df_l['detalle'].str.contains(t_f)]
+                        
+                    df_visual = df_l[['fecha', 'usuario', 'accion', 'detalle']].copy()
+                    df_visual['fecha'] = df_visual['fecha'].dt.strftime('%Y-%m-%d %H:%M')
+                    
+                    st.dataframe(df_visual, use_container_width=True, hide_index=True)
+                    st.download_button("Descargar Auditoría", generar_pdf_logs(df_l), "auditoria.pdf")
+                else:
+                    st.info("🛡️ No hay actividad registrada por los usuarios de tu entorno.")
+            else:
+                st.info("ℹ️ El registro de auditoría está completamente vacío.")
         except Exception as e:
             st.error(f"🚨 Error detectado: {e}")
-            st.info("Sin registros.")

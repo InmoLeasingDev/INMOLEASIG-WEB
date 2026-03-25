@@ -68,7 +68,9 @@ def mostrar_modulo_propietarios(supabase):
     # --- Sesión y Filtros Silenciosos ---
     var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
     usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
-    moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
+    
+    # 🛡️ Entorno operativo estricto
+    moneda_sesion = st.session_state.get("moneda_usuario", "EUR")
 
     # 1. Inicializador de estado para los paneles
     if 'modo_propietario' not in st.session_state:
@@ -85,8 +87,8 @@ def mostrar_modulo_propietarios(supabase):
         st.error(f"Error de conexión: {e}")
         df_prop, df_ops = pd.DataFrame(), pd.DataFrame()
 
-    # Filtro automático por moneda
-    if not df_prop.empty and moneda_sesion != "ALL":
+    # Filtro automático por moneda (ESTRICTO)
+    if not df_prop.empty:
         df_prop = df_prop[df_prop['moneda'] == moneda_sesion]
 
     # --- LECTURA DE DATOS (LA CUADRÍCULA) ---
@@ -158,11 +160,15 @@ def mostrar_modulo_propietarios(supabase):
             
             st.subheader("Datos Financieros")
             c6, c7, c8 = st.columns([1, 2, 2])
-            n_mon = c6.selectbox("Moneda *", ["EUR", "COP"] if moneda_sesion == "ALL" else [moneda_sesion])
-            n_ban = c7.text_input("Banco")
-            n_tcu = c8.selectbox("Tipo de Cuenta", ["IBAN", "AHORROS", "CORRIENTE", "NEQUI", "DAVIPLATA"])
-            n_cba = st.text_input("Número de Cuenta / IBAN")
             
+            # Asignación automática de moneda
+            n_mon = moneda_sesion
+            c6.text_input("Entorno Operativo", value=n_mon, disabled=True)
+            n_ban = c7.text_input("Banco")
+            n_tcu = c8.selectbox("Tipo de Cuenta", ["IBAN", "AHORROS", "CORRIENTE","LLAVE"])
+            n_cba = st.text_input("Número de Cuenta / IBAN")
+
+
             st.subheader("📄 Identificación Propietario")
             doc_subido = st.file_uploader("Escáner de Identificación (Max 5MB - PDF, JPG, PNG)", type=["pdf", "jpg", "jpeg", "png"])
             st.markdown("*Campos obligatorios marcados con asterisco (*)*")
@@ -237,11 +243,11 @@ def mostrar_modulo_propietarios(supabase):
                 
                 st.subheader("Finanzas")
                 c6, c7 = st.columns([1, 2])
-                lista_mon = ["EUR", "COP"]
-                val_mon = datos_p.get('moneda')
-                e_mon = c6.selectbox("Moneda", lista_mon, index=lista_mon.index(val_mon) if pd.notna(val_mon) and val_mon in lista_mon else 0, key=f"mon_{p_id}")
-                e_ban = c7.text_input("Banco", str(datos_p.get('banco', '')), key=f"ban_{p_id}")
                 
+                # Moneda bloqueada
+                e_mon = datos_p.get('moneda', moneda_sesion)
+                c6.text_input("Entorno (Bloqueado)", value=e_mon, disabled=True)
+                e_ban = c7.text_input("Banco", str(datos_p.get('banco', '')), key=f"ban_{p_id}")
                 c8, c9 = st.columns([1, 2])
                 lista_tcu = ["IBAN", "AHORROS", "CORRIENTE", "NEQUI", "DAVIPLATA"]
                 val_tcu = datos_p.get('tipo_cuenta')

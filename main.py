@@ -140,8 +140,15 @@ if not st.session_state.autenticado:
                         
                         st.session_state.autenticado = True
                         st.session_state.usuario = u_data
-                        st.session_state.moneda_usuario = u_data.get('moneda', 'ALL')
+                        # --- NUEVO BLINDAJE DE MONEDA ---
+                        moneda_db = str(u_data.get('moneda', '')).strip().upper()
                         
+                        # Si en la BD por error quedó 'ALL', vacío o algo raro, forzamos a EUR por seguridad
+                        if moneda_db not in ['EUR', 'COP']:
+                            st.session_state.moneda_usuario = 'EUR'
+                            st.error("⚠️ Alerta: Este usuario no tenía moneda asignada correctamente (EUR/COP). Se ha asignado EUR por seguridad.")
+                        else:
+                            st.session_state.moneda_usuario = moneda_db
                         supabase.table("usuarios").update({"ultimo_acceso": datetime.utcnow().isoformat()}).eq("id", u_data['id']).execute()
                         st.rerun()
                         
@@ -158,8 +165,7 @@ with st.sidebar:
     st.caption(f"Versión: {APP_VERSION}")
     
     st.write(f"👤 Hola, **{str(st.session_state.usuario.get('nombre', '')).strip()}**")
-    st.caption(f"Región/Moneda: **{st.session_state.moneda_usuario}**")
-    
+    st.caption(f"🌍 Entorno de Trabajo: **{st.session_state.moneda_usuario}**")
     rol_actual = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
     texto_facs = st.session_state.usuario.get('facultades_texto', '')
     

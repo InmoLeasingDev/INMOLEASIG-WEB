@@ -107,28 +107,33 @@ def mostrar_modulo_operadores(supabase):
         st.error(f"Error cargando operadores: {e}")
         df_raw = pd.DataFrame()
 
-    if not df_raw.empty and moneda_sesion != "ALL":
+    # 🛡️ FILTRO ESTRICTO: Solo ver operadores de mi región
+    moneda_sesion = st.session_state.get("moneda_usuario", "EUR")
+    if not df_raw.empty:
         df_raw = df_raw[df_raw['moneda'] == moneda_sesion]
-
     tab1, tab2, tab3 = st.tabs(["📋 Directorio", "➕ Nuevo Operador", "⚙️ Gestionar Fichas"])
 
     # --- TAB 1: DIRECTORIO E INFORMES ---
+# --- TAB 1: DIRECTORIO E INFORMES ---
     with tab1:
         if not df_raw.empty:
             busqueda = st.text_input("🔍 Buscar operador...", "").upper().strip()
             df_display = df_raw.copy().sort_values('nombre')
             
+            # Renombramos las columnas incluyendo la parte tributaria
             df_display.rename(columns={
                 'nombre': 'NOMBRE', 'identificacion': 'IDENTIFICACION', 
                 'direccion': 'DIRECCION', 'correo': 'CORREO', 'telefono': 'TELEFONO',
+                'porcentaje_iva_defecto': '% IVA', 'porcentaje_retencion_defecto': '% RET',
                 'moneda': 'MONEDA', 'estado': 'ESTADO'
             }, inplace=True)
             
             if busqueda:
                 df_display = df_display[df_display['NOMBRE'].str.contains(busqueda) | df_display['IDENTIFICACION'].str.contains(busqueda)]
             
+            # --- IMPRIMIMOS LA TABLA UNA SOLA VEZ ---
             st.dataframe(
-                df_display[["NOMBRE", "IDENTIFICACION", "DIRECCION", "CORREO", "TELEFONO", "MONEDA", "ESTADO"]], 
+                df_display[["NOMBRE", "IDENTIFICACION", "DIRECCION", "CORREO", "TELEFONO", "% IVA", "% RET", "MONEDA", "ESTADO"]], 
                 use_container_width=True, hide_index=True
             )
             
@@ -140,7 +145,7 @@ def mostrar_modulo_operadores(supabase):
             
             # 1. Preparar archivos
             pdf_bytes = generar_pdf_operadores(df_display)
-            df_para_excel = df_display[["NOMBRE", "IDENTIFICACION", "DIRECCION", "CORREO", "TELEFONO", "MONEDA", "ESTADO"]].copy()
+            df_para_excel = df_display[["NOMBRE", "IDENTIFICACION", "DIRECCION", "CORREO", "TELEFONO", "% IVA", "% RET", "MONEDA", "ESTADO"]].copy()
             excel_bytes = generar_excel_bytes(df_para_excel, "Operadores")
             
             # 2. Botones de descarga directa
@@ -238,7 +243,6 @@ def mostrar_modulo_operadores(supabase):
                     
         else:
             st.info("No hay operadores registrados en tu región.")
-
     # --- TAB 2: NUEVO OPERADOR ---
     with tab2:
         with st.form("form_nuevo_operador"):
@@ -252,8 +256,26 @@ def mostrar_modulo_operadores(supabase):
             n_cor = c4.text_input("Correo Electrónico", placeholder="ejemplo@operador.com").strip()
             
             n_dir = st.text_input("Dirección Fiscal / Sede").strip()
-            n_mon = st.selectbox("Moneda de Operación", ["EUR", "COP"], help="EUR para España, COP para Colombia.")
             
+            # 🤖 La moneda se asigna automáticamente según el usuario
+            n_mon = moneda_sesion
+            st.text_input("Entorno Operativo", value=n_mon, disabled=True)
+            
+            # --- SECCIÓN TRIBUTARIA ---
+            st.markdown("---")
+            st.write("**Perfil Tributario por Defecto**")
+            label_ret = "% IRPF" if n_mon == "EUR" else "% Retención en la Fuente"
+            val_iva_ini = 21.0 if n_mon == "EUR" else 19.0
+            
+            c_check1, c_check2 = st.columns(2)
+            n_aplica_iva = c_check1.checkbox("¿Aplica IVA?", value=True)
+            n_aplica_ret = c_check2.checkbox("¿Aplica Retención?", value=False)
+            
+            c5, c6 = st.columns(2)
+            # Si el checkbox no está marcado, deshabilitamos el campo
+            n_iva = c5.number_input("% IVA", min_value=0.0, max_value=100.0, value=val_iva_ini, step=1.0, disabled=not n_aplica_iva)
+            n_ret = c6.number_input(label_ret, min_value=0.0, max_value=100.0, value=0.0, step=1.0, disabled=not n_aplica_ret)
+
             if st.form_submit_button("✅ Registrar Operador"):
                 if not n_nom or not n_ide:
                     st.error("⚠️ El Nombre y el CIF/NIT son obligatorios.")
@@ -267,6 +289,10 @@ def mostrar_modulo_operadores(supabase):
                         "correo": n_cor.lower(),
                         "direccion": n_dir.upper(),
                         "moneda": n_mon,
+                        "aplica_iva": n_aplica_iva,
+                        "porcentaje_iva_defecto": n_iva if n_aplica_iva else 0.0,
+                        "aplica_retencion": n_aplica_ret,
+                        "porcentaje_retencion_defecto": n_ret if n_aplica_ret else 0.0,
                         "estado": "ACTIVO"
                     }
                     supabase.table("operadores").insert(datos).execute()
@@ -301,9 +327,29 @@ def mostrar_modulo_operadores(supabase):
                 dir_actual = str(o_data.get('direccion', '')) if pd.notna(o_data.get('direccion')) else ''
                 e_dir = st.text_input("Dirección", dir_actual).strip()
                 
-                idx_mon = 0 if o_data['moneda'] == "EUR" else 1
-                e_mon = st.selectbox("Moneda", ["EUR", "COP"], index=idx_mon)
+                e_mon = o_data['moneda']
+                st.text_input("Entorno Operativo (Bloqueado)", value=e_mon, disabled=True)
                 
+                # --- SECCIÓN TRIBUTARIA ---
+                st.markdown("---")
+                st.write("**Perfil Tributario por Defecto**")
+                label_ret = "% IRPF" if e_mon == "EUR" else "% Retención en la Fuente"
+                
+                # Leemos las banderas booleanas de la BD
+                chk_iva = bool(o_data.get('aplica_iva', True))
+                chk_ret = bool(o_data.get('aplica_retencion', False))
+                
+                c_check3, c_check4 = st.columns(2)
+                e_aplica_iva = c_check3.checkbox("¿Aplica IVA?", value=chk_iva, key="chk_iva_edit")
+                e_aplica_ret = c_check4.checkbox("¿Aplica Retención?", value=chk_ret, key="chk_ret_edit")
+                
+                iva_act = float(o_data.get('porcentaje_iva_defecto') or (21.0 if e_mon == "EUR" else 19.0))
+                ret_act = float(o_data.get('porcentaje_retencion_defecto') or 0.0)
+                
+                c5, c6 = st.columns(2)
+                e_iva = c5.number_input("% IVA", min_value=0.0, max_value=100.0, value=iva_act, step=1.0, disabled=not e_aplica_iva)
+                e_ret = c6.number_input(label_ret, min_value=0.0, max_value=100.0, value=ret_act, step=1.0, disabled=not e_aplica_ret)
+
                 if st.form_submit_button("💾 Actualizar Ficha"):
                     if not e_nom or not e_ide:
                         st.error("⚠️ El Nombre y el CIF/NIT son obligatorios.")
@@ -316,7 +362,11 @@ def mostrar_modulo_operadores(supabase):
                             "telefono": e_tel, 
                             "correo": e_cor.lower(),
                             "direccion": e_dir.upper(), 
-                            "moneda": e_mon
+                            "moneda": e_mon,
+                            "aplica_iva": e_aplica_iva,
+                            "porcentaje_iva_defecto": e_iva if e_aplica_iva else 0.0,
+                            "aplica_retencion": e_aplica_ret,
+                            "porcentaje_retencion_defecto": e_ret if e_aplica_ret else 0.0
                         }
                         supabase.table("operadores").update(datos_upd).eq("id", int(o_data['id'])).execute()
                         log_accion(supabase, usuario_actual, "EDITAR OPERADOR", f"Actualizado: {e_nom.upper()}")

@@ -293,6 +293,103 @@ def generar_pdf_historial_mandato(df):
         pdf.set_xy(10, y + h_fila)
     return pdf.output(dest='S').encode('latin-1')
 # ==========================================
+# 6. MOTOR PDF ACTIVOS (INVENTARIO)
+# ==========================================
+def generar_pdf_activos(df):
+    pdf = FPDF(orientation="L")
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - REPORTE DE ACTIVOS FIJOS", ln=True, align="C")
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", "B", 8)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [25, 60, 30, 35, 55, 25, 25]
+    headers = ["CODIGO", "ACTIVO", "CATEGORIA", "DUENO", "UBICACION", "ESTADO", "VALOR"]
+    for i, h in enumerate(headers): pdf.cell(cw[i], 8, h, 1, 0, "C", True)
+    pdf.ln()
+    
+    pdf.set_font("Arial", "", 7)
+    total_valor = 0.0
+    simbolo = "EUR"
+    for _, row in df.iterrows():
+        val_str = str(row.get('VALOR', '0')).replace("€", "").replace("$", "").replace(",", "").strip()
+        try: total_valor += float(val_str)
+        except: pass
+        
+        textos = [str(row.get('CÓDIGO', '')), str(row.get('ACTIVO', '')), str(row.get('CATEGORÍA', '')), str(row.get('DUEÑO', '')), str(row.get('UBICACIÓN', '')), str(row.get('ESTADO', '')), str(row.get('VALOR', '')).replace("€", "EUR")]
+        textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
+        h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
+        if pdf.get_y() + h_fila > 190: pdf.add_page()
+        x, y = pdf.get_x(), pdf.get_y()
+        for i, txt in enumerate(textos):
+            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
+        pdf.set_xy(10, y + h_fila)
+    
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_fill_color(220, 230, 240)
+    pdf.cell(sum(cw[:-1]), 8, "TOTAL INVERSION (SEGÚN FILTRO):", 1, 0, "R", True)
+    pdf.cell(cw[-1], 8, f"{simbolo} {total_valor:,.2f}", 1, 0, "L", True)
+    pdf.ln()
+    return pdf.output(dest='S').encode('latin-1')
+# ==========================================
+# 6B. MOTOR PDF CONTROL DE GARANTÍAS
+# ==========================================
+def generar_pdf_garantias(df):
+    pdf = FPDF(orientation="L")
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - CONTROL DE GARANTIAS DE ACTIVOS", ln=True, align="C")
+    pdf.ln(5)
+
+    pdf.set_font("Arial", "B", 8)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [25, 65, 45, 45, 35, 35]
+    headers = ["CODIGO", "ACTIVO", "DUENO", "UBICACION", "FECHA COMPRA", "VENCE GARANTIA"]
+    for i, h in enumerate(headers): pdf.cell(cw[i], 8, h, 1, 0, "C", True)
+    pdf.ln()
+
+    pdf.set_font("Arial", "", 8)
+    for _, row in df.iterrows():
+        textos = [str(row.get('CÓDIGO', '')), str(row.get('ACTIVO', '')), str(row.get('DUEÑO', '')), str(row.get('UBICACIÓN', '')), str(row.get('COMPRA', '')), str(row.get('FIN GARANTÍA', ''))]
+        textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
+        h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
+        if pdf.get_y() + h_fila > 190: pdf.add_page()
+        x, y = pdf.get_x(), pdf.get_y()
+        for i, txt in enumerate(textos):
+            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
+        pdf.set_xy(10, y + h_fila)
+    return pdf.output(dest='S').encode('latin-1')
+# ==========================================
+# 7. MOTOR PDF MOVIMIENTOS Y TRAZABILIDAD
+# ==========================================
+def generar_pdf_movimientos(df):
+    pdf = FPDF(orientation="L")
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "INMOLEASING - HISTORIAL LOGISTICO DE ACTIVOS", ln=True, align="C")
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 8)
+    pdf.set_fill_color(200, 220, 255)
+    cw = [25, 45, 40, 40, 80, 45]
+    headers = ["FECHA", "ACTIVO", "ORIGEN", "DESTINO", "MOTIVO", "USUARIO"]
+    for i, h in enumerate(headers): pdf.cell(cw[i], 8, h, 1, 0, "C", True)
+    pdf.ln()
+    pdf.set_font("Arial", "", 7)
+    for _, row in df.iterrows():
+        textos = [str(row.get('FECHA', '')), str(row.get('ACTIVO', '')), str(row.get('ORIGEN', '')), str(row.get('DESTINO', '')), str(row.get('MOTIVO', '')), str(row.get('USUARIO', ''))]
+        textos = [t.encode('latin-1', 'ignore').decode('latin-1') for t in textos]
+        h_fila = 5 * max([len(pdf.multi_cell(cw[i], 5, txt, split_only=True)) for i, txt in enumerate(textos)])
+        if pdf.get_y() + h_fila > 190: pdf.add_page()
+        x, y = pdf.get_x(), pdf.get_y()
+        for i, txt in enumerate(textos):
+            pdf.set_xy(x, y); pdf.rect(x, y, cw[i], h_fila)
+            pdf.multi_cell(cw[i], 5, txt, align='L'); x += cw[i]
+        pdf.set_xy(10, y + h_fila)
+    return pdf.output(dest='S').encode('latin-1')
+# ==========================================
 # MÓDULO PRINCIPAL: INMUEBLES
 # ==========================================
 def mostrar_modulo_inmuebles(supabase):
@@ -309,7 +406,7 @@ def mostrar_modulo_inmuebles(supabase):
         "🏢 1. Propiedades", 
         "🚪 2. Unidades", 
         "🤝 3. Mandatos", 
-        "🛋️ 4. Inventarios"
+        "🛋️ 4. Activos"
     ])
 
    
@@ -590,10 +687,9 @@ def mostrar_modulo_inmuebles(supabase):
                 # 🛡️ ESCUDO 2: Inicializamos la variable siempre para que nunca de error
                 df_uni_display = pd.DataFrame()
                 
-                # 🛡️ ESCUDO 3: Si la propiedad no tiene unidades, forzamos cierre de paneles
-                if df_uni.empty:
+                # 🛡️ ESCUDO 3: Corregido para permitir crear la primera unidad
+                if df_uni.empty and st.session_state.modo_unidad != "CREAR":
                     st.session_state.modo_unidad = "NADA"
-
                 # --- LA CUADRÍCULA (Grid siempre visible) ---
                 if not df_uni.empty:
                     emoji_map = {"DISPONIBLE": "🟢 DISP.", "OCUPADA": "🔴 OCUP.", "EN REPARACIÓN": "🟡 REP."}
@@ -619,7 +715,7 @@ def mostrar_modulo_inmuebles(supabase):
                 else:
                     st.info(f"ℹ️ El edificio {prop_maestra} aún no tiene unidades. Usa la barra de herramientas para añadir la primera.")
 
-            # ==========================================
+                # ==========================================
                 # 🛠️ BARRA DE HERRAMIENTAS (MODO PRO - 4 BOTONES)
                 # ==========================================
                 t_c1, t_c2, t_c3, t_c4, t_c5 = st.columns([1.5, 1.5, 1.5, 1.5, 4.0]) 
@@ -793,9 +889,12 @@ def mostrar_modulo_inmuebles(supabase):
                             df_all = pd.DataFrame(res_all.data) if res_all.data else pd.DataFrame()
                             
                             if not df_all.empty and not df_prop.empty:
-                                # Cruzar unidades con propiedades para heredar el nombre del edificio y su moneda
                                 df_cruce = df_all.merge(df_prop[['id', 'nombre', 'moneda']], left_on='id_inmueble', right_on='id', how='left')
                                 
+                                # 🛡️ BLINDAJE: Filtrar el cruce global para que solo queden las de la moneda actual
+                                moneda_sesion_actual = st.session_state.get("moneda_usuario", "ALL")
+                                if moneda_sesion_actual != "ALL":
+                                    df_cruce = df_cruce[df_cruce['moneda'] == moneda_sesion_actual]    
                                 # Aplicar formatos visuales
                                 df_cruce['ESTADO'] = df_cruce['disponibilidad'].map(lambda x: emoji_map.get(str(x).upper(), "⚪ DESC."))
                                 df_cruce['ÁREA (m2)'] = pd.to_numeric(df_cruce['area_m2']).fillna(0).apply(lambda x: f"{x:,.2f}" if x > 0 else "-")
@@ -865,26 +964,32 @@ def mostrar_modulo_inmuebles(supabase):
         if 'modo_mandato' not in st.session_state:
             st.session_state.modo_mandato = "NADA"
 
-        st.markdown("### 🤝 Contratos de Gestión Integral")
+        # 🛡️ BLINDAJE DE MONEDA ESTRICTO
+        moneda_sesion = st.session_state.get("moneda_usuario", "EUR")
+        simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
 
-        # --- 1. CARGA DE DATOS BASE ---
+        st.markdown(f"### 🤝 Contratos de Gestión Integral ({moneda_sesion})")
+
+        # --- 1. CARGA DE DATOS BASE (¡FILTRADA POR REGIÓN!) ---
         try:
-            res_inm = supabase.table("inmuebles").select("id, nombre, moneda").eq("estado", "ACTIVO").execute()
+            res_inm = supabase.table("inmuebles").select("id, nombre, moneda").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
             df_inm_m = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
             
-            res_prop = supabase.table("propietarios").select("id, nombre, cuenta_banco").eq("estado", "ACTIVO").execute()
+            res_prop = supabase.table("propietarios").select("id, nombre, cuenta_banco").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
             df_prop_m = pd.DataFrame(res_prop.data) if res_prop.data else pd.DataFrame()
             
-            res_man = supabase.table("mandatos").select("*").neq("estado_contrato", "FINALIZADO").execute()
+            # MAGIA: .eq("moneda", moneda_sesion)
+            res_man = supabase.table("mandatos").select("*, inmuebles(nombre), propietarios!mandatos_id_propietario_fkey(nombre)").neq("estado_contrato", "FINALIZADO").eq("moneda", moneda_sesion).execute()
             df_man = pd.DataFrame(res_man.data) if res_man.data else pd.DataFrame()
         except Exception as e:
             df_inm_m, df_prop_m, df_man = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-            st.warning("⚠️ Conectando con las tablas de mandatos...")
+            st.warning(f"⚠️ Cargando datos: {e}")
 
-        # --- 2. GRID DE MANDATOS (CON VISOR DE DOCUMENTOS 📄) ---
+        # --- 2. GRID DE MANDATOS ---
         if not df_man.empty and not df_inm_m.empty and not df_prop_m.empty:
-            df_view = df_man.merge(df_inm_m[['id', 'nombre']], left_on='id_inmueble', right_on='id', how='left')
-            df_view = df_view.merge(df_prop_m[['id', 'nombre']], left_on='id_propietario', right_on='id', how='left', suffixes=('_inm', '_prop'))
+            df_view_display = df_man.copy()
+            df_view_display['INMUEBLE'] = df_view_display['inmuebles'].apply(lambda x: x['nombre'] if isinstance(x, dict) else "N/A")
+            df_view_display['TITULAR'] = df_view_display['propietarios'].apply(lambda x: x['nombre'] if isinstance(x, dict) else "N/A")
             
             def visor_docs(row):
                 iconos = []
@@ -894,611 +999,1147 @@ def mostrar_modulo_inmuebles(supabase):
                 if row.get('url_suministros'): iconos.append("💧")
                 return " ".join(iconos) if iconos else "➖"
 
-            df_view['DOCS'] = df_view.apply(visor_docs, axis=1)
+            df_view_display['DOCS'] = df_view_display.apply(visor_docs, axis=1)
+            df_view_display['RENTA'] = pd.to_numeric(df_view_display['ingreso_garantizado']).fillna(0).apply(lambda x: f"{simbolo_mon} {x:,.2f}")
+            df_view_display.rename(columns={'porcentaje_pago_1': '% COBRO', 'estado_financiero': 'FINANZAS'}, inplace=True)
             
-            df_view_display = df_view[['nombre_inm', 'nombre_prop', 'porcentaje_pago_1', 'ingreso_garantizado', 'estado_financiero', 'DOCS']].copy()
-            df_view_display.rename(columns={
-                'nombre_inm': 'INMUEBLE', 'nombre_prop': 'TITULAR', 
-                'porcentaje_pago_1': '% COBRO', 'ingreso_garantizado': 'RENTA',
-                'estado_financiero': 'FINANZAS'
-            }, inplace=True)
-            
-            st.dataframe(df_view_display, use_container_width=True, hide_index=True)
-            st.caption("Legenda DOCS: 📄 Contrato | 🏠 Empadronamiento | 📦 Inventario | 💧 Suministros")
+            st.dataframe(df_view_display[['INMUEBLE', 'TITULAR', '% COBRO', 'RENTA', 'FINANZAS', 'DOCS']], use_container_width=True, hide_index=True)
         else:
-            st.info("ℹ️ No hay mandatos vigentes. Crea uno nuevo para empezar a gestionar contratos.")
+            st.info(f"ℹ️ No hay mandatos vigentes en el entorno {moneda_sesion}.")
 
         # --- 3. BARRA DE HERRAMIENTAS ---
         st.markdown("---")
-        # Ajustamos las columnas para que quepan 6 botones elegantemente
         m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns([1.5, 1.5, 1.8, 1.5, 1.6, 1.7])
         
-        if m_c1.button("➕ Nuevo", key="btn_nuevo_man", use_container_width=True):
-            st.session_state.modo_mandato = "CREAR"
-            st.rerun()
-            
+        if m_c1.button("➕ Nuevo", key="btn_nuevo_man", use_container_width=True): st.session_state.modo_mandato = "CREAR"; st.rerun()
         if not df_man.empty:
-            if m_c2.button("⚙️ Gestionar", key="btn_edit_man", use_container_width=True):
-                st.session_state.modo_mandato = "EDITAR"
-                st.rerun()
-            if m_c3.button("📁 Documentos", key="btn_docs_man", use_container_width=True):
-                st.session_state.modo_mandato = "DOCUMENTOS"
-                st.rerun()
-            if m_c4.button("💰 Pagos", key="btn_pagos_man", use_container_width=True):
-                st.session_state.modo_mandato = "PAGOS"
-                st.rerun()
-            if m_c5.button("📜 Historial", key="btn_hist_man", use_container_width=True):
-                st.session_state.modo_mandato = "HISTORIAL"
-                st.rerun()
-            if m_c6.button("📊 Reportes", key="btn_rep_man", use_container_width=True):
-                st.session_state.modo_mandato = "REPORTES"
-                st.rerun()
+            if m_c2.button("⚙️ Gestionar", key="btn_edit_man", use_container_width=True): st.session_state.modo_mandato = "EDITAR"; st.rerun()
+            if m_c3.button("📁 Documentos", key="btn_docs_man", use_container_width=True): st.session_state.modo_mandato = "DOCUMENTOS"; st.rerun()
+            if m_c4.button("💰 Pagos", key="btn_pagos_man", use_container_width=True): st.session_state.modo_mandato = "PAGOS"; st.rerun()
+            if m_c5.button("📜 Historial", key="btn_hist_man", use_container_width=True): st.session_state.modo_mandato = "HISTORIAL"; st.rerun()
+            if m_c6.button("📊 Reportes", key="btn_rep_man", use_container_width=True): st.session_state.modo_mandato = "REPORTES"; st.rerun()
 
-        # --- 4. PANEL CREAR (DISEÑO PRO) ---
+        # --- 4. PANEL CREAR ---
         if st.session_state.modo_mandato == "CREAR":
             from dateutil.relativedelta import relativedelta
             st.markdown("---")
             with st.form("form_nuevo_mandato_pro", clear_on_submit=False):
                 st.markdown("### 📝 Redactar Nuevo Contrato de Gestión")
+                st.markdown("#### 💼 1. Titularidad y Vínculo de Unidad")
                 
-                # SECCIÓN 1: VÍNCULO Y CUENTAS
-                st.markdown("#### 💼 1. Titularidad y Distribución de Pagos")
-                m_inm_sel = st.selectbox("Inmueble a gestionar *", df_inm_m['nombre'].tolist())
-                
-                st.write("**Titular 1 (Principal)**")
-                c1, c2, c3, c4 = st.columns([3, 1.2, 1.2, 4.6])
-                m_prop_sel_1 = c1.selectbox("Propietario 1 *", df_prop_m['nombre'].tolist(), key="p1")
-                
-                # ARRASTRE AUTOMÁTICO DE IBAN
-                iban_db = df_prop_m[df_prop_m['nombre'] == m_prop_sel_1].iloc[0]['cuenta_banco'] or ""
-                
-                m_porc_prop_1 = c2.number_input("% Legal", 0.0, 100.0, 100.0, key="pp1")
-                m_porc_pago_1 = c3.number_input("% Cobro", 0.0, 100.0, 100.0, key="pg1")
-                m_iban_1 = c4.text_input("IBAN / Cuenta Pago 1 *", value=iban_db, key="ib1")
-                
-                st.write("**Titular 2 (Opcional)**")
-                c5, c6, c7, c8 = st.columns([3, 1.2, 1.2, 4.6])
-                opciones_p2 = ["-- Ninguno --"] + df_prop_m['nombre'].tolist()
-                m_prop_sel_2 = c5.selectbox("Propietario 2", opciones_p2, key="p2")
-                m_porc_prop_2 = c6.number_input("% Legal 2", 0.0, 100.0, 0.0, key="pp2")
-                m_porc_pago_2 = c7.number_input("% Cobro 2", 0.0, 100.0, 0.0, key="pg2")
-                m_iban_2 = c8.text_input("IBAN / Cuenta Pago 2", key="ib2")
-
-                
-                # SECCIÓN 2: CRONOGRAMA AUTOMÁTICO
-                st.markdown("#### 📅 2. Cronograma Automático (Smart Dates)")
-                
-                # Fila 1: Lo primero que ocurre es la Firma
-                d1, d2, d3 = st.columns(3)
-                f_suscripcion = d1.date_input("Fecha de Suscripción / Firma *")
-                duracion_anos = d2.number_input("Duración Contrato (Años)", 1, 20, 5)
-                meses_aviso = d3.number_input("Meses Preaviso No Renovación", 1, 12, 2)
-                
-                # Fila 2: Luego se entregan las llaves y empiezan a contar los pagos/carencia
-                d4, d5, d6 = st.columns(3)
-                f_entrega = d4.date_input("Fecha Entrega Llaves *")
-                meses_carencia = d5.number_input("Meses de Carencia", 0, 12, 0)
-                f_vencimiento = f_suscripcion + relativedelta(years=duracion_anos)
-                f_inicio_pagos = f_entrega + relativedelta(months=meses_carencia)
-                f_limite_aviso = f_vencimiento - relativedelta(months=meses_aviso)
-
-                # --- FILA DE RESUMEN CON BOTÓN DE RECÁLCULO ---
-                c_res1, c_res2 = st.columns([8.5, 1.5])
-                c_res1.success(f"🗓️ **Resumen:** Pagos inician: **{f_inicio_pagos}** | Vence: **{f_vencimiento}** | Preaviso: **{f_limite_aviso}**")
-                
-                # Este botón de "form_submit_button" actualiza la pantalla sin guardar nada
-                c_res2.form_submit_button("🔄 Recalcular")
-                # SECCIÓN 3: ACUERDO ECONÓMICO Y PENALIZACIÓN
-                st.markdown("#### 💰 3. Acuerdo Económico")
-                e1, e2, e3 = st.columns(3)
-                m_renta = e1.number_input("Renta Garantizada *", min_value=0.0, step=50.0)
-                m_fianza = e2.number_input("Fianza a Entregar *", min_value=0.0, step=50.0)
-                m_act = e3.selectbox("Actualización Anual", ["IPC", "FIJO", "NO APLICA"])
-
-                # --- LÓGICA DE INDEMNIZACIÓN Y AMORTIZACIÓN ---
-                st.info("🛡️ Cláusula de protección (Amortización de Mejoras)")
-                c_ind1, c_ind2 = st.columns([2, 1])
-                
-                m_tipo_ind_ui = c_ind1.selectbox(
-                    "Modalidad de Penalización", 
-                    ["NO APLICA", "MONTO FIJO (Cualquier momento)", "AMORTIZACIÓN DECRECIENTE (5 Años)"]
-                )
-                
-                # Traductor para la base de datos
-                mapa_ind = {
-                    "NO APLICA": "NINGUNA", 
-                    "MONTO FIJO (Cualquier momento)": "FIJA", 
-                    "AMORTIZACIÓN DECRECIENTE (5 Años)": "DECRECIENTE_5Y"
-                }
-                m_tipo_ind_db = mapa_ind[m_tipo_ind_ui]
-
-                m_indemnizacion = c_ind2.number_input(
-                    "Monto Base 100% (€)", 
-                    min_value=0.0, step=50.0, 
-                    help="Costo total de la mejora. Si es decreciente, se calculará el % según el año."
-                )
-
-                # SECCIÓN 4: DOCUMENTOS
-                st.markdown("#### 📁 4. Documentación Escaneada")
-                cd1, cd2 = st.columns(2)
-                doc_contrato = cd1.file_uploader("Contrato Firmado", type=["pdf", "jpg", "png"])
-                doc_empadrona = cd2.file_uploader("Aut. Empadronamiento", type=["pdf", "jpg", "png"])
-                
-                cd3, cd4 = st.columns(2)
-                doc_inv = cd3.file_uploader("Acta Inventario", type=["pdf", "jpg", "png"])
-                doc_sum = cd4.file_uploader("Recibos Suministros", type=["pdf", "jpg", "png"])
-
-                st.markdown("---")
-                col_b1, col_b2, _ = st.columns([2.0, 1.5, 6.5])
-                
-                if col_b1.form_submit_button("💾 Generar Mandato"):
-                    if (m_porc_pago_1 + m_porc_pago_2) > 100.1 or (m_porc_prop_1 + m_porc_prop_2) > 100.1:
-                        st.error("❌ Los porcentajes superan el 100%. Por favor revísalos.")
+                if df_inm_m.empty or df_prop_m.empty:
+                    st.error(f"❌ Necesitas crear al menos una propiedad y un propietario en {moneda_sesion} antes de crear un mandato.")
+                else:
+                    col_inm, col_uni = st.columns(2)
+                    m_inm_sel = col_inm.selectbox("Inmueble a gestionar *", df_inm_m['nombre'].tolist())
+                    id_inm = df_inm_m[df_inm_m['nombre'] == m_inm_sel].iloc[0]['id']
+                    
+                    res_u = supabase.table("unidades").select("id, nombre, id_operador, operadores(nombre)").eq("id_inmueble", int(id_inm)).eq("estado", "ACTIVO").execute()
+                    df_u_man = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
+                    
+                    id_op_heredado = None
+                    if not df_u_man.empty:
+                        u_sel_man = col_uni.selectbox("Unidad específica *", df_u_man['nombre'].tolist())
+                        u_data = df_u_man[df_u_man['nombre'] == u_sel_man].iloc[0]
+                        id_op_heredado = u_data.get('id_operador')
+                        nom_op = u_data['operadores']['nombre'] if isinstance(u_data.get('operadores'), dict) and 'nombre' in u_data['operadores'] else "No definido"
+                        st.info(f"🛡️ **Operador Fiscal que facturará esta unidad:** {nom_op}")
                     else:
-                        with st.spinner("Subiendo archivos y registrando en base de datos..."):
-                            try:
-                                id_inm = df_inm_m[df_inm_m['nombre'] == m_inm_sel].iloc[0]['id']
-                                id_p1 = df_prop_m[df_prop_m['nombre'] == m_prop_sel_1].iloc[0]['id']
-                                id_p2 = int(df_prop_m[df_prop_m['nombre'] == m_prop_sel_2].iloc[0]['id']) if m_prop_sel_2 != "-- Ninguno --" else None
-                                
-                                def subir_pdf(archivo, prefijo):
-                                    if not archivo: return None
-                                    ext = archivo.name.split('.')[-1].lower()
-                                    tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
-                                    n_nube = f"{prefijo}_{id_inm}_{int(time.time())}.{ext}"
-                                    supabase.storage.from_("documentos_mandatos").upload(n_nube, archivo.getvalue(), file_options={"content-type": tipo_mime})
-                                    return supabase.storage.from_("documentos_mandatos").get_public_url(n_nube)
+                        col_uni.warning("⚠️ Este edificio no tiene unidades activas.")
+                    
+                    st.write("**Titular 1 (Principal)**")
+                    c1, c2, c3, c4 = st.columns([3, 1.2, 1.2, 4.6])
+                    m_prop_sel_1 = c1.selectbox("Propietario 1 *", df_prop_m['nombre'].tolist(), key="p1")
+                    iban_db = df_prop_m[df_prop_m['nombre'] == m_prop_sel_1].iloc[0]['cuenta_banco'] or ""
+                    m_porc_prop_1 = c2.number_input("% Legal", 0.0, 100.0, 100.0, key="pp1")
+                    m_porc_pago_1 = c3.number_input("% Cobro", 0.0, 100.0, 100.0, key="pg1")
+                    m_iban_1 = c4.text_input("IBAN / Cuenta Pago 1 *", value=iban_db, key="ib1")
+                    
+                    st.write("**Titular 2 (Opcional)**")
+                    c5, c6, c7, c8 = st.columns([3, 1.2, 1.2, 4.6])
+                    opciones_p2 = ["-- Ninguno --"] + df_prop_m['nombre'].tolist()
+                    m_prop_sel_2 = c5.selectbox("Propietario 2", opciones_p2, key="p2")
+                    m_porc_prop_2 = c6.number_input("% Legal 2", 0.0, 100.0, 0.0, key="pp2")
+                    m_porc_pago_2 = c7.number_input("% Cobro 2", 0.0, 100.0, 0.0, key="pg2")
+                    m_iban_2 = c8.text_input("IBAN / Cuenta Pago 2", key="ib2")
 
-                                url_c = subir_pdf(doc_contrato, "contrato")
-                                url_e = subir_pdf(doc_empadrona, "empadronamiento")
-                                url_i = subir_pdf(doc_inv, "inventario")
-                                url_s = subir_pdf(doc_sum, "suministros")
+                    st.markdown("#### 📅 2. Cronograma Automático (Smart Dates)")
+                    d1, d2, d3 = st.columns(3)
+                    f_suscripcion = d1.date_input("Fecha de Suscripción / Firma *")
+                    duracion_anos = d2.number_input("Duración Contrato (Años)", 1, 20, 5)
+                    meses_aviso = d3.number_input("Meses Preaviso No Renovación", 1, 12, 2)
+                    d4, d5, d6 = st.columns(3)
+                    f_entrega = d4.date_input("Fecha Entrega Llaves *")
+                    meses_carencia = d5.number_input("Meses de Carencia", 0, 12, 0)
+                    f_vencimiento = f_suscripcion + relativedelta(years=duracion_anos)
+                    f_inicio_pagos = f_entrega + relativedelta(months=meses_carencia)
+                    f_limite_aviso = f_vencimiento - relativedelta(months=meses_aviso)
 
-                                datos = {
-                                    "id_inmueble": int(id_inm), "id_propietario": int(id_p1), "id_propietario_2": id_p2,
-                                    "porcentaje_propiedad": m_porc_prop_1, "porcentaje_propiedad_2": m_porc_prop_2,
-                                    "porcentaje_pago_1": m_porc_pago_1, "porcentaje_pago_2": m_porc_pago_2,
-                                    "cuenta_pago": m_iban_1, "cuenta_pago_2": m_iban_2,
-                                    "ingreso_garantizado": m_renta, "valor_fianza": m_fianza,
-                                    "tipo_actualizacion": m_act, 
-                                    "tipo_indemnizacion": m_tipo_ind_db, 
-                                    "indemnizacion_anticipada": m_indemnizacion,
-                                    "fecha_suscripcion": str(f_suscripcion), "fecha_entrega": str(f_entrega),
-                                    "fecha_inicio_pagos": str(f_inicio_pagos), "fecha_terminacion": str(f_vencimiento),
-                                    "fecha_aviso_no_renovacion": str(f_limite_aviso),
-                                    "url_contrato": url_c, "url_empadronamiento": url_e,
-                                    "url_inventario": url_i, "url_suministros": url_s,
-                                    "estado_contrato": "FIRMADO", "estado_financiero": "PENDIENTE_FIANZA"
-                                }
-                                res = supabase.table("mandatos").insert(datos).execute()
-                                
-                                # Usamos la variable 'usuario_actual' global que definimos al inicio del módulo
-                                # Inyectamos la fecha legal de suscripción en el texto descriptivo del historial
-                                supabase.table("historial_mandatos").insert({
-                                "id_mandato": res.data[0]['id'], 
-                                "accion": f"CREACIÓN DE MANDATO (Firma Legal: {f_suscripcion})",
-                                "usuario": usuario_actual
-                            }).execute()
+                    c_res1, c_res2 = st.columns([8.5, 1.5])
+                    c_res1.success(f"🗓️ **Resumen:** Pagos inician: **{f_inicio_pagos}** | Vence: **{f_vencimiento}** | Preaviso: **{f_limite_aviso}**")
+                    c_res2.form_submit_button("🔄 Recalcular")
+                    
+                    st.markdown("#### 💰 3. Acuerdo Económico")
+                    e1, e2, e3 = st.columns(3)
+                    m_renta = e1.number_input(f"Renta Garantizada ({simbolo_mon}) *", min_value=0.0, step=50.0)
+                    m_fianza = e2.number_input(f"Fianza a Entregar ({simbolo_mon}) *", min_value=0.0, step=50.0)
+                    m_act = e3.selectbox("Actualización Anual", ["IPC", "FIJO", "NO APLICA"])
 
-                                st.success("✅ Mandato registrado con éxito.")
-                                st.session_state.modo_mandato = "NADA"
-                                time.sleep(1.5); st.rerun()
-                            except Exception as e: st.error(f"❌ Error al guardar: {e}")
+                    st.info("🛡️ Cláusula de protección (Amortización de Mejoras)")
+                    c_ind1, c_ind2 = st.columns([2, 1])
+                    m_tipo_ind_ui = c_ind1.selectbox("Modalidad de Penalización", ["NO APLICA", "MONTO FIJO (Cualquier momento)", "AMORTIZACIÓN DECRECIENTE (5 Años)"])
+                    mapa_ind = {"NO APLICA": "NINGUNA", "MONTO FIJO (Cualquier momento)": "FIJA", "AMORTIZACIÓN DECRECIENTE (5 Años)": "DECRECIENTE_5Y"}
+                    m_tipo_ind_db = mapa_ind[m_tipo_ind_ui]
+                    m_indemnizacion = c_ind2.number_input(f"Monto Base 100% ({simbolo_mon})", min_value=0.0, step=50.0)
 
-                if col_b2.form_submit_button("❌ Cancelar"):
-                    st.session_state.modo_mandato = "NADA"; st.rerun()
+                    st.markdown("#### 📁 4. Documentación Escaneada")
+                    cd1, cd2 = st.columns(2)
+                    doc_contrato = cd1.file_uploader("Contrato Firmado", type=["pdf", "jpg", "png"])
+                    doc_empadrona = cd2.file_uploader("Aut. Empadronamiento", type=["pdf", "jpg", "png"])
+                    cd3, cd4 = st.columns(2)
+                    doc_inv = cd3.file_uploader("Acta Inventario", type=["pdf", "jpg", "png"])
+                    doc_sum = cd4.file_uploader("Recibos Suministros", type=["pdf", "jpg", "png"])
 
-        # --- 5. PANEL PAGOS (VERSIÓN ERP CON CASCADA FINANCIERA) ---
+                    st.markdown("---")
+                    col_b1, col_b2, _ = st.columns([2.0, 1.5, 6.5])
+                    
+                    if col_b1.form_submit_button("💾 Generar Mandato"):
+                        if (m_porc_pago_1 + m_porc_pago_2) > 100.1 or (m_porc_prop_1 + m_porc_prop_2) > 100.1:
+                            st.error("❌ Los porcentajes superan el 100%.")
+                        elif df_u_man.empty:
+                            st.error("❌ No puedes crear un mandato en un inmueble sin unidades.")
+                        else:
+                            with st.spinner("Registrando contrato y vinculando operador..."):
+                                try:
+                                    id_p1 = df_prop_m[df_prop_m['nombre'] == m_prop_sel_1].iloc[0]['id']
+                                    id_p2 = int(df_prop_m[df_prop_m['nombre'] == m_prop_sel_2].iloc[0]['id']) if m_prop_sel_2 != "-- Ninguno --" else None
+                                    
+                                    def subir_pdf(archivo, prefijo):
+                                        if not archivo: return None
+                                        ext = archivo.name.split('.')[-1].lower()
+                                        tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
+                                        n_nube = f"{prefijo}_{id_inm}_{int(time.time())}.{ext}"
+                                        supabase.storage.from_("documentos_mandatos").upload(n_nube, archivo.getvalue(), file_options={"content-type": tipo_mime})
+                                        return supabase.storage.from_("documentos_mandatos").get_public_url(n_nube)
+
+                                    url_c = subir_pdf(doc_contrato, "contrato")
+                                    url_e = subir_pdf(doc_empadrona, "empadronamiento")
+                                    url_i = subir_pdf(doc_inv, "inventario")
+                                    url_s = subir_pdf(doc_sum, "suministros")
+
+                                    datos = {
+                                        "id_inmueble": int(id_inm), "id_propietario": int(id_p1), "id_propietario_2": id_p2,
+                                        "id_operador": id_op_heredado, "moneda": moneda_sesion, 
+                                        "porcentaje_propiedad": m_porc_prop_1, "porcentaje_propiedad_2": m_porc_prop_2,
+                                        "porcentaje_pago_1": m_porc_pago_1, "porcentaje_pago_2": m_porc_pago_2,
+                                        "cuenta_pago": m_iban_1, "cuenta_pago_2": m_iban_2,
+                                        "ingreso_garantizado": m_renta, "valor_fianza": m_fianza,
+                                        "tipo_actualizacion": m_act, "tipo_indemnizacion": m_tipo_ind_db, 
+                                        "indemnizacion_anticipada": m_indemnizacion,
+                                        "fecha_suscripcion": str(f_suscripcion), "fecha_entrega": str(f_entrega),
+                                        "fecha_inicio_pagos": str(f_inicio_pagos), "fecha_terminacion": str(f_vencimiento),
+                                        "fecha_aviso_no_renovacion": str(f_limite_aviso),
+                                        "url_contrato": url_c, "url_empadronamiento": url_e,
+                                        "url_inventario": url_i, "url_suministros": url_s,
+                                        "estado_contrato": "FIRMADO", "estado_financiero": "PENDIENTE_FIANZA"
+                                    }
+                                    res = supabase.table("mandatos").insert(datos).execute()
+                                    
+                                    var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                                    usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+
+                                    supabase.table("historial_mandatos").insert({
+                                        "id_mandato": res.data[0]['id'], 
+                                        "accion": f"CREACIÓN MANDATO (Firma: {f_suscripcion}). Operador: {nom_op}",
+                                        "usuario": usuario_actual
+                                    }).execute()
+
+                                    st.success("✅ Mandato registrado con éxito.")
+                                    st.session_state.modo_mandato = "NADA"; time.sleep(1.5); st.rerun()
+                                except Exception as e: st.error(f"❌ Error al guardar: {e}")
+
+                    if col_b2.form_submit_button("❌ Cancelar"): st.session_state.modo_mandato = "NADA"; st.rerun()
+
+        # --- 5. PANEL PAGOS (CASCADA FINANCIERA) ---
         elif st.session_state.modo_mandato == "PAGOS" and not df_man.empty:
             st.markdown("---")
             st.markdown("### 💰 Gestión de Pagos y Soportes Bancarios")
-            
-            # 1. Cargar Cuentas Bancarias Activas (Para elegir de dónde sale el dinero)
             try:
-                res_bancos = supabase.table("fin_cuentas_bancarias").select("id, nombre_interno, banco, saldo_actual").eq("estado", "ACTIVO").execute()
+                res_bancos = supabase.table("fin_cuentas_bancarias").select("id, nombre_interno, banco, saldo_actual").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
                 df_cuentas = pd.DataFrame(res_bancos.data) if res_bancos.data else pd.DataFrame()
-            except:
-                df_cuentas = pd.DataFrame()
+            except: df_cuentas = pd.DataFrame()
 
             op_man = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel = st.selectbox("Selecciona el Mandato a pagar:", op_man)
-            
             if m_sel:
                 idx = op_man.index(m_sel)
                 id_m = df_man.iloc[idx]['id']
                 d_m = df_man.iloc[idx]
-                
-                st.info(f"**Acuerdo Actual:** Renta: **{d_m['ingreso_garantizado']}** | Fianza: **{d_m['valor_fianza']}** | Estado: **{d_m['estado_financiero']}**")
+                st.info(f"**Acuerdo Actual:** Renta: **{simbolo_mon} {d_m['ingreso_garantizado']}** | Fianza: **{simbolo_mon} {d_m['valor_fianza']}** | Estado: **{d_m['estado_financiero']}**")
                 
                 c_f, c_h = st.columns([1.2, 1])
                 with c_f:
                     with st.form(f"form_pago_{id_m}", clear_on_submit=True):
                         st.subheader("📤 Registrar Egreso / Pago")
-                        
                         p_c1, p_c2 = st.columns(2)
                         conc = p_c1.text_input("Concepto", value="PAGO FIANZA" if d_m['estado_financiero'] == "PENDIENTE_FIANZA" else "ALQUILER MES")
-                        fecha_pago = p_c2.date_input("Fecha del Pago") # <- IMPORTANTE PARA BACKDATING (Ej: 18/03/2026)
-                        
+                        fecha_pago = p_c2.date_input("Fecha del Pago")
                         p_c3, p_c4 = st.columns(2)
-                        monto = p_c3.number_input("Monto (€/$)", value=float(d_m['valor_fianza'] if d_m['estado_financiero'] == "PENDIENTE_FIANZA" else d_m['ingreso_garantizado']))
+                        monto = p_c3.number_input(f"Monto ({simbolo_mon})", value=float(d_m['valor_fianza'] if d_m['estado_financiero'] == "PENDIENTE_FIANZA" else d_m['ingreso_garantizado']))
                         
-                        # Selector de cuenta bancaria
                         if not df_cuentas.empty:
                             opciones_cta = [f"{r['nombre_interno']} ({r['banco']}) - Saldo: {r['saldo_actual']}" for _, r in df_cuentas.iterrows()]
                             cta_sel = p_c4.selectbox("Cuenta de Origen *", opciones_cta)
-                        else:
-                            cta_sel = p_c4.selectbox("Cuenta de Origen *", ["No hay cuentas registradas"])
+                        else: cta_sel = p_c4.selectbox("Cuenta de Origen *", [f"No hay cuentas en {moneda_sesion}"])
                             
                         sop = st.file_uploader("Adjuntar Soporte del Banco", type=["pdf", "jpg", "png"])
                         
                         if st.form_submit_button("💾 Ejecutar Pago y Actualizar Bancos"):
-                            if df_cuentas.empty:
-                                st.error("❌ Debes crear una cuenta bancaria primero en el módulo Tesorería.")
+                            if df_cuentas.empty: st.error("❌ Debes crear una cuenta bancaria primero.")
                             else:
                                 with st.spinner("Procesando cascada financiera..."):
                                     try:
-                                        # Identificar la cuenta seleccionada
                                         idx_cta = opciones_cta.index(cta_sel)
                                         id_cta = df_cuentas.iloc[idx_cta]['id']
                                         saldo_anterior = float(df_cuentas.iloc[idx_cta]['saldo_actual'])
                                         
-                                        # 1. Subir soporte al Bucket
                                         u_s = None
                                         if sop:
                                             ext = sop.name.split('.')[-1].lower()
-                                            # 💡 SOLUCIÓN: Le decimos explícitamente al navegador qué tipo de archivo es
                                             tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
                                             n_s = f"soporte_{id_m}_{int(time.time())}.{ext}"
                                             supabase.storage.from_("soportes_pagos").upload(n_s, sop.getvalue(), file_options={"content-type": tipo_mime})
                                             u_s = supabase.storage.from_("soportes_pagos").get_public_url(n_s)                                            
-                                        # 2. Registrar en pagos_mandatos (Historial de la propiedad)
-                                        supabase.table("pagos_mandatos").insert({
-                                            "id_mandato": int(id_m), "concepto": conc, "monto": monto, 
-                                            "fecha_pago": str(fecha_pago), "url_soporte_bancario": u_s, 
-                                            "estado_envio": "PENDIENTE"
-                                        }).execute()
                                         
-                                        # 3. Registrar Movimiento Bancario (EGRESO EN TESORERÍA)
-                                        supabase.table("fin_movimientos_banco").insert({
-                                            "id_cuenta_bancaria": int(id_cta),
-                                            "fecha_movimiento": str(fecha_pago),
-                                            "tipo": "EGRESO",
-                                            "monto": monto,
-                                            "concepto": f"{conc} - MANDATO {id_m}",
-                                            "estado_conciliacion": "PENDIENTE"
-                                        }).execute()
-                                        
-                                        # 4. Actualizar Saldo de la Cuenta Bancaria (La matemática real)
+                                        supabase.table("pagos_mandatos").insert({"id_mandato": int(id_m), "concepto": conc, "monto": monto, "fecha_pago": str(fecha_pago), "url_soporte_bancario": u_s, "estado_envio": "PENDIENTE"}).execute()
+                                        supabase.table("fin_movimientos_banco").insert({"id_cuenta_bancaria": int(id_cta), "fecha_movimiento": str(fecha_pago), "tipo": "EGRESO", "monto": monto, "concepto": f"{conc} - MANDATO {id_m}", "estado_conciliacion": "PENDIENTE"}).execute()
                                         nuevo_saldo = saldo_anterior - monto
                                         supabase.table("fin_cuentas_bancarias").update({"saldo_actual": nuevo_saldo}).eq("id", int(id_cta)).execute()
 
-                                        # 4.5 ¡MAGIA ERP! GENERAR ASIENTO CONTABLE AUTOMÁTICO (Partida Doble)
-                                        id_cta_banco = supabase.table("fin_cuentas_contables").select("id").eq("codigo", "1110").execute().data[0]['id']
-                                        # Lógica básica: Si es fianza a la 2505, si es alquiler a la 4105 (Ingresos)
+                                        id_cta_banco = supabase.table("fin_cuentas_contables").select("id").eq("codigo", "1110").eq("moneda", moneda_sesion).execute().data[0]['id']
                                         codigo_contra = "2505" if "FIANZA" in conc.upper() else "4105"
-                                        id_cta_contra = supabase.table("fin_cuentas_contables").select("id").eq("codigo", codigo_contra).execute().data[0]['id']
+                                        id_cta_contra = supabase.table("fin_cuentas_contables").select("id").eq("codigo", codigo_contra).eq("moneda", moneda_sesion).execute().data[0]['id']
                                         
-                                        # A. Cabecera (Enviando doble concepto para evitar error NOT NULL)
-                                        res_ast = supabase.table("fin_asientos").insert({
-                                            "fecha_contable": str(fecha_pago),
-                                            "descripcion": f"{conc} - MANDATO {id_m}",
-                                            "concepto_general": f"{conc} - MANDATO {id_m}",
-                                            "origen": "MODULO_PAGOS",
-                                            "estado": "CONTABILIZADO"
-                                        }).execute()
+                                        res_ast = supabase.table("fin_asientos").insert({"fecha_contable": str(fecha_pago), "descripcion": f"{conc} - MANDATO {id_m}", "concepto_general": f"{conc} - MANDATO {id_m}", "origen": "MODULO_PAGOS", "moneda": moneda_sesion, "estado": "CONTABILIZADO"}).execute()
                                         id_ast_nuevo = res_ast.data[0]['id']
                                         
-                                        # B. Apuntes
-                                        supabase.table("fin_apuntes").insert({
-                                            "id_asiento": id_ast_nuevo, "id_cuenta_contable": id_cta_banco,
-                                            "debito": 0.0, "credito": float(monto), "descripcion_linea": "Salida de Tesorería"
-                                        }).execute()
-                                        supabase.table("fin_apuntes").insert({
-                                            "id_asiento": id_ast_nuevo, "id_cuenta_contable": id_cta_contra,
-                                            "debito": float(monto), "credito": 0.0, "descripcion_linea": conc
-                                        }).execute()
-
-                                        # 5. Actualizar Estado del Mandato
+                                        supabase.table("fin_apuntes").insert({"id_asiento": id_ast_nuevo, "id_cuenta_contable": id_cta_banco, "debito": 0.0, "credito": float(monto), "descripcion_linea": "Salida Banco"}).execute()
+                                        supabase.table("fin_apuntes").insert({"id_asiento": id_ast_nuevo, "id_cuenta_contable": id_cta_contra, "debito": float(monto), "credito": 0.0, "descripcion_linea": conc}).execute()
                                         supabase.table("mandatos").update({"estado_financiero": "AL_DIA"}).eq("id", int(id_m)).execute()
                                         
-                                        # 6. Registrar en Historial Específico
-                                        supabase.table("historial_mandatos").insert({
-                                            "id_mandato": int(id_m), 
-                                            "accion": f"PAGO REGISTRADO: {conc} ({monto}). Saldo banco actualizado y Asiento generado.",
-                                            "usuario": usuario_actual
-                                        }).execute()
+                                        var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                                        usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+                                        supabase.table("historial_mandatos").insert({"id_mandato": int(id_m), "accion": f"PAGO: {conc} ({monto}). Banco actualizado.", "usuario": usuario_actual}).execute()
                                         
-                                        # 7. Registrar en el Log General de Usuarios
                                         log_accion(supabase, usuario_actual, "PAGO REGISTRADO", f"{conc} - Mandato ID: {id_m}")
 
                                         st.success("✅ ¡Cascada Financiera ejecutada! Banco y Contabilidad actualizados.")
                                         time.sleep(2); st.rerun()
-                                    except Exception as e: 
-                                        st.error(f"Error en la Cascada Financiera: {e}")
+                                    except Exception as e: st.error(f"Error en Cascada: {e}")
 
                 with c_h:
-                    # 💡 AÑADIMOS EL CONTENEDOR CON BORDE 
                     with st.container(border=True):
                         st.subheader("📚 Historial de Pagos")
                         try:
                             res_p = supabase.table("pagos_mandatos").select("*").eq("id_mandato", int(id_m)).order("fecha_pago", desc=True).execute()
                             df_p = pd.DataFrame(res_p.data) if res_p.data else pd.DataFrame()
                         except: df_p = pd.DataFrame()
-                            
                         if not df_p.empty:
                             for _, p in df_p.iterrows():
                                 with st.expander(f"✅ {p['fecha_pago']} - {p['concepto']} ({p['monto']})"):
                                     if p['url_soporte_bancario']: st.markdown(f"**[🔍 Ver PDF del Banco]({p['url_soporte_bancario']})**")
-                                    if st.button("📲 Compartir a Propietario", key=f"btn_comp_{p['id']}", use_container_width=True):
-                                        st.toast("Módulo de envío en construcción 🚧", icon="⏳")
-                        else: st.info("Sin pagos registrados.")
+                        else: st.info("Sin pagos.")
             st.markdown("---")
             if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
-        # --- PANEL: BÓVEDA DE DOCUMENTOS ---
+
         elif st.session_state.modo_mandato == "DOCUMENTOS" and not df_man.empty:
             st.markdown("---")
             st.markdown("### 📁 Bóveda de Documentos Legales")
-            
-            # Selector del Contrato
             op_man_docs = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel_doc = st.selectbox("Selecciona el Mandato para ver sus archivos:", op_man_docs)
-            
             if m_sel_doc:
                 idx = op_man_docs.index(m_sel_doc)
                 d_m = df_man.iloc[idx]
-                
-                st.write("") # Espaciador
                 c1, c2, c3, c4 = st.columns(4)
-                
                 def tarjeta_doc(columna, titulo, url_doc, icono):
                     with columna:
                         st.markdown(f"**{icono} {titulo}**")
                         if url_doc and str(url_doc).strip() != "None" and str(url_doc).strip() != "":
-                            st.success("✅ Guardado en Nube")
-                            st.markdown(f"[📥 Abrir / Ver Documento]({url_doc})")
-                        else:
-                            st.warning("❌ Pendiente")
-                            
-                tarjeta_doc(c1, "Contrato Firmado", d_m.get('url_contrato'), "📄")
-                tarjeta_doc(c2, "Empadronamiento", d_m.get('url_empadronamiento'), "🏠")
-                tarjeta_doc(c3, "Acta Inventario", d_m.get('url_inventario'), "📦")
+                            st.success("✅ Guardado")
+                            st.markdown(f"[📥 Abrir Documento]({url_doc})")
+                        else: st.warning("❌ Pendiente")
+                tarjeta_doc(c1, "Contrato", d_m.get('url_contrato'), "📄")
+                tarjeta_doc(c2, "Empadrona.", d_m.get('url_empadronamiento'), "🏠")
+                tarjeta_doc(c3, "Inventario", d_m.get('url_inventario'), "📦")
                 tarjeta_doc(c4, "Suministros", d_m.get('url_suministros'), "💧")
-                
             st.markdown("---")
-            if st.button("❌ Cerrar Bóveda", key="btn_cerrar_docs"): 
-                st.session_state.modo_mandato = "NADA"
-                st.rerun()
-        # --- PANEL: HISTORIAL DE MANDATOS ---
+            if st.button("❌ Cerrar Bóveda"): st.session_state.modo_mandato = "NADA"; st.rerun()
+
         elif st.session_state.modo_mandato == "HISTORIAL" and not df_man.empty:
             st.markdown("---")
             st.markdown("### 📜 Historial y Auditoría del Contrato")
-            
-            # Selector del Contrato
             op_man_hist = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel_hist = st.selectbox("Selecciona el Mandato para ver su actividad:", op_man_hist)
-            
             if m_sel_hist:
                 idx = op_man_hist.index(m_sel_hist)
                 id_m = df_man.iloc[idx]['id']
-                
                 try:
-                    # Extraemos usando la columna real 'fecha_evento'
                     res_hist = supabase.table("historial_mandatos").select("fecha_evento, accion, usuario").eq("id_mandato", int(id_m)).order("fecha_evento", desc=True).execute()
                     df_h = pd.DataFrame(res_hist.data) if res_hist.data else pd.DataFrame()
-                except Exception as e:
-                    df_h = pd.DataFrame()
-                    st.error(f"Error técnico al cargar historial: {e}")
-                    
+                except Exception as e: df_h = pd.DataFrame()
                 if not df_h.empty:
-                    # Formateamos la fecha correctamente
                     df_h['FECHA'] = pd.to_datetime(df_h['fecha_evento']).dt.strftime('%d/%m/%Y %H:%M')
-                    df_h_display = df_h[['FECHA', 'accion', 'usuario']].copy()    
-                    st.dataframe(df_h_display, use_container_width=True, hide_index=True)
-                else:
-                    st.info("ℹ️ No hay registros en el historial para este mandato todavía.")
-            
+                    st.dataframe(df_h[['FECHA', 'accion', 'usuario']].copy(), use_container_width=True, hide_index=True)
+                else: st.info("ℹ️ No hay registros en el historial.")
             st.markdown("---")
-            if st.button("❌ Cerrar Historial", key="btn_cerrar_hist"):
-                st.session_state.modo_mandato = "NADA"
-                st.rerun()
+            if st.button("❌ Cerrar Historial"): st.session_state.modo_mandato = "NADA"; st.rerun()
 
-        # --- 6. PANELES EDITAR  ---
         elif st.session_state.modo_mandato == "EDITAR" and not df_man.empty:
             st.markdown("---")
             st.markdown("### ⚙️ Gestionar y Modificar Contrato")
-            
-            # Selector
             op_man_edit = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel_edit = st.selectbox("Selecciona el Mandato a gestionar:", op_man_edit)
-
             if m_sel_edit:
                 idx = op_man_edit.index(m_sel_edit)
                 d_m = df_man.iloc[idx]
                 id_m = str(d_m['id'])
-
                 with st.form(f"form_edit_man_{id_m}", clear_on_submit=False):
-                    st.write("**Actualizar Condiciones Financieras**")
                     c1, c2, c3 = st.columns(3)
-                    e_renta = c1.number_input("Renta Garantizada (€/$)", value=float(d_m.get('ingreso_garantizado', 0.0)), step=50.0)
-                    e_fianza = c2.number_input("Fianza (€/$)", value=float(d_m.get('valor_fianza', 0.0)), step=50.0)
-                    
+                    e_renta = c1.number_input(f"Renta Garantizada ({simbolo_mon})", value=float(d_m.get('ingreso_garantizado', 0.0)), step=50.0)
+                    e_fianza = c2.number_input(f"Fianza ({simbolo_mon})", value=float(d_m.get('valor_fianza', 0.0)), step=50.0)
                     lista_act = ["IPC", "FIJO", "NO APLICA"]
                     idx_act = lista_act.index(d_m.get('tipo_actualizacion', 'IPC')) if d_m.get('tipo_actualizacion') in lista_act else 0
                     e_act = c3.selectbox("Actualización Anual", lista_act, index=idx_act)
-
-                    st.write("**Actualizar Cuentas de Pago (IBAN)**")
+                    
                     c4, c5 = st.columns(2)
                     e_cta1 = c4.text_input("Cuenta / IBAN Principal", value=str(d_m.get('cuenta_pago', '')))
                     e_cta2 = c5.text_input("Cuenta / IBAN Secundaria", value=str(d_m.get('cuenta_pago_2', '')).replace("None", ""))
-
-                    st.markdown("---")
-                    col_b1, col_b2, _ = st.columns([2, 1.5, 6.5])
                     
+                    col_b1, col_b2, _ = st.columns([2, 1.5, 6.5])
                     if col_b1.form_submit_button("💾 Guardar Cambios"):
-                        datos_upd = {
-                            "ingreso_garantizado": e_renta,
-                            "valor_fianza": e_fianza,
-                            "tipo_actualizacion": e_act,
-                            "cuenta_pago": e_cta1.strip(),
-                            "cuenta_pago_2": e_cta2.strip()
-                        }
-                        supabase.table("mandatos").update(datos_upd).eq("id", int(id_m)).execute()
-                        
-                        # Guardar historial
-                        supabase.table("historial_mandatos").insert({
-                            "id_mandato": int(id_m), 
-                            "accion": f"CONDICIONES ACTUALIZADAS: Renta {e_renta}, Fianza {e_fianza}, Act: {e_act}",
-                            "usuario": usuario_actual
-                        }).execute()
-                        log_accion(supabase, usuario_actual, "EDITAR MANDATO", m_sel_edit)
-                        
-                        st.success("✅ Contrato actualizado correctamente.")
-                        st.session_state.modo_mandato = "NADA"
-                        time.sleep(1)
-                        st.rerun()
-                        
-                    if col_b2.form_submit_button("❌ Cerrar"):
-                        st.session_state.modo_mandato = "NADA"
-                        st.rerun()
-
-                # --- ZONA DE PELIGRO (Fuera del form para evitar clicks accidentales) ---
+                        supabase.table("mandatos").update({"ingreso_garantizado": e_renta, "valor_fianza": e_fianza, "tipo_actualizacion": e_act, "cuenta_pago": e_cta1.strip(), "cuenta_pago_2": e_cta2.strip()}).eq("id", int(id_m)).execute()
+                        var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                        usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+                        supabase.table("historial_mandatos").insert({"id_mandato": int(id_m), "accion": f"CONDICIONES ACTUALIZADAS: Renta {e_renta}, Fianza {e_fianza}, Act: {e_act}", "usuario": usuario_actual}).execute()
+                        st.success("✅ Contrato actualizado."); st.session_state.modo_mandato = "NADA"; time.sleep(1); st.rerun()
+                    if col_b2.form_submit_button("❌ Cerrar"): st.session_state.modo_mandato = "NADA"; st.rerun()
+                
                 st.write("")
                 st.error("🚨 Zona de Peligro: Finalización de Contrato")
                 c_del1, c_del2 = st.columns([7, 3])
-                confirmar_fin = c_del1.checkbox("⚠️ Confirmo que deseo FINALIZAR este contrato (Pasará a histórico y no generará más pagos).", key=f"chk_fin_{id_m}")
-                
+                confirmar_fin = c_del1.checkbox("⚠️ Confirmo que deseo FINALIZAR este contrato.", key=f"chk_fin_{id_m}")
                 if c_del2.button("🛑 Finalizar Contrato", disabled=not confirmar_fin, use_container_width=True):
-                    # Actualizamos el estado a FINALIZADO
                     supabase.table("mandatos").update({"estado_contrato": "FINALIZADO"}).eq("id", int(id_m)).execute()
-                    
-                    supabase.table("historial_mandatos").insert({
-                        "id_mandato": int(id_m), "accion": "CONTRATO FINALIZADO POR EL USUARIO", "usuario": usuario_actual
-                    }).execute()
-                    log_accion(supabase, usuario_actual, "FINALIZAR MANDATO", m_sel_edit)
-                    
-                    st.success("✅ El contrato ha sido finalizado y archivado.")
-                    st.session_state.modo_mandato = "NADA"
-                    time.sleep(1.5)
-                    st.rerun()
+                    var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                    usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+                    supabase.table("historial_mandatos").insert({"id_mandato": int(id_m), "accion": "CONTRATO FINALIZADO POR EL USUARIO", "usuario": usuario_actual}).execute()
+                    st.success("✅ El contrato ha sido finalizado."); st.session_state.modo_mandato = "NADA"; time.sleep(1.5); st.rerun()
 
-        # --- 6.1 PANELES  REPORTES ---
         elif st.session_state.modo_mandato == "REPORTES" and not df_man.empty:
             st.markdown("---")
             st.markdown("## Centro de Reportes de Mandatos")
-
-            # 💡 CAMBIO A SELECTBOX (Más elegante y escalable)
-            tipo_rep = st.selectbox("Elige el tipo de reporte:", [
-                "Ficha Detallada (Un Contrato)", 
-                "Historial de Auditoría (Un Contrato)",
-                "Directorio Global (Todos los Contratos)"
-            ])
+            tipo_rep = st.selectbox("Elige el tipo de reporte:", ["Ficha Detallada (Un Contrato)", "Historial de Auditoría (Un Contrato)", "Directorio Global (Todos los Contratos)"])
+            
+            var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+            usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
 
             if tipo_rep == "Directorio Global (Todos los Contratos)":
-                try:
-                    res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
-                    df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+                try: res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
                 except: df_ops = pd.DataFrame()
-
                 df_rep = df_view_display.copy()
                 if 'DOCS' in df_rep.columns: df_rep = df_rep.drop(columns=['DOCS'])
-
-                panel_reportes_y_compartir(
-                    df_datos=df_rep,
-                    nombre_base="directorio_mandatos_activos",
-                    modulo_origen="Mandatos",
-                    funcion_pdf=generar_pdf_mandatos,
-                    df_operadores=df_ops,
-                    supabase=supabase,
-                    usuario_actual=usuario_actual,
-                    clave_estado_cerrar="modo_mandato"
-                )
-
+                panel_reportes_y_compartir(df_rep, "directorio_mandatos", "Mandatos", generar_pdf_mandatos, df_ops, supabase, usuario_actual, "modo_mandato")
             elif tipo_rep == "Ficha Detallada (Un Contrato)":
                 op_man_rep = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
                 m_sel_rep = st.selectbox("Selecciona el Mandato a exportar:", op_man_rep)
-
                 if m_sel_rep:
                     idx = op_man_rep.index(m_sel_rep)
-                    d_m = df_man.iloc[idx]
-                    d_v = df_view_display.iloc[idx]
-
+                    d_m = df_man.iloc[idx]; d_v = df_view_display.iloc[idx]
                     datos_ficha = {
-                        'inmueble': d_v['INMUEBLE'], 'propietario_1': d_v['TITULAR'],
-                        'porc_prop_1': d_m.get('porcentaje_propiedad', 0), 'porc_pago_1': d_m.get('porcentaje_pago_1', 0),
-                        'iban_1': d_m.get('cuenta_pago', ''), 'porc_prop_2': d_m.get('porcentaje_propiedad_2', 0),
-                        'porc_pago_2': d_m.get('porcentaje_pago_2', 0), 'iban_2': d_m.get('cuenta_pago_2', ''),
-                        'f_suscripcion': d_m.get('fecha_suscripcion', ''), 'f_entrega': d_m.get('fecha_entrega', ''),
-                        'f_pagos': d_m.get('fecha_inicio_pagos', ''), 'f_vence': d_m.get('fecha_terminacion', ''),
-                        'f_aviso': d_m.get('fecha_aviso_no_renovacion', ''), 'renta': d_m.get('ingreso_garantizado', 0),
-                        'actualizacion': d_m.get('tipo_actualizacion', ''), 'fianza': d_m.get('valor_fianza', 0),
-                        'tipo_ind': d_m.get('tipo_indemnizacion', ''), 'monto_ind': d_m.get('indemnizacion_anticipada', 0),
-                        'estado_fin': d_m.get('estado_financiero', ''), 'url_c': d_m.get('url_contrato', ''),
-                        'url_e': d_m.get('url_empadronamiento', ''), 'url_i': d_m.get('url_inventario', ''),
-                        'url_s': d_m.get('url_suministros', '')
+                        'inmueble': d_v['INMUEBLE'], 'propietario_1': d_v['TITULAR'], 'porc_prop_1': d_m.get('porcentaje_propiedad', 0), 'porc_pago_1': d_m.get('porcentaje_pago_1', 0), 'iban_1': d_m.get('cuenta_pago', ''), 'porc_prop_2': d_m.get('porcentaje_propiedad_2', 0), 'porc_pago_2': d_m.get('porcentaje_pago_2', 0), 'iban_2': d_m.get('cuenta_pago_2', ''), 'f_suscripcion': d_m.get('fecha_suscripcion', ''), 'f_entrega': d_m.get('fecha_entrega', ''), 'f_pagos': d_m.get('fecha_inicio_pagos', ''), 'f_vence': d_m.get('fecha_terminacion', ''), 'f_aviso': d_m.get('fecha_aviso_no_renovacion', ''), 'renta': d_m.get('ingreso_garantizado', 0), 'actualizacion': d_m.get('tipo_actualizacion', ''), 'fianza': d_m.get('valor_fianza', 0), 'tipo_ind': d_m.get('tipo_indemnizacion', ''), 'monto_ind': d_m.get('indemnizacion_anticipada', 0), 'estado_fin': d_m.get('estado_financiero', ''), 'url_c': d_m.get('url_contrato', ''), 'url_e': d_m.get('url_empadronamiento', ''), 'url_i': d_m.get('url_inventario', ''), 'url_s': d_m.get('url_suministros', '')
                     }
-
-                    df_ficha_unica = pd.DataFrame([datos_ficha])
-
-                    try:
-                        res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
-                        df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+                    try: res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
                     except: df_ops = pd.DataFrame()
-
-                    panel_reportes_y_compartir(
-                        df_datos=df_ficha_unica,
-                        nombre_base=f"Ficha_Mandato_{d_v['INMUEBLE'].replace(' ', '_')}",
-                        modulo_origen="Ficha de Mandato",
-                        funcion_pdf=generar_pdf_ficha_mandato,
-                        df_operadores=df_ops,
-                        supabase=supabase,
-                        usuario_actual=usuario_actual,
-                        clave_estado_cerrar="modo_mandato"
-                    )
-
+                    panel_reportes_y_compartir(pd.DataFrame([datos_ficha]), f"Ficha_Mandato", "Ficha de Mandato", generar_pdf_ficha_mandato, df_ops, supabase, usuario_actual, "modo_mandato")
             elif tipo_rep == "Historial de Auditoría (Un Contrato)":
                 op_man_aud = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
                 m_sel_aud = st.selectbox("Selecciona el Mandato para auditar:", op_man_aud)
-
                 if m_sel_aud:
                     idx = op_man_aud.index(m_sel_aud)
                     id_m = df_man.iloc[idx]['id']
-                    
-                    try:
-                        res_hist = supabase.table("historial_mandatos").select("fecha_evento, accion, usuario").eq("id_mandato", int(id_m)).order("fecha_evento", desc=True).execute()
-                        df_h = pd.DataFrame(res_hist.data) if res_hist.data else pd.DataFrame()
-                    except Exception as e:
-                        df_h = pd.DataFrame()
-
+                    try: res_hist = supabase.table("historial_mandatos").select("fecha_evento, accion, usuario").eq("id_mandato", int(id_m)).order("fecha_evento", desc=True).execute(); df_h = pd.DataFrame(res_hist.data) if res_hist.data else pd.DataFrame()
+                    except Exception as e: df_h = pd.DataFrame()
                     if not df_h.empty:
                         df_h['FECHA'] = pd.to_datetime(df_h['fecha_evento']).dt.strftime('%d/%m/%Y %H:%M')
                         df_h_rep = df_h[['FECHA', 'accion', 'usuario']].copy()
                         df_h_rep.rename(columns={'accion': 'ACCION REGISTRADA', 'usuario': 'USUARIO'}, inplace=True)
-
-                        try:
-                            res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
-                            df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+                        try: res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
                         except: df_ops = pd.DataFrame()
-
-                        panel_reportes_y_compartir(
-                            df_datos=df_h_rep,
-                            nombre_base=f"Auditoria_Mandato_{id_m}",
-                            modulo_origen="Historial Mandato",
-                            funcion_pdf=generar_pdf_historial_mandato,
-                            df_operadores=df_ops,
-                            supabase=supabase,
-                            usuario_actual=usuario_actual,
-                            clave_estado_cerrar="modo_mandato"
-                        )
-                    else:
-                        st.info("ℹ️ No hay registros de auditoría para este contrato todavía.")
-
+                        panel_reportes_y_compartir(df_h_rep, f"Auditoria_Mandato", "Historial Mandato", generar_pdf_historial_mandato, df_ops, supabase, usuario_actual, "modo_mandato")
+                    else: st.info("ℹ️ No hay registros.")
             st.markdown("---")
             if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
 
     # ==========================================
-    # TAB 4: INVENTARIOS (Mobiliario)
+    # TAB 4: ACTIVOS NO INVENTARIOS (Mobiliario y Equipos)
     # ==========================================
     with tab4:
-        st.subheader("Control de Bienes y Mobiliario")
-        st.info("💡 Control de activos. Si dejas la 'Unidad' en blanco, el sistema sabrá que pertenece a las Zonas Comunes del edificio.")
-        st.button("➕ Simular Botón: Registrar Mobiliario", disabled=True)
+        if 'modo_activo' not in st.session_state:
+            st.session_state.modo_activo = "NADA"
+
+        st.subheader("Activos Fijos y Mobiliario")
+
+        moneda_sesion = st.session_state.get("moneda_usuario", "EUR")
+        simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
+
+        try:
+            res_inm = supabase.table("inmuebles").select("id, nombre").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
+            df_inm_act = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
+        except:
+            df_inm_act = pd.DataFrame()
+# 🚀 --- DIRECTORIO DE ACTIVOS (LA CUADRÍCULA) --- 🚀
+        if st.session_state.modo_activo == "NADA":
+            try:
+                # Traemos los activos cruzando datos con operadores, propiedades y unidades para tener los nombres reales
+                res_act = supabase.table("activos").select("*, operadores(nombre), inmuebles(nombre), unidades(nombre)").eq("moneda", moneda_sesion).execute()
+                df_act = pd.DataFrame(res_act.data) if res_act.data else pd.DataFrame()
+            except:
+                df_act = pd.DataFrame()
+
+            st.write("") 
+            
+            if not df_act.empty:
+                df_act_display = df_act.copy()
+                
+                # --- 1. PREPARAMOS LOS DATOS PRIMERO ---
+                def get_dueno(row):
+                    if row.get('propiedad') == 'Empresa' and isinstance(row.get('operadores'), dict):
+                        return row['operadores'].get('nombre', 'Operador')
+                    return "Propietario"
+                    
+                def get_ubicacion(row):
+                    ubi = str(row.get('ubicacion_tipo', 'Bodega'))
+                    if ubi == 'Zona Común' and isinstance(row.get('inmuebles'), dict):
+                        return f"{row['inmuebles'].get('nombre', '')}: Común"
+                    elif ubi == 'Unidad' and isinstance(row.get('unidades'), dict):
+                        inm_nom = row['inmuebles'].get('nombre', '') if isinstance(row.get('inmuebles'), dict) else ""
+                        return f"{inm_nom}: {row['unidades'].get('nombre', '')}"
+                    return ubi
+                
+                df_act_display['DUEÑO'] = df_act_display.apply(get_dueno, axis=1)
+                df_act_display['UBICACIÓN'] = df_act_display.apply(get_ubicacion, axis=1)
+                df_act_display['VALOR'] = pd.to_numeric(df_act_display['valor_compra']).fillna(0).apply(lambda x: f"{simbolo_mon} {x:,.2f}" if x > 0 else "-")
+                
+                df_act_display.rename(columns={'codigo_unico': 'CÓDIGO', 'nombre': 'ACTIVO', 'categoria': 'CATEGORÍA', 'estado': 'ESTADO', 'factura_url': 'SOPORTE'}, inplace=True)
+                
+                # --- 2. LOS 3 FILTROS SUPERIORES ---
+                c_busq1, c_busq2, c_busq3 = st.columns([4, 3, 3])
+                
+                busqueda_act = c_busq1.text_input("🔍 Buscar Código o Nombre...", "").upper().strip()
+                
+                lista_ubicaciones = ["TODAS"] + sorted(df_act_display['UBICACIÓN'].dropna().unique().tolist())
+                filtro_ubi = c_busq2.selectbox("Filtrar por Ubicación", lista_ubicaciones)
+                
+                lista_categorias = ["TODAS"] + sorted(df_act_display['CATEGORÍA'].dropna().unique().tolist())
+                filtro_cat = c_busq3.selectbox("Filtrar por Categoría", lista_categorias)
+                
+                # --- 3. APLICAMOS LOS FILTROS ---
+                if busqueda_act:
+                    df_act_display = df_act_display[df_act_display['CÓDIGO'].str.contains(busqueda_act) | df_act_display['ACTIVO'].str.contains(busqueda_act)]
+                if filtro_ubi != "TODAS":
+                    df_act_display = df_act_display[df_act_display['UBICACIÓN'] == filtro_ubi]
+                if filtro_cat != "TODAS":
+                    df_act_display = df_act_display[df_act_display['CATEGORÍA'] == filtro_cat]
+
+                # --- 4. MOSTRAR LA TABLA BONITA ---
+                st.dataframe(
+                    df_act_display[['CÓDIGO', 'ACTIVO', 'CATEGORÍA', 'DUEÑO', 'UBICACIÓN', 'ESTADO', 'VALOR', 'SOPORTE']].sort_values(by='CÓDIGO', ascending=False), 
+                    use_container_width=True, 
+                    hide_index=True,
+                    column_config={
+                        "SOPORTE": st.column_config.LinkColumn(
+                            "🔍 DOC",
+                            help="Haz clic para abrir la factura o soporte",
+                            display_text="🔍 Abrir"
+                        )
+                    }
+                )
+            else:
+                st.info(f"ℹ️ Aún no hay activos registrados en tu entorno operativo ({moneda_sesion}).")
+
+        # --- BARRA DE HERRAMIENTAS ---
+        st.markdown("---")
+        a_c1, a_c2, a_c3, a_c4, a_c5 = st.columns([1.5, 1.5, 1.5, 1.5, 4.0])
+        
+        if a_c1.button("➕ Nuevo", key="btn_nuevo_act", use_container_width=True):
+            st.session_state.modo_activo = "CREAR"; st.rerun()
+        if a_c2.button("⚙️ Gestionar", key="btn_gest_act", use_container_width=True):
+            st.session_state.modo_activo = "GESTIONAR"; st.rerun()
+        if a_c3.button("📦 Mover", key="btn_mover_act", use_container_width=True):
+            st.session_state.modo_activo = "MOVER"; st.rerun()
+        if a_c4.button("📊 Reportes", key="btn_rep_act", use_container_width=True):
+            st.session_state.modo_activo = "REPORTES"; st.rerun()
+
+        # --- PANEL: CREAR NUEVO ACTIVO (CON CASCADA CONTABLE) ---
+        if st.session_state.modo_activo == "CREAR":
+            from dateutil.relativedelta import relativedelta
+            st.markdown("---")
+            st.markdown("### Alta de Nuevo Activo Fijo")
+
+            try:
+                res_ops = supabase.table("operadores").select("id, nombre").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
+                df_ops_act = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+            except:
+                df_ops_act = pd.DataFrame()
+
+            if df_inm_act.empty:
+                st.error(f"❌ No hay propiedades registradas en {moneda_sesion}.")
+            else:
+                with st.container():
+                    st.write("**1. Identificación y Propiedad**")
+                    c1, c2 = st.columns(2)
+                    
+                    tipo_propiedad = c1.selectbox("¿A quién pertenece el activo? *", ["Operador", "Propietario"], key="tipo_prop_din")
+                    
+                    es_operador = (tipo_propiedad == "Operador")
+                    id_operador_sel = None
+                    nombre_dueño_final = "Propietario"
+                    prefijo = "OP-" if es_operador else "PO-" 
+                    
+                    # --- NUEVAS VARIABLES FINANCIERAS ---
+                    origen_activo = "PROPIETARIO"
+                    id_cta_bancaria = None
+                    saldo_actual_banco = 0.0
+
+                    if es_operador:
+                        if len(df_ops_act) == 1:
+                            nombre_dueño_final = df_ops_act.iloc[0]['nombre']
+                            id_operador_sel = int(df_ops_act.iloc[0]['id'])
+                            st.info(f"🏢 **Dueño:** {nombre_dueño_final} (Auto-asignado)")
+                        elif len(df_ops_act) > 1:
+                            nombre_dueño_final = st.selectbox("Selecciona el Operador dueño *", df_ops_act['nombre'].tolist(), key="sel_op_din")
+                            id_operador_sel = int(df_ops_act[df_ops_act['nombre'] == nombre_dueño_final].iloc[0]['id'])
+                        
+                        st.markdown("---")
+                        st.write("**💰 Adquisición y Contabilidad**")
+                        c_orq1, c_orq2 = st.columns(2)
+                        origen_activo = c_orq1.selectbox("Origen del Activo *", ["COMPRA DIRECTA", "APORTACIÓN DE SOCIO"])
+                        
+                        if origen_activo == "COMPRA DIRECTA":
+                            try:
+                                res_b = supabase.table("fin_cuentas_bancarias").select("id, nombre_interno, banco, saldo_actual").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
+                                df_b = pd.DataFrame(res_b.data) if res_b.data else pd.DataFrame()
+                            except: df_b = pd.DataFrame()
+
+                            if not df_b.empty:
+                                op_b = [f"{r['nombre_interno']} ({r['banco']}) - Saldo: {r['saldo_actual']}" for _, r in df_b.iterrows()]
+                                cta_sel = c_orq2.selectbox("¿De qué cuenta salió el dinero? *", op_b)
+                                idx_b = op_b.index(cta_sel)
+                                id_cta_bancaria = df_b.iloc[idx_b]['id']
+                                saldo_actual_banco = float(df_b.iloc[idx_b]['saldo_actual'])
+                            else:
+                                c_orq2.error("❌ No hay bancos registrados en esta moneda.")
+                        elif origen_activo == "APORTACIÓN DE SOCIO":
+                            c_orq2.info("📈 Este activo aumentará el patrimonio (Aportes Sociales) sin afectar tesorería.")
+                        st.markdown("---")
+
+                    c3, c4 = st.columns([2, 1])
+                    nombre_act = c3.text_input("Nombre / Descripción *", placeholder="Ej: Lavadora LG 9kg", key="nom_act_din")
+                    categoria = c4.selectbox("Categoría", ["Mobiliario", "Electrodomésticos", "Electrónica", "Climatización", "Decoración", "Otro"], key="cat_act_din")
+
+                    st.write("**2. Ubicación Física**")
+                    c5, c6, c7 = st.columns(3)
+                    
+                    ubic_tipo = c5.selectbox("Ubicación *", ["Bodega", "Zona Común", "Unidad"], key="ubi_tipo_din")
+                    id_inm_sel, id_uni_sel = None, None
+                    
+                    if ubic_tipo in ["Zona Común", "Unidad"]:
+                        inm_sel = c6.selectbox("Edificio *", df_inm_act['nombre'].tolist(), key="inm_sel_din")
+                        id_inm_sel = df_inm_act[df_inm_act['nombre'] == inm_sel].iloc[0]['id']
+                        
+                        if ubic_tipo == "Unidad":
+                            res_u = supabase.table("unidades").select("id, nombre").eq("id_inmueble", int(id_inm_sel)).eq("estado", "ACTIVO").execute()
+                            df_u = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
+                            if not df_u.empty:
+                                uni_sel = c7.selectbox("Unidad *", df_u['nombre'].tolist(), key="uni_sel_din")
+                                id_uni_sel = df_u[df_u['nombre'] == uni_sel].iloc[0]['id']
+                            else:
+                                c7.warning("Este edificio no tiene unidades.")
+
+                    st.write("**3. Valor, Estado y Garantía**")
+                    c8, c9, c10 = st.columns(3)
+                    valor_compra = c8.number_input(f"Valor ({simbolo_mon})", min_value=0.0, step=1.0, value=0.0, disabled=not es_operador, key="val_act_din")
+                    fecha_compra = c9.date_input("Fecha Compra", key="f_compra_din")
+                    estado_fisico = c10.selectbox("Estado", ["Nuevo", "Bueno", "Deteriorado", "En reparación", "En bodega"], key="est_act_din")
+                    meses_gar = st.number_input("Meses de Garantía (Ejem: 36 para 3 años)", min_value=0, value=12, step=1, key="meses_gar_din")
+
+                    st.write("**4. Soporte**")
+                    factura_file = st.file_uploader("Factura (PDF/Imagen)", type=["pdf", "jpg", "png"], key="fac_file_din")
+
+                    st.markdown("---")
+                    col_b1, col_b2, _ = st.columns([2.0, 1.5, 6.5]) 
+                    
+                    if col_b1.button("💾 Guardar Activo", key="btn_save_din"):
+                        if not nombre_act:
+                            st.error("❌ El nombre es obligatorio.")
+                        elif origen_activo == "COMPRA DIRECTA" and not id_cta_bancaria:
+                            st.error("❌ Debes seleccionar una cuenta bancaria válida para la compra.")
+                        elif ubic_tipo == "Unidad" and not id_uni_sel:
+                            st.error("❌ Selecciona una unidad o revisa que el edificio tenga unidades creadas.")
+                        else:
+                            try:
+                                with st.spinner("Generando código, guardando y ejecutando cascada contable..."):
+                                    res_last = supabase.table("activos").select("codigo_unico").like("codigo_unico", f"{prefijo}%").order("codigo_unico", desc=True).limit(1).execute()
+                                    if not res_last.data:
+                                        cod_final = f"{prefijo}001"
+                                    else:
+                                        ultimo_txt = res_last.data[0]['codigo_unico']
+                                        try: num_extraido = int(ultimo_txt.split('-')[1]); cod_final = f"{prefijo}{num_extraido + 1:03d}"
+                                        except: cod_final = f"{prefijo}001"
+
+                                    url_f = None
+                                    if factura_file:
+                                        ext = factura_file.name.split('.')[-1].lower()
+                                        n_f = f"fac_{int(time.time())}.{ext}"
+                                        supabase.storage.from_("documentos_activos").upload(n_f, factura_file.getvalue(), file_options={"content-type": f"image/{ext}" if ext != 'pdf' else "application/pdf"})
+                                        url_f = supabase.storage.from_("documentos_activos").get_public_url(n_f)
+
+                                    f_vence_gar = fecha_compra + relativedelta(months=meses_gar)
+                                    
+                                    ins = {
+                                        "codigo_unico": cod_final, "nombre": nombre_act.strip().upper(),
+                                        "categoria": categoria, "propiedad": "Empresa" if es_operador else "Propietario", 
+                                        "origen": origen_activo, # 🚀 DATO NUEVO
+                                        "operador_id": id_operador_sel, "moneda": moneda_sesion,
+                                        "valor_compra": float(valor_compra) if es_operador else 0.0, 
+                                        "fecha_compra": str(fecha_compra), "ubicacion_tipo": ubic_tipo, 
+                                        "inmueble_id": int(id_inm_sel) if id_inm_sel else None,
+                                        "unidad_id": int(id_uni_sel) if id_uni_sel else None, 
+                                        "estado": estado_fisico, "inicio_garantia": str(fecha_compra), 
+                                        "fin_garantia": str(f_vence_gar), "factura_url": url_f
+                                    }
+                                    res_ins = supabase.table("activos").insert(ins).execute()
+                                    
+                                    var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                                    usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+
+                                    supabase.table("activos_movimientos").insert({
+                                        "activo_id": res_ins.data[0]['id'], "origen_tipo": "ALTA", 
+                                        "destino_tipo": ubic_tipo, "motivo": f"Registro Inicial {cod_final} ({origen_activo})", 
+                                        "usuario_responsable": usuario_actual
+                                    }).execute()
+
+                                    # 🚀 --- CASCADA FINANCIERA AUTOMÁTICA --- 🚀
+                                    if es_operador and float(valor_compra) > 0:
+                                        try:
+                                            # 1. Traer catálogo de cuentas para búsqueda dinámica (Soporta España PGC y Latam PUC)
+                                            res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
+                                            df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
+                                            
+                                            id_cta_activo, id_cta_patrimonio, id_cta_banco = None, None, None
+                                            if not df_ctas.empty:
+                                                cta_act = df_ctas[df_ctas['codigo'].str.startswith('15', na=False)]
+                                                if not cta_act.empty: id_cta_activo = cta_act.iloc[0]['id']
+                                                
+                                                cta_patr = df_ctas[df_ctas['codigo'].str.startswith('31', na=False)]
+                                                if not cta_patr.empty: id_cta_patrimonio = cta_patr.iloc[0]['id']
+                                                
+                                                cta_ban = df_ctas[df_ctas['codigo'].str.startswith('1110', na=False)]
+                                                if not cta_ban.empty: id_cta_banco = cta_ban.iloc[0]['id']
+                                            # 2. Crear Asiento Contable Maestro
+                                            desc_asiento = f"ALTA ACTIVO: {nombre_act.strip().upper()} ({cod_final})"
+                                            res_ast = supabase.table("fin_asientos").insert({
+                                                "fecha_contable": str(fecha_compra), "descripcion": desc_asiento,
+                                                "concepto_general": f"Ingreso por {origen_activo}", "origen": "MODULO_ACTIVOS",
+                                                "moneda": moneda_sesion, "estado": "CONTABILIZADO"
+                                            }).execute()
+                                            id_ast = res_ast.data[0]['id']
+
+                                            # Débito al Activo (Aumenta tu inventario)
+                                            if id_cta_activo:
+                                                supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_activo), "debito": float(valor_compra), "credito": 0.0, "descripcion_linea": desc_asiento}).execute()
+
+                                            if origen_activo == "COMPRA DIRECTA" and id_cta_bancaria:
+                                                if id_cta_banco:
+                                                    # Crédito al Banco (Disminuye)
+                                                    supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_banco), "debito": 0.0, "credito": float(valor_compra), "descripcion_linea": "Pago por compra activo"}).execute()
+                                                
+                                                # Descontar del Banco Físico en la UI
+                                                supabase.table("fin_movimientos_banco").insert({
+                                                    "id_cuenta_bancaria": int(id_cta_bancaria), "fecha_movimiento": str(fecha_compra), 
+                                                    "tipo": "EGRESO", "monto": float(valor_compra), "concepto": desc_asiento, "estado_conciliacion": "PENDIENTE"
+                                                }).execute()
+                                                supabase.table("fin_cuentas_bancarias").update({"saldo_actual": saldo_actual_banco - float(valor_compra)}).eq("id", int(id_cta_bancaria)).execute()
+
+                                            elif origen_activo == "APORTACIÓN DE SOCIO":
+                                                if id_cta_patrimonio:
+                                                    # Crédito al Patrimonio (Aumenta el capital)
+                                                    supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_patrimonio), "debito": 0.0, "credito": float(valor_compra), "descripcion_linea": "Aporte No Dinerario de Socio"}).execute()
+                                        except Exception as e:
+                                            st.error(f"⚠️ Activo guardado, pero hubo un error en la cascada contable: {e}")                                    
+                                    st.success(f"✅ Activo **{cod_final}** y contabilidad registrados.");
+                                    log_accion(supabase, usuario_actual, "CREAR ACTIVO", f"{cod_final} - {nombre_act.strip().upper()}")
+                                    time.sleep(2.5); 
+                                    st.session_state.modo_activo = "NADA";
+                                    st.rerun()
+                            except Exception as e: st.error(f"Error: {e}")
+                    if col_b2.button("❌ Cancelar", key="btn_cancel_din"): st.session_state.modo_activo = "NADA"; st.rerun()
+        # --- PANEL: GESTIONAR ACTIVO ---
+        elif st.session_state.modo_activo == "GESTIONAR":
+            st.markdown("---")
+            st.markdown("### ⚙️ Gestionar Activo Fijo")
+
+            try:
+                res_act_edit = supabase.table("activos").select("*, operadores(nombre), inmuebles(nombre), unidades(nombre)").eq("moneda", moneda_sesion).order("codigo_unico", desc=True).execute()
+                df_a_edit = pd.DataFrame(res_act_edit.data) if res_act_edit.data else pd.DataFrame()
+            except: df_a_edit = pd.DataFrame()
+
+            if df_a_edit.empty:
+                st.warning("No hay activos registrados para gestionar.")
+                if st.button("❌ Cerrar Panel"): st.session_state.modo_activo = "NADA"; st.rerun()
+            else:
+                def get_ubicacion_edit(row):
+                    ubi = str(row.get('ubicacion_tipo', 'Bodega'))
+                    if ubi == 'Zona Común' and isinstance(row.get('inmuebles'), dict): return f"{row['inmuebles'].get('nombre', '')}: Común"
+                    elif ubi == 'Unidad' and isinstance(row.get('unidades'), dict):
+                        inm_nom = row['inmuebles'].get('nombre', '') if isinstance(row.get('inmuebles'), dict) else ""
+                        return f"{inm_nom}: {row['unidades'].get('nombre', '')}"
+                    return ubi
+                
+                df_a_edit['UBICACION'] = df_a_edit.apply(get_ubicacion_edit, axis=1)
+
+                st.markdown("**🔍 Buscar activo a modificar**")
+                c_f1, c_f2, c_f3 = st.columns([4, 3, 3])
+                busqueda_edit = c_f1.text_input("Buscar Código o Nombre...", "", key="busq_edit_act").upper().strip()
+                lista_ubicaciones = ["TODAS"] + sorted(df_a_edit['UBICACION'].dropna().unique().tolist())
+                filtro_ubi = c_f2.selectbox("Filtrar por Ubicación", lista_ubicaciones, key="ubi_edit_act")
+                lista_categorias = ["TODAS"] + sorted(df_a_edit['categoria'].dropna().unique().tolist())
+                filtro_cat = c_f3.selectbox("Filtrar por Categoría", lista_categorias, key="cat_edit_act")
+
+                df_filtrado = df_a_edit.copy()
+                if busqueda_edit: df_filtrado = df_filtrado[df_filtrado['codigo_unico'].str.contains(busqueda_edit) | df_filtrado['nombre'].str.contains(busqueda_edit)]
+                if filtro_ubi != "TODAS": df_filtrado = df_filtrado[df_filtrado['UBICACION'] == filtro_ubi]
+                if filtro_cat != "TODAS": df_filtrado = df_filtrado[df_filtrado['categoria'] == filtro_cat]
+
+                if df_filtrado.empty:
+                    st.warning("⚠️ No se encontraron activos con estos filtros.")
+                    if st.button("❌ Cancelar", key="btn_cancel_empty"): st.session_state.modo_activo = "NADA"; st.rerun()
+                else:
+                    opciones_activos = df_filtrado.apply(lambda r: f"{r['codigo_unico']} - {r['nombre']} ({r['UBICACION']})", axis=1).tolist()
+                    act_sel = st.selectbox("Selecciona el Activo exacto:", opciones_activos)
+
+                    if act_sel:
+                        cod_seleccionado = act_sel.split(" - ")[0]
+                        datos_act = df_filtrado[df_filtrado['codigo_unico'] == cod_seleccionado].iloc[0]
+                        id_act = str(datos_act['id'])
+                        es_op = datos_act.get('propiedad') == 'Empresa'
+
+                        with st.form(f"form_edit_act_{id_act}", clear_on_submit=False):
+                            st.write("**Detalles del Activo**")
+                            c1, c2 = st.columns([2, 1])
+                            e_nom = c1.text_input("Nombre / Descripción *", datos_act['nombre'])
+                            
+                            lista_cat = ["Mobiliario", "Electrodomésticos", "Electrónica", "Climatización", "Decoración", "Otro"]
+                            idx_cat = lista_cat.index(datos_act['categoria']) if datos_act.get('categoria') in lista_cat else 0
+                            e_cat = c2.selectbox("Categoría", lista_cat, index=idx_cat)
+
+                            c3, c4 = st.columns(2)
+                            lista_est = ["Nuevo", "Bueno", "Deteriorado", "En reparación", "En bodega", "Sustituido", "Inactivo", "Punto Limpio"]
+                            idx_est = lista_est.index(datos_act['estado']) if datos_act.get('estado') in lista_est else 0
+                            e_est = c3.selectbox("Estado Físico", lista_est, index=idx_est)
+                            
+                            # 🚀 CAMPOS FINANCIEROS EDITABLES
+                            if es_op:
+                                st.markdown("---")
+                                st.write("💰 **Corrección Financiera (Atención: Modificar esto recalculará la contabilidad)**")
+                                cf1, cf2, cf3 = st.columns(3)
+                                e_val = cf1.number_input(f"Valor de Compra ({simbolo_mon})", min_value=0.0, step=1.0, value=float(datos_act.get('valor_compra', 0.0)))
+                                
+                                lista_origen = ["COMPRA DIRECTA", "APORTACIÓN DE SOCIO", "PROPIETARIO"]
+                                idx_ori = lista_origen.index(datos_act.get('origen', 'COMPRA DIRECTA')) if datos_act.get('origen') in lista_origen else 0
+                                e_ori = cf2.selectbox("Origen del Activo", lista_origen, index=idx_ori)
+                                
+                                id_cta_bancaria_edit = None
+                                saldo_actual_banco_edit = 0.0
+                                try: res_b = supabase.table("fin_cuentas_bancarias").select("id, nombre_interno, banco, saldo_actual").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_b = pd.DataFrame(res_b.data) if res_b.data else pd.DataFrame()
+                                except: df_b = pd.DataFrame()
+                                
+                                if not df_b.empty:
+                                    op_b = [f"{r['nombre_interno']} ({r['banco']})" for _, r in df_b.iterrows()]
+                                    cta_sel = cf3.selectbox("Banco (Solo si cambia a Compra Directa)", op_b)
+                                    idx_b = op_b.index(cta_sel)
+                                    id_cta_bancaria_edit = df_b.iloc[idx_b]['id']
+                                    saldo_actual_banco_edit = float(df_b.iloc[idx_b]['saldo_actual'])
+                                else: cf3.warning("Sin bancos.")
+                            else:
+                                e_val = 0.0
+                                e_ori = "PROPIETARIO"
+
+                            st.markdown("---")
+                            col_b1, col_b2, _ = st.columns([2.0, 1.5, 6.5])
+                            
+                            if col_b1.form_submit_button("💾 Guardar Cambios"):
+                                if not e_nom: st.error("❌ El nombre no puede estar vacío.")
+                                else:
+                                    # 🚀 1. REVERSIÓN CONTABLE DEL PASADO (Si hubo cambios financieros)
+                                    cambio_financiero = es_op and (float(e_val) != float(datos_act.get('valor_compra', 0.0)) or e_ori != datos_act.get('origen'))
+                                    
+                                    if cambio_financiero and float(datos_act.get('valor_compra', 0.0)) > 0:
+                                        with st.spinner("Revirtiendo contabilidad anterior..."):
+                                            # Borrar asiento viejo
+                                            res_v = supabase.table("fin_asientos").select("id").like("descripcion", f"%({cod_seleccionado})%").execute()
+                                            if res_v.data:
+                                                for asnt in res_v.data: supabase.table("fin_asientos").delete().eq("id", asnt['id']).execute()
+                                            # Devolver dinero al banco si era compra
+                                            res_mb = supabase.table("fin_movimientos_banco").select("id, id_cuenta_bancaria, monto").like("concepto", f"%({cod_seleccionado})%").execute()
+                                            if res_mb.data:
+                                                for mb in res_mb.data:
+                                                    cta = supabase.table("fin_cuentas_bancarias").select("saldo_actual").eq("id", mb['id_cuenta_bancaria']).execute()
+                                                    if cta.data:
+                                                        n_saldo = float(cta.data[0]['saldo_actual']) + float(mb['monto'])
+                                                        supabase.table("fin_cuentas_bancarias").update({"saldo_actual": n_saldo}).eq("id", mb['id_cuenta_bancaria']).execute()
+                                                    supabase.table("fin_movimientos_banco").delete().eq("id", mb['id']).execute()
+
+                                    # 🚀 2. ACTUALIZAR ACTIVO
+                                    upd_data = {
+                                        "nombre": e_nom.strip().upper(), "categoria": e_cat, "estado": e_est,
+                                        "valor_compra": e_val if es_op else 0.0, "origen": e_ori if es_op else "PROPIETARIO"
+                                    }
+                                    supabase.table("activos").update(upd_data).eq("id", id_act).execute()
+                                    
+                                    var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                                    usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+                                    
+                                    supabase.table("activos_movimientos").insert({
+                                        "activo_id": id_act, "origen_tipo": "MODIFICACIÓN", "destino_tipo": "N/A",
+                                        "motivo": f"Actualización (Estado: {e_est})", "usuario_responsable": usuario_actual
+                                    }).execute()
+
+                                    # 🚀 3. NUEVA CASCADA FINANCIERA (Si aplica)
+                                    if cambio_financiero and float(e_val) > 0:
+                                        with st.spinner("Generando nueva contabilidad..."):
+                                            res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
+                                            df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
+                                            
+                                            id_cta_activo, id_cta_patrimonio, id_cta_banco = None, None, None
+                                            if not df_ctas.empty:
+                                                cta_act = df_ctas[df_ctas['codigo'].str.startswith('15', na=False)]
+                                                if not cta_act.empty: id_cta_activo = cta_act.iloc[0]['id']
+                                                
+                                                cta_patr = df_ctas[df_ctas['codigo'].str.startswith('31', na=False)]
+                                                if not cta_patr.empty: id_cta_patrimonio = cta_patr.iloc[0]['id']
+                                                
+                                                cta_ban = df_ctas[df_ctas['codigo'].str.startswith('1110', na=False)]
+                                                if not cta_ban.empty: id_cta_banco = cta_ban.iloc[0]['id']
+                                            fecha_hoy = time.strftime("%Y-%m-%d")
+                                            desc_asiento = f"AJUSTE ACTIVO: {e_nom.strip().upper()} ({cod_seleccionado})"
+                                            res_ast = supabase.table("fin_asientos").insert({
+                                                "fecha_contable": fecha_hoy, "descripcion": desc_asiento,
+                                                "concepto_general": f"Ajuste por {e_ori}", "origen": "MODULO_ACTIVOS",
+                                                "moneda": moneda_sesion, "estado": "CONTABILIZADO"
+                                            }).execute()
+                                            id_ast = res_ast.data[0]['id']
+
+                                            if id_cta_activo: 
+                                                supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_activo), "debito": float(e_val), "credito": 0.0, "descripcion_linea": desc_asiento}).execute()
+
+                                            if e_ori == "COMPRA DIRECTA" and id_cta_bancaria_edit:
+                                                if id_cta_banco: 
+                                                    supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_banco), "debito": 0.0, "credito": float(e_val), "descripcion_linea": "Pago ajustado"}).execute()
+                                                
+                                                supabase.table("fin_movimientos_banco").insert({
+                                                    "id_cuenta_bancaria": int(id_cta_bancaria_edit), "fecha_movimiento": fecha_hoy, 
+                                                    "tipo": "EGRESO", "monto": float(e_val), "concepto": desc_asiento, "estado_conciliacion": "PENDIENTE"
+                                                }).execute()
+                                                
+                                                res_b_act = supabase.table("fin_cuentas_bancarias").select("saldo_actual").eq("id", int(id_cta_bancaria_edit)).execute()
+                                                if res_b_act.data:
+                                                    saldo_fresco = float(res_b_act.data[0]['saldo_actual'])
+                                                    supabase.table("fin_cuentas_bancarias").update({"saldo_actual": saldo_fresco - float(e_val)}).eq("id", int(id_cta_bancaria_edit)).execute()
+
+                                            elif e_ori == "APORTACIÓN DE SOCIO":
+                                                if id_cta_patrimonio: 
+                                                    supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_patrimonio), "debito": 0.0, "credito": float(e_val), "descripcion_linea": "Aporte ajustado"}).execute()
+                                    log_accion(supabase, usuario_actual, "EDITAR ACTIVO", f"{cod_seleccionado} - {e_nom.strip().upper()}")
+                                    st.success("✅ Activo y contabilidad actualizados exitosamente.")
+                                    time.sleep(1.5); st.session_state.modo_activo = "NADA"; st.rerun()
+
+                            if col_b2.form_submit_button("❌ Cancelar"): st.session_state.modo_activo = "NADA"; st.rerun()
+                        
+                        # --- 🚨 ZONA DE PELIGRO: DAR DE BAJA (CON ASIENTO DE PÉRDIDA) ---
+                        st.write("")
+                        st.error("🚨 Zona de Peligro: Baja del Activo")
+                        c_del1, c_del2 = st.columns([7, 3])
+                        confirmar_baja = c_del1.checkbox("⚠️ Confirmo que deseo desechar este activo (Enviar a Punto Limpio).", key=f"del_chk_act_{id_act}")
+                        
+                        if c_del2.button("🚫 Dar de Baja", disabled=not confirmar_baja, use_container_width=True):
+                            with st.spinner("Registrando baja y ajustando patrimonio..."):
+                                var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                                usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+                                
+                                # 🚀 CASCADA CONTABLE DE PÉRDIDA POR BAJA
+                                if es_op and float(datos_act.get('valor_compra', 0)) > 0:
+                                    try:
+                                        val_perdida = float(datos_act['valor_compra'])
+                                        desc_baja = f"BAJA ACTIVO: {datos_act['nombre']} ({cod_seleccionado})"
+                                        res_ast_baja = supabase.table("fin_asientos").insert({
+                                            "fecha_contable": time.strftime("%Y-%m-%d"), "descripcion": desc_baja,
+                                            "concepto_general": "Baja/Pérdida de Activo Fijo", "origen": "MODULO_ACTIVOS",
+                                            "moneda": moneda_sesion, "estado": "CONTABILIZADO"
+                                        }).execute()
+                                        id_ast_baja = res_ast_baja.data[0]['id']
+
+                                        # Cuenta Activos (15/21) disminuye, Gastos (53/67) aumenta
+                                        res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
+                                        df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
+                                        
+                                        id_cta_activo, id_cta_gasto = None, None
+                                        if not df_ctas.empty:
+                                            cta_act = df_ctas[df_ctas['codigo'].str.startswith('15', na=False)]
+                                            if not cta_act.empty: id_cta_activo = cta_act.iloc[0]['id']
+                                            
+                                            cta_gas = df_ctas[df_ctas['codigo'].str.startswith('53', na=False) | df_ctas['codigo'].str.startswith('51', na=False)]
+                                            if not cta_gas.empty: id_cta_gasto = cta_gas.iloc[0]['id']    
+                                        if id_cta_activo and id_cta_gasto:
+                                            supabase.table("fin_apuntes").insert([
+                                                {"id_asiento": id_ast_baja, "id_cuenta_contable": int(id_cta_gasto), "debito": val_perdida, "credito": 0.0, "descripcion_linea": "Pérdida por retiro"},
+                                                {"id_asiento": id_ast_baja, "id_cuenta_contable": int(id_cta_activo), "debito": 0.0, "credito": val_perdida, "descripcion_linea": "Salida de activo"}
+                                            ]).execute()
+                                    except Exception as e:
+                                        pass # Fallback silencioso si no existen cuentas                                
+                                log_accion(supabase, usuario_actual, "BAJA ACTIVO", f"{cod_seleccionado} enviado a Punto Limpio.")
+                                
+                                st.success("✅ Activo enviado a Punto Limpio y pérdida patrimonial registrada.")
+                                time.sleep(2.0); st.session_state.modo_activo = "NADA"; st.rerun()
+# --- PANEL: MOVER ACTIVO ---
+        elif st.session_state.modo_activo == "MOVER":
+            st.markdown("---")
+            st.markdown("### 📦 Mover / Trasladar Activo Fijo")
+
+            try:
+                # 🚀 Traemos la información completa
+                res_act_mov = supabase.table("activos").select("*, operadores(nombre), inmuebles(nombre), unidades(nombre)").eq("moneda", moneda_sesion).order("codigo_unico", desc=True).execute()
+                df_a_mov = pd.DataFrame(res_act_mov.data) if res_act_mov.data else pd.DataFrame()
+            except:
+                df_a_mov = pd.DataFrame()
+
+            if df_a_mov.empty:
+                st.warning("No hay activos registrados para mover.")
+                if st.button("❌ Cerrar Panel"): st.session_state.modo_activo = "NADA"; st.rerun()
+            else:
+                def get_ubicacion_mov(row):
+                    ubi = str(row.get('ubicacion_tipo', 'Bodega'))
+                    if ubi == 'Zona Común' and isinstance(row.get('inmuebles'), dict):
+                        return f"{row['inmuebles'].get('nombre', '')}: Común"
+                    elif ubi == 'Unidad' and isinstance(row.get('unidades'), dict):
+                        inm_nom = row['inmuebles'].get('nombre', '') if isinstance(row.get('inmuebles'), dict) else ""
+                        return f"{inm_nom}: {row['unidades'].get('nombre', '')}"
+                    return ubi
+                
+                df_a_mov['UBICACION'] = df_a_mov.apply(get_ubicacion_mov, axis=1)
+
+                st.markdown("**🔍 Buscar activo a trasladar**")
+                c_f1, c_f2, c_f3 = st.columns([4, 3, 3])
+                
+                busqueda_mov = c_f1.text_input("Buscar Código o Nombre...", "", key="busq_mov_act").upper().strip()
+                lista_ubicaciones = ["TODAS"] + sorted(df_a_mov['UBICACION'].dropna().unique().tolist())
+                filtro_ubi = c_f2.selectbox("Filtrar por Ubicación", lista_ubicaciones, key="ubi_mov_act")
+                lista_categorias = ["TODAS"] + sorted(df_a_mov['categoria'].dropna().unique().tolist())
+                filtro_cat = c_f3.selectbox("Filtrar por Categoría", lista_categorias, key="cat_mov_act")
+
+                df_filtrado_mov = df_a_mov.copy()
+                if busqueda_mov:
+                    df_filtrado_mov = df_filtrado_mov[df_filtrado_mov['codigo_unico'].str.contains(busqueda_mov) | df_filtrado_mov['nombre'].str.contains(busqueda_mov)]
+                if filtro_ubi != "TODAS":
+                    df_filtrado_mov = df_filtrado_mov[df_filtrado_mov['UBICACION'] == filtro_ubi]
+                if filtro_cat != "TODAS":
+                    df_filtrado_mov = df_filtrado_mov[df_filtrado_mov['categoria'] == filtro_cat]
+
+                if df_filtrado_mov.empty:
+                    st.warning("⚠️ No se encontraron activos con estos filtros.")
+                    if st.button("❌ Cancelar", key="btn_cancel_mov_empty"): st.session_state.modo_activo = "NADA"; st.rerun()
+                else:
+                    opciones_act_mov = df_filtrado_mov.apply(lambda r: f"{r['codigo_unico']} - {r['nombre']} ({r['UBICACION']})", axis=1).tolist()
+                    act_mov_sel = st.selectbox("Selecciona el Activo exacto:", opciones_act_mov)
+
+                    if act_mov_sel:
+                        cod_seleccionado = act_mov_sel.split(" - ")[0]
+                        datos_act = df_filtrado_mov[df_filtrado_mov['codigo_unico'] == cod_seleccionado].iloc[0]
+                        id_act = str(datos_act['id'])
+                        ubi_actual_str = datos_act['UBICACION']
+
+                        st.info(f"📍 **Ubicación Actual:** {ubi_actual_str}")
+
+                        # 🚀 USAMOS CONTENEDOR DINÁMICO (Sin st.form para que los menús reaccionen en vivo)
+                        with st.container():
+                            st.write("**Nueva Ubicación Física**")
+                            c5, c6, c7 = st.columns(3)
+                            
+                            n_ubic_tipo = c5.selectbox("Destino *", ["Bodega", "Zona Común", "Unidad"], key="n_ubi_tipo_din")
+                            n_id_inm_sel, n_id_uni_sel = None, None
+                            
+                            if n_ubic_tipo in ["Zona Común", "Unidad"]:
+                                n_inm_sel = c6.selectbox("Edificio Destino *", df_inm_act['nombre'].tolist(), key="n_inm_sel_din")
+                                n_id_inm_sel = df_inm_act[df_inm_act['nombre'] == n_inm_sel].iloc[0]['id']
+                                
+                                if n_ubic_tipo == "Unidad":
+                                    res_u = supabase.table("unidades").select("id, nombre").eq("id_inmueble", int(n_id_inm_sel)).eq("estado", "ACTIVO").execute()
+                                    df_u = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
+                                    if not df_u.empty:
+                                        n_uni_sel = c7.selectbox("Unidad Destino *", df_u['nombre'].tolist(), key="n_uni_sel_din")
+                                        n_id_uni_sel = df_u[df_u['nombre'] == n_uni_sel].iloc[0]['id']
+                                    else:
+                                        c7.warning("El edificio destino no tiene unidades.")
+                            
+                            motivo_mov = st.text_input("Motivo del traslado *", placeholder="Ej: Solicitud de inquilino, reubicación de bodega, etc.", key="motivo_mov")
+
+                            st.markdown("---")
+                            col_b1, col_b2, _ = st.columns([2.0, 1.5, 6.5]) 
+                            
+                            if col_b1.button("💾 Ejecutar Traslado", key="btn_save_mov"):
+                                if not motivo_mov:
+                                    st.error("❌ Debes indicar el motivo del traslado.")
+                                elif n_ubic_tipo == "Unidad" and not n_id_uni_sel:
+                                    st.error("❌ Selecciona una unidad destino válida.")
+                                else:
+                                    with st.spinner("Registrando movimiento logístico..."):
+                                        try:
+                                            # 1. Actualizamos la tabla maestra de activos
+                                            upd_loc = {
+                                                "ubicacion_tipo": n_ubic_tipo,
+                                                "inmueble_id": int(n_id_inm_sel) if n_id_inm_sel else None,
+                                                "unidad_id": int(n_id_uni_sel) if n_id_uni_sel else None
+                                            }
+                                            supabase.table("activos").update(upd_loc).eq("id", id_act).execute()
+                                            
+                                            # 2. Guardamos la auditoría estricta del movimiento
+                                            var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                                            usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+                                            
+                                            supabase.table("activos_movimientos").insert({
+                                                "activo_id": id_act,
+                                                "origen_tipo": f"Desde: {ubi_actual_str}", 
+                                                "destino_tipo": n_ubic_tipo,
+                                                "motivo": motivo_mov.strip(),
+                                                "usuario_responsable": usuario_actual
+                                            }).execute()
+
+                                            # 3. Disparamos la alerta al LOG GLOBAL
+                                            log_accion(supabase, usuario_actual, "TRASLADO ACTIVO", f"{datos_act['codigo_unico']} -> Movido a {n_ubic_tipo}")
+
+                                            st.success("✅ Traslado completado y registrado con éxito.")
+                                            time.sleep(1.5)
+                                            st.session_state.modo_activo = "NADA"
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Error técnico: {e}")
+
+                            if col_b2.button("❌ Cancelar", key="btn_cancel_mov"):
+                                st.session_state.modo_activo = "NADA"
+                                st.rerun()
+
+# --- PANEL: REPORTES DE ACTIVOS ---
+        elif st.session_state.modo_activo == "REPORTES":
+            st.markdown("---")
+            st.markdown("### 📊 Centro de Reportes de Activos e Inventarios")
+            
+            var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+            usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+
+            try: res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+            except: df_ops = pd.DataFrame()
+
+            # 🚀 AHORA SON 6 REPORTES SEPARADOS PERFECTAMENTE
+            tipo_rep = st.selectbox("Selecciona el tipo de reporte a exportar:", [
+                "1. Inventario Global (Todos los activos de la región)",
+                "2. Activos por Ubicación (Bodega, Edificios, Unidades)",
+                "3. Valorización y Propiedad (Empresa vs Terceros)",
+                "4. Estado Físico y Valorización",
+                "5. Control de Garantías",
+                "6. Historial de Movimientos y Trazabilidad"
+            ])
+
+            res_act_rep = supabase.table("activos").select("*, operadores(nombre), inmuebles(nombre), unidades(nombre)").eq("moneda", moneda_sesion).order("codigo_unico", desc=True).execute()
+            df_a_rep = pd.DataFrame(res_act_rep.data) if res_act_rep.data else pd.DataFrame()
+            
+            if df_a_rep.empty:
+                st.warning("No hay activos registrados en esta región para generar reportes.")
+            else:
+                def format_rep(df_in):
+                    df_out = df_in.copy()
+                    df_out['DUEÑO'] = df_out.apply(lambda r: r['operadores'].get('nombre', 'Operador') if r.get('propiedad') == 'Empresa' and isinstance(r.get('operadores'), dict) else "Propietario", axis=1)
+                    df_out['UBICACIÓN'] = df_out.apply(lambda r: f"{r['inmuebles'].get('nombre', '')}: Común" if str(r.get('ubicacion_tipo')) == 'Zona Común' and isinstance(r.get('inmuebles'), dict) else (f"{r['inmuebles'].get('nombre', '') if isinstance(r.get('inmuebles'), dict) else ''}: {r['unidades'].get('nombre', '')}" if str(r.get('ubicacion_tipo')) == 'Unidad' and isinstance(r.get('unidades'), dict) else str(r.get('ubicacion_tipo', 'Bodega'))), axis=1)
+                    df_out['VALOR'] = pd.to_numeric(df_out['valor_compra']).fillna(0).apply(lambda x: f"{simbolo_mon} {x:,.2f}" if x > 0 else "-")
+                    df_out.rename(columns={'codigo_unico': 'CÓDIGO', 'nombre': 'ACTIVO', 'categoria': 'CATEGORÍA', 'estado': 'ESTADO', 'inicio_garantia': 'COMPRA', 'fin_garantia': 'FIN GARANTÍA'}, inplace=True)
+                    return df_out[['CÓDIGO', 'ACTIVO', 'CATEGORÍA', 'DUEÑO', 'UBICACIÓN', 'ESTADO', 'VALOR', 'COMPRA', 'FIN GARANTÍA', 'ubicacion_tipo', 'propiedad']]
+
+                df_base_rep = format_rep(df_a_rep)
+                df_export = pd.DataFrame()
+                nombre_pdf = ""
+
+                if "1. Inventario Global" in tipo_rep:
+                    df_export = df_base_rep.drop(columns=['ubicacion_tipo', 'propiedad', 'COMPRA', 'FIN GARANTÍA'])
+                    nombre_pdf = "inventario_global_activos"
+                    st.info("💡 Muestra un resumen general de todos los activos físicos registrados.")
+
+                elif "2. Activos por Ubicación" in tipo_rep:
+                    ub_filtro = st.radio("Filtro de Ubicación Operativa:", ["Disponibles en Bodega", "En Zonas Comunes", "Asignados a Unidades"], horizontal=True)
+                    if ub_filtro == "Disponibles en Bodega": df_export = df_base_rep[df_base_rep['ubicacion_tipo'] == 'Bodega']
+                    elif ub_filtro == "En Zonas Comunes": df_export = df_base_rep[df_base_rep['ubicacion_tipo'] == 'Zona Común']
+                    else: df_export = df_base_rep[df_base_rep['ubicacion_tipo'] == 'Unidad']
+                    df_export = df_export.drop(columns=['ubicacion_tipo', 'propiedad', 'COMPRA', 'FIN GARANTÍA'])
+                    nombre_pdf = f"activos_{ub_filtro.replace(' ', '_').lower()}"
+
+                elif "3. Valorización" in tipo_rep:
+                    prop_filtro = st.radio("Filtro Patrimonial:", ["Todos", "Inversión Propia (Empresa)", "Activos de Terceros (Propietarios)"], horizontal=True)
+                    if prop_filtro == "Inversión Propia (Empresa)": df_export = df_base_rep[df_base_rep['propiedad'] == 'Empresa']
+                    elif prop_filtro == "Activos de Terceros (Propietarios)": df_export = df_base_rep[df_base_rep['propiedad'] == 'Propietario']
+                    else: df_export = df_base_rep.copy()
+                    
+                    val_total = df_a_rep[df_a_rep['propiedad'] == 'Empresa']['valor_compra'].sum()
+                    st.success(f"💰 **Cálculo de Inversión Patrimonial (Solo activos de la Empresa):** {simbolo_mon} {val_total:,.2f}")
+                    df_export = df_export.drop(columns=['ubicacion_tipo', 'propiedad', 'COMPRA', 'FIN GARANTÍA'])
+                    nombre_pdf = "valorizacion_patrimonio"
+
+                # 🚀 REPORTE 4: SOLO ESTADO FÍSICO (Mantiene el valor)
+                elif "4. Estado Físico" in tipo_rep:
+                    est_filtro = st.selectbox("Ver activos según su estado físico:", ["Todos", "Nuevo", "Bueno", "Deteriorado", "En reparación", "Punto Limpio"])
+                    if est_filtro != "Todos": df_export = df_base_rep[df_base_rep['ESTADO'] == est_filtro]
+                    else: df_export = df_base_rep.copy()
+                    df_export = df_export.drop(columns=['ubicacion_tipo', 'propiedad', 'COMPRA', 'FIN GARANTÍA'])
+                    nombre_pdf = "estado_fisico_activos"
+                    st.info("💡 Muestra el inventario filtrado por condición física, manteniendo sus valores económicos para la depreciación.")
+
+                # 🚀 REPORTE 5: SOLO GARANTÍAS (Nuevo motor PDF)
+                elif "5. Control de Garantías" in tipo_rep:
+                    df_export = df_base_rep.copy()
+                    # Quitamos categoría y valor para que quepan las fechas en el PDF
+                    df_export = df_export.drop(columns=['ubicacion_tipo', 'propiedad', 'CATEGORÍA', 'VALOR', 'ESTADO']) 
+                    nombre_pdf = "control_garantias_activos"
+                    st.info("💡 Muestra las fechas de compra y fin de garantía para gestionar mantenimientos y reemplazos.")
+
+                elif "6. Historial de Movimientos" in tipo_rep:
+                    res_mov = supabase.table("activos_movimientos").select("*, activos(codigo_unico, nombre)").order("fecha_movimiento", desc=True).execute()
+                    df_m = pd.DataFrame(res_mov.data) if res_mov.data else pd.DataFrame()
+                    if not df_m.empty:
+                        df_m['FECHA'] = pd.to_datetime(df_m['fecha_movimiento']).dt.strftime('%d/%m/%Y %H:%M')
+                        df_m['ACTIVO'] = df_m['activos'].apply(lambda x: f"{x.get('codigo_unico','')} - {x.get('nombre','')}" if isinstance(x, dict) else "N/A")
+                        df_export = df_m[['FECHA', 'ACTIVO', 'origen_tipo', 'destino_tipo', 'motivo', 'usuario_responsable']].copy()
+                        df_export.rename(columns={'origen_tipo': 'ORIGEN', 'destino_tipo': 'DESTINO', 'motivo': 'MOTIVO', 'usuario_responsable': 'USUARIO'}, inplace=True)
+                    nombre_pdf = "trazabilidad_logistica"
+                    st.info("💡 Registro de auditoría inmutable de traslados y bajas.")
+
+                # --- 🚀 LANZAR EL GENERADOR DE REPORTES UNIVERSAL ---
+                if not df_export.empty:
+                    if "6. Historial" in tipo_rep:
+                        panel_reportes_y_compartir(df_export, nombre_pdf, "Historial Activos", generar_pdf_movimientos, df_ops, supabase, usuario_actual, "modo_activo")
+                    elif "5. Control de Garantías" in tipo_rep:
+                        # LLAMAMOS AL NUEVO MOTOR PDF!
+                        panel_reportes_y_compartir(df_export, nombre_pdf, "Reporte Garantías", generar_pdf_garantias, df_ops, supabase, usuario_actual, "modo_activo")
+                    else:
+                        panel_reportes_y_compartir(df_export, nombre_pdf, "Reporte Activos", generar_pdf_activos, df_ops, supabase, usuario_actual, "modo_activo")
+                else:
+                    st.warning("⚠️ No hay datos que coincidan con los filtros seleccionados.")
+
+            st.markdown("---")
+            if st.button("❌ Cerrar Panel"): st.session_state.modo_activo = "NADA"; st.rerun()
