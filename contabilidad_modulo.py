@@ -167,16 +167,140 @@ def mostrar_modulo_contabilidad(supabase):
 
     # --- LA NUEVA PESTAÑA PARA EL CFO ---
     with tab5:
-        st.subheader("Reportes Oficiales y Cierres de Periodo")
+        st.subheader("🏛️ Reportes Oficiales y Auditoría Contable")
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("#### 📄 Estados Financieros")
-            st.button("⚖️ Generar Balance General", disabled=True)
-            st.button("📈 Generar Estado de Resultados (P&G)", disabled=True)
+        # Sub-pestañas para organizar la contabilidad
+        tab_bp, tab_lm, tab_bg = st.tabs(["⚖️ Balance de Prueba", "📖 Libro Mayor", "📈 Estados Financieros"])
+        
+        # --- 🚀 EXTRACCIÓN MAESTRA DE DATOS FINANCIEROS ---
+        simbolo_view = "€" if moneda_sesion == "EUR" else "$"
+        
+        try:
+            # 1. Traer Catálogo
+            res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo, nombre, naturaleza").eq("moneda", moneda_sesion).execute()
+            df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
             
-        with c2:
-            st.markdown("#### 🔒 Cierres Contables")
-            st.button("🔐 Ejecutar Cierre de Mes", disabled=True)
-            st.button("📆 Ejecutar Cierre de Año", disabled=True)
-            st.info("Un mes cerrado bloqueará cualquier modificación pasada para proteger la contabilidad.")
+            # 2. Traer Asientos Contabilizados
+            res_ast = supabase.table("fin_asientos").select("id, fecha_contable, descripcion").eq("estado", "CONTABILIZADO").eq("moneda", moneda_sesion).execute()
+            df_ast = pd.DataFrame(res_ast.data) if res_ast.data else pd.DataFrame()
+            
+            if not df_ast.empty and not df_ctas.empty:
+                ids_asientos = df_ast['id'].tolist()
+                
+                # 3. Traer Apuntes (El detalle del DEBE y HABER)
+                res_ap = supabase.table("fin_apuntes").select("id_asiento, id_cuenta_contable, debito, credito, descripcion_linea").execute()
+                df_ap_raw = pd.DataFrame(res_ap.data) if res_ap.data else pd.DataFrame()
+                
+                if not df_ap_raw.empty:
+                    df_ap = df_ap_raw[df_ap_raw['id_asiento'].isin(ids_asientos)].copy()
+                    
+                    # 4. Fusión de Tablas (Data Warehouse Contable)
+                    df_full = pd.merge(df_ap, df_ast, left_on="id_asiento", right_on="id", how="left")
+                    df_full = pd.merge(df_full, df_ctas, left_on="id_cuenta_contable", right_on="id", how="left")
+                    
+                    df_full['debito'] = pd.to_numeric(df_full['debito']).fillna(0)
+                    df_full['credito'] = pd.to_numeric(df_full['credito']).fillna(0)
+                else:
+                    df_full = pd.DataFrame()
+            else:
+                df_full = pd.DataFrame()
+        except Exception as e:
+            st.error(f"Error cargando motor contable: {e}")
+            df_full = pd.DataFrame()
+
+        # =========================================================
+        # 1. BALANCE DE PRUEBA (SUMAS Y SALDOS)
+        # =========================================================
+        with tab_bp:
+            st.markdown("### Balance de Comprobación (Sumas y Saldos)")
+            st.caption("Verifica matemáticamente que la contabilidad esté libre de errores. Sumas y Saldos deben ser idénticos.")
+            
+            if not df_full.empty:
+                # Agrupamos todo por cuenta contable
+                df_bp = df_full.groupby(['codigo', 'nombre', 'naturaleza']).agg({'debito': 'sum', 'credito': 'sum'}).reset_index()
+                
+                # Calculadora de Saldos según su Naturaleza
+                def calc_saldos(row):
+                    d, c = row['debito'], row['credito']
+                    if row['naturaleza'] == 'DEUDORA':
+                        saldo = d - c
+                        return pd.Series([saldo if saldo > 0 else 0, abs(saldo) if saldo < 0 else 0])
+                    else: # ACREEDORA
+                        saldo = c - d
+                        return pd.Series([abs(saldo) if saldo < 0 else 0, saldo if saldo > 0 else 0])
+                
+                df_bp[['saldo_deudor', 'saldo_acreedor']] = df_bp.apply(calc_saldos, axis=1)
+                
+                # Formateo visual
+                df_bp_view = df_bp.copy()
+                for col in ['debito', 'credito', 'saldo_deudor', 'saldo_acreedor']:
+                    df_bp_view[col] = df_bp_view[col].apply(lambda x: f"{simbolo_view} {x:,.2f}" if x > 0 else "-")
+                
+                df_bp_view.columns = ['CÓDIGO', 'CUENTA', 'NATURALEZA', 'SUMA DEBE', 'SUMA HABER', 'SALDO DEUDOR', 'SALDO ACREEDOR']
+                st.dataframe(df_bp_view.sort_values('CÓDIGO'), use_container_width=True, hide_index=True)
+                
+                # Ecuación Patrimonial (Totales)
+                st.markdown("---")
+                tot_d, tot_c = df_bp['debito'].sum(), df_bp['credito'].sum()
+                tot_sd, tot_sc = df_bp['saldo_deudor'].sum(), df_bp['saldo_acreedor'].sum()
+                
+                c_t1, c_t2 = st.columns(2)
+                if round(tot_d, 2) == round(tot_c, 2): c_t1.success(f"✅ Sumas Iguales: {simbolo_view} {tot_d:,.2f}")
+                else: c_t1.error(f"❌ Descuadre en Sumas: DEBE {tot_d:,.2f} vs HABER {tot_c:,.2f}")
+                    
+                if round(tot_sd, 2) == round(tot_sc, 2): c_t2.success(f"✅ Saldos Iguales: {simbolo_view} {tot_sd:,.2f}")
+                else: c_t2.error(f"❌ Descuadre en Saldos: DEUDOR {tot_sd:,.2f} vs ACREEDOR {tot_sc:,.2f}")
+            else:
+                st.info("ℹ️ No hay movimientos contables registrados para generar el balance.")
+
+        # =========================================================
+        # 2. LIBRO MAYOR (CUENTAS T / AUDITORÍA)
+        # =========================================================
+        with tab_lm:
+            st.markdown("### Libro Mayor (Auditoría por Cuenta)")
+            st.caption("Revisa el extracto detallado y el saldo acumulado de cualquier cuenta contable.")
+            
+            if not df_full.empty:
+                opciones_ctas = df_bp.apply(lambda r: f"{r['codigo']} - {r['nombre']} ({r['naturaleza']})", axis=1).tolist()
+                cta_sel = st.selectbox("🔍 Selecciona la cuenta a auditar:", ["-- Seleccione --"] + opciones_ctas)
+                
+                if cta_sel != "-- Seleccione --":
+                    cod_sel = cta_sel.split(" - ")[0]
+                    # Filtramos solo los apuntes de esa cuenta
+                    df_mayor = df_full[df_full['codigo'] == cod_sel].sort_values('fecha_contable').copy()
+                    nat_sel = df_mayor.iloc[0]['naturaleza']
+                    
+                    st.markdown(f"**Extracto de Movimientos | Naturaleza: `{nat_sel}`**")
+                    
+                    # Calcular el saldo acumulado línea por línea
+                    saldo_acum = 0.0
+                    saldos = []
+                    for _, row in df_mayor.iterrows():
+                        if nat_sel == 'DEUDORA': saldo_acum += (row['debito'] - row['credito'])
+                        else: saldo_acum += (row['credito'] - row['debito'])
+                        saldos.append(saldo_acum)
+                    
+                    df_mayor['saldo_acumulado'] = saldos
+                    
+                    # Preparar vista
+                    df_mayor_view = df_mayor[['fecha_contable', 'descripcion', 'debito', 'credito', 'saldo_acumulado']].copy()
+                    df_mayor_view.columns = ['FECHA', 'ORIGEN DEL ASIENTO', 'DEBE', 'HABER', 'SALDO ACUM.']
+                    
+                    for col in ['DEBE', 'HABER', 'SALDO ACUM.']:
+                        df_mayor_view[col] = df_mayor_view[col].apply(lambda x: f"{simbolo_view} {x:,.2f}" if x != 0 else "-")
+                        
+                    st.dataframe(df_mayor_view, use_container_width=True, hide_index=True)
+            else:
+                st.info("ℹ️ Selecciona una cuenta para auditar sus movimientos.")
+
+        # =========================================================
+        # 3. ESTADOS FINANCIEROS (BALANCE Y P&G)
+        # =========================================================
+        with tab_bg:
+            st.markdown("### Estados Financieros Oficiales")
+            st.info("🚧 El generador de Balance General y Estado de Resultados está en construcción.")
+            st.write("Ahora que el Balance de Comprobación está calculando los saldos reales (Activos, Pasivos, Patrimonio, Ingresos y Gastos), el próximo paso es organizar esos saldos en el formato de presentación oficial NIIF.")
+            
+            c1, c2 = st.columns(2)
+            c1.button("⚖️ Generar Balance General", disabled=True)
+            c2.button("📈 Generar Estado de Resultados (P&G)", disabled=True)
