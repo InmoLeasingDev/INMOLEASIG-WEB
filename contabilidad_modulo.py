@@ -216,9 +216,9 @@ def mostrar_modulo_contabilidad(supabase):
                     else:
                         c_tot1.error(f"❌ **Descuadre Detectado:** DEBE {tot_d:,.2f} vs HABER {tot_c:,.2f}")
 
-                    # ==========================================
+                    # ================================================================
                     # 🚀 PANEL DE EXPORTACIÓN Y COMUNICACIÓN (CON AUDITORÍA BLINDADA)
-                    # ==========================================
+                    # ================================================================
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.markdown("#### 🖨️ Exportar y Compartir Reporte")
                     
