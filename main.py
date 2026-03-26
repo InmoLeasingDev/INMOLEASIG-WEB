@@ -238,7 +238,7 @@ if selected == "Inicio":
         except Exception:
             st.warning("Imagen 'portada.jpg' no encontrada.")
             
-    # --- TIP CUSTOM PRO: Tamaño reducido y posición exacta ---
+    # ---- TIP CUSTOM PRO: Tamaño reducido y posición exacta ----
     st.markdown("""
         <div style='
             margin-top: -4px; 
