@@ -4,9 +4,12 @@ import time
 import urllib.parse
 import re
 from fpdf import FPDF
-
+import supabase
+import plotly.express as px
 # --- NUESTRA LIBRERÍA MAESTRA ---
 from herramientas import log_accion, enviar_reporte_correo, generar_excel_bytes, panel_reportes_y_compartir, panel_gestor_galeria
+
+
 # =========================================
 # 1. MOTOR PDF PROPIEDADES
 # =========================================
@@ -393,23 +396,178 @@ def generar_pdf_movimientos(df):
 # MÓDULO PRINCIPAL: INMUEBLES
 # ==========================================
 def mostrar_modulo_inmuebles(supabase):
-    st.header("🏢 Gestión de Inmuebles e Inventarios")
-    MOD_VERSION = "v1.0  )"
+    st.header("🏢 Gestión de Inmuebles y Activos")
+    MOD_VERSION = "v4.5  )"
     st.caption(f"⚙️ Módulo Inmuebles {MOD_VERSION} | Control de Propiedades, Unidades, Mandatos e Inventarios.")
 
     # --- Identificar al usuario para los logs ---
     var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
     usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
-
-    # --- CREACIÓN DE LAS 4 PESTAÑAS MAESTRAS ---
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "🏢 1. Propiedades", 
-        "🚪 2. Unidades", 
-        "🤝 3. Mandatos", 
-        "🛋️ 4. Activos"
+    # 🛡️ DEFINIR LA MONEDA DE LA SESIÓN (El blindaje que faltaba)
+    moneda_sesion = st.session_state.get("moneda_usuario", "EUR")
+    # --- NAVEGACIÓN PRINCIPAL DEL MÓDULO (Pestañas) ---
+    tab_dash, tab1, tab2, tab3, tab4 = st.tabs([
+        "📊 Dashboard",
+        "🏢 Propiedades", 
+        "🚪 Unidades", 
+        "📜 Mandatos",
+        "🛋️ Activos Fijos"
     ])
+    #========================================================
+    # 📊 DASHBOARD OPERATIVO Y CAPACIDAD INSTALADA (PRO MINIMALISTA)
+    # =========================================================
+    with tab_dash:
+        # --- 🎨 1. CSS ULTRA-MINIMALISTA Y COMPACTO ---
+        st.markdown("""
+        <style>
+            .pro-card {
+                background: linear-gradient(145deg, #181824, #1f1f2e);
+                border-radius: 8px;
+                border: 1px solid rgba(131, 56, 236, 0.15);
+                padding: 10px 14px; /* Aún más compacto */
+                margin-bottom: 2px;
+                transition: transform 0.2s ease, border-color 0.2s ease;
+            }
+            .pro-card:hover {
+                transform: translateY(-2px);
+                border-color: rgba(131, 56, 236, 0.6);
+            }
+            .pro-metric-title { color: #8a8a9e; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+            .pro-metric-value { color: #ffffff; font-size: 22px; font-weight: 600; margin-bottom: 0px; line-height: 1.1; }
+            .pro-metric-delta { font-size: 10px; font-weight: 500; }
+            .pro-metric-delta.positive { color: #10b981; }
+            .pro-metric-delta.negative { color: #ef4444; }
+            .pro-metric-delta.neutral { color: #6b7280; }
+            
+            /* Títulos de sección ultra-compactos */
+            .sec-title {
+                font-size: 14px;
+                font-weight: 600;
+                color: #4a4a5e;
+                margin-top: 4px;
+                margin-bottom: 4px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
-   
+        # Título nativo de Streamlit (sin huecos)
+        #st.caption("📊 Dashboard Operativo (Calculado On-The-Fly)")
+        
+        simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
+        
+        # --- 2. EXTRACCIÓN DE DATOS ---
+        with st.spinner("Calculando métricas..."):
+            try:
+                res_inm = supabase.table("inmuebles").select("id, estado").eq("moneda", moneda_sesion).execute()
+                df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
+                
+                res_uni = supabase.table("unidades").select("id, estado, id_inmueble").execute()
+                df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
+                
+                res_man = supabase.table("mandatos").select("id, estado_contrato, fecha_terminacion").eq("moneda", moneda_sesion).execute()
+                df_man = pd.DataFrame(res_man.data) if res_man.data else pd.DataFrame()
+                
+                res_act = supabase.table("activos").select("id, estado, valor_compra, origen, ubicacion_tipo, propiedad").eq("moneda", moneda_sesion).execute()
+                df_act = pd.DataFrame(res_act.data) if res_act.data else pd.DataFrame()
+            except Exception as e:
+                st.error(f"Error base de datos: {e}")
+                df_inm, df_uni, df_man, df_act = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+        # --- 3. CÁLCULO DE KPIS ---
+        inm_totales = len(df_inm)
+        inm_activos = len(df_inm[df_inm['estado'] == 'ACTIVO']) if not df_inm.empty else 0
+        inm_inactivos = inm_totales - inm_activos
+        
+        uni_totales = len(df_uni)
+        uni_ocupadas = len(df_uni[df_uni['estado'] == 'OCUPADA']) if not df_uni.empty else 0
+        uni_disponibles = len(df_uni[df_uni['estado'].isin(['DISPONIBLE', 'LIBRE'])]) if not df_uni.empty else 0
+        ocupacion_pct = (uni_ocupadas / uni_totales * 100) if uni_totales > 0 else 0.0
+        
+        man_activos, man_vencer, man_vencidos = 0, 0, 0
+        if not df_man.empty:
+            df_man['fecha_terminacion'] = pd.to_datetime(df_man['fecha_terminacion'], errors='coerce')
+            hoy = pd.Timestamp.now().normalize()
+            man_activos = len(df_man[df_man['estado_contrato'] != 'FINALIZADO'])
+            man_vencidos = len(df_man[(df_man['fecha_terminacion'] < hoy) & (df_man['estado_contrato'] != 'FINALIZADO')])
+            limite_60d = hoy + pd.Timedelta(days=60)
+            man_vencer = len(df_man[(df_man['fecha_terminacion'] >= hoy) & (df_man['fecha_terminacion'] <= limite_60d) & (df_man['estado_contrato'] != 'FINALIZADO')])
+
+        act_totales, val_total, val_bodega, act_bodega = len(df_act), 0.0, 0.0, 0
+        act_buenos, act_malos = 0, 0
+        if not df_act.empty:
+            df_empresa = df_act[df_act['propiedad'] == 'Empresa'].copy()
+            df_empresa['valor_compra'] = pd.to_numeric(df_empresa['valor_compra'], errors='coerce').fillna(0)
+            val_total = df_empresa['valor_compra'].sum()
+            act_buenos = len(df_act[df_act['estado'].isin(['Nuevo', 'Bueno'])])
+            act_malos = len(df_act[df_act['estado'].isin(['Deteriorado', 'En reparación', 'Punto Limpio'])])
+            df_bodega = df_act[(df_act['ubicacion_tipo'] == 'Bodega') | (df_act['estado'] == 'En bodega')]
+            act_bodega = len(df_bodega)
+            val_bodega = df_bodega[df_bodega['propiedad'] == 'Empresa']['valor_compra'].astype(float).sum() if not df_bodega.empty else 0.0
+
+        # --- 4. FUNCIÓN CREADORA DE TARJETAS ---
+        def create_pro_card(title, value, delta, is_negative=False):
+            delta_class = "negative" if is_negative else ("positive" if "↑" in delta or "%" in delta else "neutral")
+            st.markdown(f"""
+            <div class="pro-card">
+                <div class="pro-metric-title">{title}</div>
+                <div class="pro-metric-value">{value}</div>
+                <div class="pro-metric-delta {delta_class}">{delta}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # --- SECCIÓN 1 ---
+        st.markdown("<div class='sec-title' style='margin-top: -30px;'>Capacidad Instalada</div>", unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: create_pro_card("Propiedades Activas", f"{inm_activos}", f"{inm_inactivos} inactivas")
+        with c2: create_pro_card("Unidades Totales", f"{uni_totales}", "")
+        with c3: create_pro_card("Mandatos Activos", f"{man_activos}", "")
+        with c4: create_pro_card("Ocupación Global", f"{ocupacion_pct:.1f}%", f"{uni_ocupadas} ocupadas", is_negative=(ocupacion_pct < 80))
+
+        # --- SECCIÓN 2 ---
+        st.markdown("<div class='sec-title'>Riesgo y Activos</div>", unsafe_allow_html=True)
+        ca1, ca2, ca3, ca4 = st.columns(4)
+        status_man_vencidos = f"{man_vencidos}" if man_vencidos > 0 else "0"
+        with ca1: create_pro_card("Mandatos Vencidos", status_man_vencidos, "Crítico" if man_vencidos > 0 else "Al día", is_negative=(man_vencidos > 0))
+        with ca2: create_pro_card("Por Vencer (60d)", f"{man_vencer}", "Atención" if man_vencer > 0 else "Estable", is_negative=(man_vencer > 0))
+        with ca3: create_pro_card("Activos Físicos", f"{act_totales}", f"{act_buenos} sanos")
+        with ca4: create_pro_card("Capital en Bodega", f"{simbolo_mon} {val_bodega:,.0f}", f"{act_bodega} ítems", is_negative=(val_bodega > 0))
+
+        st.write("") # Pequeño respiro antes de los gráficos        
+        # --- 5. GRÁFICOS COMPACTOS ---
+        if not df_act.empty:
+            # 1. Usamos la misma clase de título pequeña que arriba en lugar del ####
+            st.markdown("<div class='sec-title'>Distribución Financiera</div>", unsafe_allow_html=True)
+            
+            cg1, cg2 = st.columns(2)
+            colores_pro = ['#3a86ff', '#8338ec', '#ff006e', '#fb5607', '#ffbe0b']
+
+            with cg1:
+                origen_counts = df_act['origen'].value_counts()
+                fig_origen = px.pie(names=origen_counts.index, values=origen_counts.values, hole=0.7, color_discrete_sequence=colores_pro)
+                fig_origen.update_traces(textposition='inside', textinfo='percent')
+                fig_origen.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+                    # Margen superior a 0 y altura reducida a 170px
+                    margin=dict(l=0, r=0, t=0, b=0), showlegend=True, height=170, 
+                    legend=dict(orientation="v", yanchor="auto", y=0.5, xanchor="right", x=1)
+                )
+                st.plotly_chart(fig_origen, use_container_width=True, key="plotly_origen_min")
+            
+            with cg2:
+                estado_counts = df_act['estado'].value_counts()
+                fig_estado = px.area(x=estado_counts.index, y=estado_counts.values, color_discrete_sequence=['#8338ec'])
+                fig_estado.update_traces(fill='tozeroy', fillcolor='rgba(131, 56, 236, 0.2)', line=dict(width=2, color='#8338ec'))
+                fig_estado.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+                    xaxis=dict(title=None, showgrid=False, tickfont=dict(size=10)), 
+                    yaxis=dict(title=None, showgrid=True, tickfont=dict(size=10)), 
+                    # Margen superior casi a 0 y altura reducida a 170px
+                    margin=dict(l=0, r=0, t=5, b=0), height=170
+                )
+                st.plotly_chart(fig_estado, use_container_width=True, key="plotly_estado_min")
+
     # ==========================================
     # TAB 1: PROPIEDADES (CRUD + REPORTES)
     # ==========================================
@@ -2039,24 +2197,31 @@ def mostrar_modulo_inmuebles(supabase):
                                 st.rerun()
 
 # --- PANEL: REPORTES DE ACTIVOS ---
+# --- PANEL: REPORTES DE ACTIVOS ---
         elif st.session_state.modo_activo == "REPORTES":
             st.markdown("---")
-            st.markdown("### 📊 Centro de Reportes de Activos e Inventarios")
+            st.markdown("### 📊 Centro de Reportes y Auditoría de Activos")
             
             var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
             usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
 
-            try: res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+            try: 
+                res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
+                df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
             except: df_ops = pd.DataFrame()
 
-            # 🚀 AHORA SON 6 REPORTES SEPARADOS PERFECTAMENTE
-            tipo_rep = st.selectbox("Selecciona el tipo de reporte a exportar:", [
-                "1. Inventario Global (Todos los activos de la región)",
-                "2. Activos por Ubicación (Bodega, Edificios, Unidades)",
-                "3. Valorización y Propiedad (Empresa vs Terceros)",
-                "4. Estado Físico y Valorización",
-                "5. Control de Garantías",
-                "6. Historial de Movimientos y Trazabilidad"
+            # 🚀 LOS 10 REPORTES DE GRADO DIRECTOR
+            tipo_rep = st.selectbox("Selecciona el tipo de reporte financiero/operativo:", [
+                "1. Inventario Global (Todos los activos)",
+                "2. Origen: Aportaciones de Socios",
+                "3. Origen: Compras de la Empresa",
+                "4. Propiedad: Activos del Propietario (Terceros)",
+                "5. Auditoría: Activos sin Factura",
+                "6. Inversión por Inmueble (Edificios)",
+                "7. Detalle Fino por Unidad (Habitaciones)",
+                "8. Activos Improductivos (En Bodega)",
+                "9. Control de Garantías",
+                "10. Historial de Movimientos"
             ])
 
             res_act_rep = supabase.table("activos").select("*, operadores(nombre), inmuebles(nombre), unidades(nombre)").eq("moneda", moneda_sesion).order("codigo_unico", desc=True).execute()
@@ -2071,54 +2236,88 @@ def mostrar_modulo_inmuebles(supabase):
                     df_out['UBICACIÓN'] = df_out.apply(lambda r: f"{r['inmuebles'].get('nombre', '')}: Común" if str(r.get('ubicacion_tipo')) == 'Zona Común' and isinstance(r.get('inmuebles'), dict) else (f"{r['inmuebles'].get('nombre', '') if isinstance(r.get('inmuebles'), dict) else ''}: {r['unidades'].get('nombre', '')}" if str(r.get('ubicacion_tipo')) == 'Unidad' and isinstance(r.get('unidades'), dict) else str(r.get('ubicacion_tipo', 'Bodega'))), axis=1)
                     df_out['VALOR'] = pd.to_numeric(df_out['valor_compra']).fillna(0).apply(lambda x: f"{simbolo_mon} {x:,.2f}" if x > 0 else "-")
                     df_out.rename(columns={'codigo_unico': 'CÓDIGO', 'nombre': 'ACTIVO', 'categoria': 'CATEGORÍA', 'estado': 'ESTADO', 'inicio_garantia': 'COMPRA', 'fin_garantia': 'FIN GARANTÍA'}, inplace=True)
-                    return df_out[['CÓDIGO', 'ACTIVO', 'CATEGORÍA', 'DUEÑO', 'UBICACIÓN', 'ESTADO', 'VALOR', 'COMPRA', 'FIN GARANTÍA', 'ubicacion_tipo', 'propiedad']]
+                    
+                    # Filtros Ocultos para cálculos
+                    df_out['ORIGEN'] = df_out.get('origen', 'PROPIETARIO')
+                    df_out['SOPORTE'] = df_out.get('factura_url', None).apply(lambda x: "SIN FACTURA" if pd.isna(x) or str(x).strip() == "" else "CON FACTURA")
+                    df_out['INM_NOMBRE'] = df_out.apply(lambda r: r['inmuebles'].get('nombre', 'Sin Inmueble') if isinstance(r.get('inmuebles'), dict) else 'Sin Inmueble', axis=1)
+                    
+                    return df_out[['CÓDIGO', 'ACTIVO', 'CATEGORÍA', 'DUEÑO', 'ORIGEN', 'UBICACIÓN', 'ESTADO', 'VALOR', 'SOPORTE', 'COMPRA', 'FIN GARANTÍA', 'ubicacion_tipo', 'propiedad', 'INM_NOMBRE', 'valor_compra']]
 
                 df_base_rep = format_rep(df_a_rep)
                 df_export = pd.DataFrame()
                 nombre_pdf = ""
+                
+                # Columnas estándar para que el PDF no se desborde
+                columnas_estandar = ['CÓDIGO', 'ACTIVO', 'CATEGORÍA', 'UBICACIÓN', 'ESTADO', 'VALOR']
 
                 if "1. Inventario Global" in tipo_rep:
-                    df_export = df_base_rep.drop(columns=['ubicacion_tipo', 'propiedad', 'COMPRA', 'FIN GARANTÍA'])
-                    nombre_pdf = "inventario_global_activos"
-                    st.info("💡 Muestra un resumen general de todos los activos físicos registrados.")
+                    df_export = df_base_rep[columnas_estandar]
+                    nombre_pdf = "inventario_global"
 
-                elif "2. Activos por Ubicación" in tipo_rep:
-                    ub_filtro = st.radio("Filtro de Ubicación Operativa:", ["Disponibles en Bodega", "En Zonas Comunes", "Asignados a Unidades"], horizontal=True)
-                    if ub_filtro == "Disponibles en Bodega": df_export = df_base_rep[df_base_rep['ubicacion_tipo'] == 'Bodega']
-                    elif ub_filtro == "En Zonas Comunes": df_export = df_base_rep[df_base_rep['ubicacion_tipo'] == 'Zona Común']
-                    else: df_export = df_base_rep[df_base_rep['ubicacion_tipo'] == 'Unidad']
-                    df_export = df_export.drop(columns=['ubicacion_tipo', 'propiedad', 'COMPRA', 'FIN GARANTÍA'])
-                    nombre_pdf = f"activos_{ub_filtro.replace(' ', '_').lower()}"
+                elif "2. Origen: Aportaciones" in tipo_rep:
+                    df_export = df_base_rep[df_base_rep['ORIGEN'] == 'APORTACIÓN DE SOCIO']
+                    val_tot = df_export['valor_compra'].sum()
+                    st.success(f"💰 **Total Patrimonio Aportado en Especie:** {simbolo_mon} {val_tot:,.2f}")
+                    df_export = df_export[columnas_estandar]
+                    nombre_pdf = "aportaciones_socios"
 
-                elif "3. Valorización" in tipo_rep:
-                    prop_filtro = st.radio("Filtro Patrimonial:", ["Todos", "Inversión Propia (Empresa)", "Activos de Terceros (Propietarios)"], horizontal=True)
-                    if prop_filtro == "Inversión Propia (Empresa)": df_export = df_base_rep[df_base_rep['propiedad'] == 'Empresa']
-                    elif prop_filtro == "Activos de Terceros (Propietarios)": df_export = df_base_rep[df_base_rep['propiedad'] == 'Propietario']
-                    else: df_export = df_base_rep.copy()
-                    
-                    val_total = df_a_rep[df_a_rep['propiedad'] == 'Empresa']['valor_compra'].sum()
-                    st.success(f"💰 **Cálculo de Inversión Patrimonial (Solo activos de la Empresa):** {simbolo_mon} {val_total:,.2f}")
-                    df_export = df_export.drop(columns=['ubicacion_tipo', 'propiedad', 'COMPRA', 'FIN GARANTÍA'])
-                    nombre_pdf = "valorizacion_patrimonio"
+                elif "3. Origen: Compras" in tipo_rep:
+                    df_export = df_base_rep[df_base_rep['ORIGEN'] == 'COMPRA DIRECTA']
+                    val_tot = df_export['valor_compra'].sum()
+                    st.success(f"💸 **Total Activos Comprados por la Empresa:** {simbolo_mon} {val_tot:,.2f}")
+                    df_export = df_export[columnas_estandar]
+                    nombre_pdf = "compras_empresa"
 
-                # 🚀 REPORTE 4: SOLO ESTADO FÍSICO (Mantiene el valor)
-                elif "4. Estado Físico" in tipo_rep:
-                    est_filtro = st.selectbox("Ver activos según su estado físico:", ["Todos", "Nuevo", "Bueno", "Deteriorado", "En reparación", "Punto Limpio"])
-                    if est_filtro != "Todos": df_export = df_base_rep[df_base_rep['ESTADO'] == est_filtro]
-                    else: df_export = df_base_rep.copy()
-                    df_export = df_export.drop(columns=['ubicacion_tipo', 'propiedad', 'COMPRA', 'FIN GARANTÍA'])
-                    nombre_pdf = "estado_fisico_activos"
-                    st.info("💡 Muestra el inventario filtrado por condición física, manteniendo sus valores económicos para la depreciación.")
+                elif "4. Propiedad: Activos del Propietario" in tipo_rep:
+                    df_export = df_base_rep[df_base_rep['propiedad'] == 'Propietario']
+                    st.info("💡 Estos activos pertenecen al dueño del inmueble, no aumentan tu patrimonio ni se deprecian en tu empresa.")
+                    df_export = df_export[columnas_estandar]
+                    nombre_pdf = "activos_propietario"
 
-                # 🚀 REPORTE 5: SOLO GARANTÍAS (Nuevo motor PDF)
-                elif "5. Control de Garantías" in tipo_rep:
-                    df_export = df_base_rep.copy()
-                    # Quitamos categoría y valor para que quepan las fechas en el PDF
-                    df_export = df_export.drop(columns=['ubicacion_tipo', 'propiedad', 'CATEGORÍA', 'VALOR', 'ESTADO']) 
+                elif "5. Auditoría: Activos sin Factura" in tipo_rep:
+                    df_export = df_base_rep[df_base_rep['SOPORTE'] == 'SIN FACTURA']
+                    val_tot = df_export[df_export['propiedad'] == 'Empresa']['valor_compra'].sum()
+                    st.error(f"🚨 **Atención:** Hay {len(df_export)} activos sin soporte documental físico. Valor sin sustento: {simbolo_mon} {val_tot:,.2f}")
+                    df_export = df_export[columnas_estandar]
+                    nombre_pdf = "auditoria_sin_factura"
+
+                elif "6. Inversión por Inmueble" in tipo_rep:
+                    lista_inm = df_base_rep[df_base_rep['ubicacion_tipo'].isin(['Zona Común', 'Unidad'])]['INM_NOMBRE'].unique().tolist()
+                    if lista_inm:
+                        inm_sel = st.selectbox("Selecciona el Inmueble a evaluar:", lista_inm)
+                        df_export = df_base_rep[df_base_rep['INM_NOMBRE'] == inm_sel]
+                        val_tot = df_export[df_export['propiedad'] == 'Empresa']['valor_compra'].sum()
+                        st.success(f"🏢 **Inversión total de la Empresa en este inmueble:** {simbolo_mon} {val_tot:,.2f}")
+                    else:
+                        st.warning("No hay activos asignados a inmuebles.")
+                    df_export = df_export[columnas_estandar]
+                    nombre_pdf = "inversion_inmueble"
+
+                elif "7. Detalle Fino por Unidad" in tipo_rep:
+                    df_export = df_base_rep[df_base_rep['ubicacion_tipo'] == 'Unidad']
+                    lista_inm = df_export['INM_NOMBRE'].unique().tolist()
+                    if lista_inm:
+                        inm_sel = st.selectbox("Filtra por Edificio:", ["Todos"] + lista_inm)
+                        if inm_sel != "Todos": df_export = df_export[df_export['INM_NOMBRE'] == inm_sel]
+                        val_tot = df_export[df_export['propiedad'] == 'Empresa']['valor_compra'].sum()
+                        st.info(f"🛏️ **Inversión en unidades filtradas:** {simbolo_mon} {val_tot:,.2f}")
+                    df_export = df_export[columnas_estandar]
+                    nombre_pdf = "activos_unidades_fino"
+
+                elif "8. Activos Improductivos" in tipo_rep:
+                    df_export = df_base_rep[(df_base_rep['ubicacion_tipo'] == 'Bodega') | (df_base_rep['ESTADO'] == 'En bodega')]
+                    val_tot = df_export[df_export['propiedad'] == 'Empresa']['valor_compra'].sum()
+                    st.warning(f"📦 **Capital inmovilizado en Bodega (Improductivo):** {simbolo_mon} {val_tot:,.2f}")
+                    df_export = df_export[columnas_estandar]
+                    nombre_pdf = "activos_improductivos"
+
+                elif "9. Control de Garantías" in tipo_rep:
+                    df_export = df_base_rep[['CÓDIGO', 'ACTIVO', 'DUEÑO', 'UBICACIÓN', 'COMPRA', 'FIN GARANTÍA']].copy()
                     nombre_pdf = "control_garantias_activos"
-                    st.info("💡 Muestra las fechas de compra y fin de garantía para gestionar mantenimientos y reemplazos.")
+                    st.info("💡 Muestra las fechas de compra y fin de garantía para gestionar mantenimientos.")
 
-                elif "6. Historial de Movimientos" in tipo_rep:
+                elif "10. Historial de Movimientos" in tipo_rep:
                     res_mov = supabase.table("activos_movimientos").select("*, activos(codigo_unico, nombre)").order("fecha_movimiento", desc=True).execute()
                     df_m = pd.DataFrame(res_mov.data) if res_mov.data else pd.DataFrame()
                     if not df_m.empty:
@@ -2131,10 +2330,9 @@ def mostrar_modulo_inmuebles(supabase):
 
                 # --- 🚀 LANZAR EL GENERADOR DE REPORTES UNIVERSAL ---
                 if not df_export.empty:
-                    if "6. Historial" in tipo_rep:
+                    if "10. Historial" in tipo_rep:
                         panel_reportes_y_compartir(df_export, nombre_pdf, "Historial Activos", generar_pdf_movimientos, df_ops, supabase, usuario_actual, "modo_activo")
-                    elif "5. Control de Garantías" in tipo_rep:
-                        # LLAMAMOS AL NUEVO MOTOR PDF!
+                    elif "9. Control de Garantías" in tipo_rep:
                         panel_reportes_y_compartir(df_export, nombre_pdf, "Reporte Garantías", generar_pdf_garantias, df_ops, supabase, usuario_actual, "modo_activo")
                     else:
                         panel_reportes_y_compartir(df_export, nombre_pdf, "Reporte Activos", generar_pdf_activos, df_ops, supabase, usuario_actual, "modo_activo")

@@ -36,6 +36,7 @@ def emitir_beep_alerta():
 st.set_page_config(page_title="INMOLEASING WEB", layout="wide", page_icon="🏢")
 APP_VERSION = "v5.0 GOLD" # Simetría absoluta en menú y foto perfecta
 
+
 # ==========================================
 # 1.5 DICCIONARIO: MENÚ LATERAL <-> FACULTAD DB
 # ==========================================
@@ -46,26 +47,29 @@ DICCIONARIO_MENU_FACULTADES = {
     "Propietarios": "MODULO PROPIETARIOS",
     "Inmuebles": "MODULO INMUEBLES",
     "Arrendamientos": "MODULO ARRENDAMIENTOS",
-    "Bancos": "MODULO BANCOS",          # <--- REEMPLAZADO
+    "Suministros": "MODULO SUMINISTROS",  # <--- NUEVO
+    "Incidencias": "MODULO INCIDENCIAS",  # <--- NUEVO
+    "Bancos": "MODULO BANCOS",          
     "Contabilidad": "MODULO CONTABILIDAD" 
 }
 
 # ================================================
 # 1.6 AJUSTES VISUALES CSS (PIXEL PERFECT EXTREMO)
-# ===============================================
+# ================================================
 st.markdown("""
     <style>
         /* 1. Limpieza total de cabecera lateral */
         [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; height: 0px !important; min-height: 0px !important; }
         
-        /* 2. Menú lateral: subimos el contenido */
+        /* 2. Menú lateral: subimos el contenido y ADELGAZAMOS EL PANEL */
+        [data-testid="stSidebar"] { min-width: 220px !important; max-width: 220px !important; }
         [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; margin-top: -0.5rem !important; }
         
         /* 3. Panel principal: respiro superior */
         .block-container { padding-top: 3rem !important; }
         
-        /* 4. Acompañar la subida de la línea acercando el botón Cerrar Sesión */
-        .stButton button { margin-top: -1.5rem !important; }
+        /* 4. Subir el botón de Cerrar Sesión (limitado SOLO a la barra lateral) */
+        [data-testid="stSidebar"] .stButton button { margin-top: -30px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -157,23 +161,29 @@ if not st.session_state.autenticado:
                 
     st.stop()
 
+
 # ==========================================
 # 6. MENÚ LATERAL (SIDEBAR)
 # ==========================================
 with st.sidebar:
-    st.title("🏢 INMOLEASING")
-    st.caption(f"Versión: {APP_VERSION}")
-    
-    st.write(f"👤 Hola, **{str(st.session_state.usuario.get('nombre', '')).strip()}**")
-    st.caption(f"🌍 Entorno de Trabajo: **{st.session_state.moneda_usuario}**")
     rol_actual = st.session_state.usuario.get('rol_nombre', 'SIN ROL')
     texto_facs = st.session_state.usuario.get('facultades_texto', '')
+    nombre_usuario = str(st.session_state.usuario.get('nombre', '')).strip()
+    moneda_usuario = st.session_state.moneda_usuario
     
-    st.caption(f"Perfil: **{rol_actual}**")
-    
-    # Línea superior (manteniendo la simetría base)
-    st.markdown("<hr style='margin-top: 0; margin-bottom: 0;'>", unsafe_allow_html=True)
-
+    # --- CABECERA COMPACTA Y ELEGANTE CON HTML ---
+    st.markdown(f"""
+    <div style="margin-top: -20px;">
+        <h2 style="margin-bottom: 0px; padding-bottom: 0px; font-size: 26px;">🏢 INMOLEASING</h2>
+        <div style="font-size: 12px; color: #8a8a9e; margin-top: -5px; margin-bottom: 18px;">Versión: {APP_VERSION}</div>
+        <div style="font-size: 15px; margin-bottom: 6px;">👤 Hola, <b>{nombre_usuario}</b></div>
+        <div style="font-size: 13px; color: #8a8a9e; margin-bottom: 4px;">🌍 Entorno: <b>{moneda_usuario}</b></div>
+        <div style="font-size: 13px; color: #8a8a9e; margin-bottom: 15px;">Perfil: <b>{rol_actual}</b></div>
+    </div>
+    <hr style='margin-top: 0px; margin-bottom: -5px;'>
+    """, unsafe_allow_html=True)  
+  
+    # Restablecemos la lista base de permisos
     st.session_state.opciones_permitidas = ["Inicio"]
     
     for item, fac in DICCIONARIO_MENU_FACULTADES.items():
@@ -181,10 +191,10 @@ with st.sidebar:
             st.session_state.opciones_permitidas.append(item)
 
 
-    opciones = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Bancos", "Contabilidad"]
-    iconos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "bank", "journal-bookmark"]
+    opciones = ["Inicio", "Dashboard", "Usuarios", "Operadores", "Propietarios", "Inmuebles", "Arrendamientos", "Suministros", "Incidencias", "Bancos", "Contabilidad"]
+    iconos = ["house", "speedometer2", "person-gear", "briefcase", "person-badge", "house-door", "file-earmark-check", "plug", "tools", "bank", "journal-bookmark"]
 
-    # Menú sin paddings internos extraños
+    # Menú Compacto Pro (Letra más pequeña y menos espacio)
     selected = option_menu(
         menu_title=None, 
         options=opciones, 
@@ -192,13 +202,20 @@ with st.sidebar:
         menu_icon="cast", 
         default_index=0,
         styles={
-            "container": {"padding": "0!important", "margin-top": "0!important", "margin-bottom": "0!important"}
+            "container": {"padding": "0!important", "margin-top": "0px!important", "margin-bottom": "0!important"},
+            "icon": {"font-size": "13px"}, 
+            "nav-link": {
+                "font-size": "13px",          
+                "text-align": "left", 
+                "margin": "2px 0px",          
+                "padding": "8px 10px",        
+                "--hover-color": "#333"
+            },
+            "nav-link-selected": {"background-color": "#ff4b4b", "font-weight": "bold"},
         }
     )
-    
-    # LÍNEA INFERIOR REBELDE: Aumentamos la tracción a -45px y compensamos el espacio abajo con -20px
-    st.markdown("<hr style='position: relative; top: -45px; margin-bottom: -20px;'>", unsafe_allow_html=True)
-    
+    # LÍNEA INFERIOR REBELDE: Aumentamos la tracción y compensamos el espacio abajo
+    st.markdown("<hr style='position: relative; top: -45px; margin-bottom: -40px;'>", unsafe_allow_html=True)
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
@@ -212,20 +229,36 @@ if selected == "Inicio":
     st.markdown("**Bienvenido al Sistema Integral de Gestión Inmobiliaria.**")
     st.caption(f"Versión actual: {APP_VERSION}")
     
-    st.write("") 
-    
     # FOTO PERFECTA: Proporciones 1 - 2 - 1
     img_cols = st.columns([1, 2, 1]) 
     
     with img_cols[1]:
         try:
             st.image("portada.jpg", use_container_width=True)
-        except:
+        except Exception:
             st.warning("Imagen 'portada.jpg' no encontrada.")
             
-    st.write("") 
-    st.info("👋 Selecciona una opción en el menú lateral para comenzar.")
-
+    # --- TIP CUSTOM PRO: Tamaño reducido y posición exacta ---
+    st.markdown("""
+        <div style='
+            margin-top: -4px; 
+            margin-left: auto;
+            margin-right: auto;
+            width: 50%;
+            background-color: #0e1117; 
+            border: 1px solid #1f2937;
+            border-radius: 8px;
+            padding: 8px 15px;
+            color: #8a8a9e;
+            font-size: 13px;
+            text-align: center;
+            position: relative; 
+            z-index: 10;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        '>
+            👋 Selecciona una opción en el menú lateral para comenzar.
+        </div>
+    """, unsafe_allow_html=True)
 elif selected not in st.session_state.opciones_permitidas:
     emitir_beep_alerta()
     st.error("### 🔒 Acceso Restringido")
@@ -252,6 +285,14 @@ else:
         
     elif selected == "Arrendamientos":
         st.header("📝 Arrendamientos")
+        st.info("🚧 Módulo en construcción.")
+        
+    elif selected == "Suministros":
+        st.header("🔌 Gestión de Suministros")
+        st.info("🚧 Módulo en construcción.")
+        
+    elif selected == "Incidencias":
+        st.header("🛠️ Mantenimiento e Incidencias")
         st.info("🚧 Módulo en construcción.")
    
     elif selected == "Bancos":
