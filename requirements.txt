@@ -6,3 +6,4 @@ st-supabase-connection
 pytz
 fpdf
 xlsxwriter
+plotly
