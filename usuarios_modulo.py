@@ -686,7 +686,7 @@ def mostrar_modulo_usuarios(supabase):
                 else:
                     st.warning("No hay operadores con teléfono.")
 
-    # ---- TAB 5: LOGS Y AUDITORÍA ----
+    # ----- TAB 5: LOGS Y AUDITORÍA -----
     with tab5:
         try:
             res_l = supabase.table("logs_actividad").select("*").order("fecha", desc=True).execute()
