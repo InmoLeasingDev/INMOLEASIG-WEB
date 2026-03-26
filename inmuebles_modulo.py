@@ -457,7 +457,7 @@ def mostrar_modulo_inmuebles(supabase):
         
         simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
         
-        # --- 2. EXTRACCIÓN DE DATOS ---
+        # ---- 2. EXTRACCIÓN DE DATOS ----
         with st.spinner("Calculando métricas..."):
             try:
                 res_inm = supabase.table("inmuebles").select("id, estado").eq("moneda", moneda_sesion).execute()
