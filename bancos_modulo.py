@@ -42,7 +42,7 @@ def mostrar_modulo_bancos(supabase):
 
         st.markdown("---")
         
-        # --- FORMULARIO PARA AÑADIR NUEVA CUENTA ---
+        # ---- FORMULARIO PARA AÑADIR NUEVA CUENTA ----
         with st.expander("➕ Añadir Nueva Cuenta Bancaria", expanded=df_bancos.empty):
             with st.form("form_nuevo_banco", clear_on_submit=True):
                 c1, c2 = st.columns(2)
