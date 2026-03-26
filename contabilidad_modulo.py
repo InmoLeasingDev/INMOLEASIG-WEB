@@ -155,7 +155,7 @@ def mostrar_modulo_contabilidad(supabase):
         st.info(f"Aquí registraremos salidas de dinero, comisiones y conciliación para el entorno {moneda_sesion}.")
 
 # --- LA NUEVA PESTAÑA PARA EL CFO ---
-with tab4:
+    with tab4:
         st.subheader("📚 Libro Diario Oficial")
         st.caption(f"Registro cronológico de operaciones contables ({moneda_sesion}).")
         
@@ -229,7 +229,7 @@ with tab4:
             else: st.info("ℹ️ Libro Diario vacío.")
         except Exception as e: st.error(f"Error: {e}")
 # --- AHORA SÍ EMPIEZA LA PESTAÑA 5 ---
-with tab5:
+    with tab5:
         st.subheader("🏛️ Reportes Oficiales y Auditoría Contable")
         
         # Sub-pestañas para organizar la contabilidad
