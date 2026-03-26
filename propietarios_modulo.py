@@ -139,9 +139,9 @@ def mostrar_modulo_propietarios(supabase):
             st.session_state.modo_propietario = "REPORTES"
             st.rerun()
 
-    # ==========================================
+    # =========================================
     # 🗂️ PANELES DINÁMICOS
-    # ==========================================
+    # =========================================
     
     # --- PANEL: CREAR NUEVO PROPIETARIO ---
     if st.session_state.modo_propietario == "CREAR":
