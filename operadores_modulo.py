@@ -156,9 +156,9 @@ def mostrar_modulo_operadores(supabase):
             with c_desc_t1_2:
                 st.download_button("📊 Descargar Excel", excel_bytes, "directorio_operadores.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-            # ==========================================
+            # =========================================
             # SECCIÓN COMPARTIR A OPERADORES
-            # ==========================================
+            # =========================================
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("#### 📤 Compartir Directorio a Operadores")
             
