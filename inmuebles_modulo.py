@@ -639,10 +639,10 @@ def mostrar_modulo_inmuebles(supabase):
         # ==========================================
         t_c1, t_c2, t_c3, t_c4, t_c5 = st.columns([1.5, 1.5, 1.5, 1.5, 4.0]) 
         
-        if t_c1.button("➕ Nueva", key="btn_nueva_prop", use_container_width=True):
+        def set_crear_propiedad():
             st.session_state.modo_propiedad = "CREAR"
-            st.rerun()
-            
+
+        t_c1.button("➕ Nueva", key="btn_nueva_prop", use_container_width=True, on_click=set_crear_propiedad)    
         if not df_inm.empty:
             if t_c2.button("⚙️ Gestionar", key="btn_edit_prop", use_container_width=True):
                 st.session_state.modo_propiedad = "EDITAR"
