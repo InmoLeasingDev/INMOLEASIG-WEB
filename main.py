@@ -219,7 +219,6 @@ with st.sidebar:
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
-
 # ==========================================
 # 7. ENRUTADOR PRINCIPAL
 # ==========================================
@@ -230,39 +229,33 @@ if selected == "Inicio":
     st.caption(f"Versión actual: {APP_VERSION}")
     
     # --- INICIO: RECORDATORIO MANTENIMIENTO (VACUUM) ---
-    # Solo mostramos el aviso a los administradores
-    if "ADMINISTRADOR" in st.session_state.usuario.get('rol_nombre', 'SIN ROL'):
-        
-        # 1. Obtenemos la fecha del último mantenimiento desde una tabla de configuración
-        # (Asumiendo que creas una tabla 'configuracion' con un registro donde id=1 y campo 'ultimo_vacuum')
+    texto_facs = st.session_state.usuario.get('facultades_texto', '')
+    
+    # Condición: Solo lo ve quien tenga acceso al Módulo de Usuarios
+    if "MODULO USUARIOS" in texto_facs:
         try:
             res_config = supabase.table("configuracion").select("ultimo_vacuum").eq("id", 1).execute()
-            
             if res_config.data:
                 fecha_str = res_config.data[0].get("ultimo_vacuum")
-                
                 if fecha_str:
-                    # Convertimos el string a objeto datetime
                     ultima_fecha = datetime.fromisoformat(fecha_str)
-                    
-                    # Comprobamos si han pasado más de 180 días (aprox 6 meses)
                     diferencia = datetime.utcnow() - ultima_fecha
                     
+                    # Si han pasado más de 180 días (aprox 6 meses)
                     if diferencia.days > 180:
-                        st.warning("⚠️ **Recordatorio de Mantenimiento:** Han pasado más de 6 meses desde el último Vacuum de la base de datos.")
-                        
-                        if st.button("Marcar mantenimiento como completado"):
+                        st.warning("⚠️ **Mantenimiento del Sistema:** Han pasado más de 6 meses desde la última optimización de la base de datos (Vacuum).")
+                        if st.button("✅ Marcar mantenimiento como completado"):
                             nueva_fecha = datetime.utcnow().isoformat()
                             supabase.table("configuracion").update({"ultimo_vacuum": nueva_fecha}).eq("id", 1).execute()
-                            st.success("✅ Fecha de mantenimiento actualizada. El aviso desaparecerá al recargar.")
-                            time.sleep(1)
+                            st.success("Fecha actualizada correctamente. El aviso desaparecerá al recargar.")
+                            time.sleep(1.5)
                             st.rerun()
-        except Exception as e:
-            st.error(f"Error al verificar el mantenimiento: {e}")
+        except Exception:
+            # Si la tabla 'configuracion' no existe o hay error, lo ignoramos silenciosamente
+            pass
     # --- FIN: RECORDATORIO MANTENIMIENTO (VACUUM) ---
-
-  
-  
+    
+ 
     # FOTO PERFECTA: Proporciones 1 - 2 - 1
     img_cols = st.columns([1, 2, 1]) 
     
