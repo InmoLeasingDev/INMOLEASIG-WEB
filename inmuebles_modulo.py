@@ -1681,23 +1681,10 @@ def mostrar_modulo_inmuebles(supabase):
                         origen_activo = c_orq1.selectbox("Origen del Activo *", ["COMPRA DIRECTA", "APORTACIÓN DE SOCIO"])
                         
                         if origen_activo == "COMPRA DIRECTA":
-                            try:
-                                res_b = supabase.table("fin_cuentas_bancarias").select("id, nombre_interno, banco, saldo_actual").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
-                                df_b = pd.DataFrame(res_b.data) if res_b.data else pd.DataFrame()
-                            except: df_b = pd.DataFrame()
-
-                            if not df_b.empty:
-                                op_b = [f"{r['nombre_interno']} ({r['banco']}) - Saldo: {r['saldo_actual']}" for _, r in df_b.iterrows()]
-                                cta_sel = c_orq2.selectbox("¿De qué cuenta salió el dinero? *", op_b)
-                                idx_b = op_b.index(cta_sel)
-                                id_cta_bancaria = df_b.iloc[idx_b]['id']
-                                saldo_actual_banco = float(df_b.iloc[idx_b]['saldo_actual'])
-                            else:
-                                c_orq2.error("❌ No hay bancos registrados en esta moneda.")
+                            c_orq2.info("🧾 Esta compra generará una Cuenta por Pagar (CxP) en Tesorería.")
                         elif origen_activo == "APORTACIÓN DE SOCIO":
                             c_orq2.info("📈 Este activo aumentará el patrimonio (Aportes Sociales) sin afectar tesorería.")
                         st.markdown("---")
-
                     c3, c4 = st.columns([2, 1])
                     nombre_act = c3.text_input("Nombre / Descripción *", placeholder="Ej: Lavadora LG 9kg", key="nom_act_din")
                     categoria = c4.selectbox("Categoría", ["Mobiliario", "Electrodomésticos", "Electrónica", "Climatización", "Decoración", "Otro"], key="cat_act_din")
@@ -1737,8 +1724,6 @@ def mostrar_modulo_inmuebles(supabase):
                     if col_b1.button("💾 Guardar Activo", key="btn_save_din"):
                         if not nombre_act:
                             st.error("❌ El nombre es obligatorio.")
-                        elif origen_activo == "COMPRA DIRECTA" and not id_cta_bancaria:
-                            st.error("❌ Debes seleccionar una cuenta bancaria válida para la compra.")
                         elif ubic_tipo == "Unidad" and not id_uni_sel:
                             st.error("❌ Selecciona una unidad o revisa que el edificio tenga unidades creadas.")
                         else:
@@ -1783,15 +1768,14 @@ def mostrar_modulo_inmuebles(supabase):
                                         "destino_tipo": ubic_tipo, "motivo": f"Registro Inicial {cod_final} ({origen_activo})", 
                                         "usuario_responsable": usuario_actual
                                     }).execute()
-
                                     # 🚀 --- CASCADA FINANCIERA AUTOMÁTICA --- 🚀
                                     if es_operador and float(valor_compra) > 0:
                                         try:
-                                            # 1. Traer catálogo de cuentas para búsqueda dinámica (Soporta España PGC y Latam PUC)
+                                            # 1. Traer catálogo de cuentas (Buscamos Activos, Patrimonio y CxP)
                                             res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
                                             df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
                                             
-                                            id_cta_activo, id_cta_patrimonio, id_cta_banco = None, None, None
+                                            id_cta_activo, id_cta_patrimonio, id_cta_cxp = None, None, None
                                             if not df_ctas.empty:
                                                 cta_act = df_ctas[df_ctas['codigo'].str.startswith('15', na=False)]
                                                 if not cta_act.empty: id_cta_activo = cta_act.iloc[0]['id']
@@ -1799,8 +1783,10 @@ def mostrar_modulo_inmuebles(supabase):
                                                 cta_patr = df_ctas[df_ctas['codigo'].str.startswith('31', na=False)]
                                                 if not cta_patr.empty: id_cta_patrimonio = cta_patr.iloc[0]['id']
                                                 
-                                                cta_ban = df_ctas[df_ctas['codigo'].str.startswith('1110', na=False)]
-                                                if not cta_ban.empty: id_cta_banco = cta_ban.iloc[0]['id']
+                                                # Cuentas 22 o 23 para Proveedores / CxP
+                                                cta_cxp = df_ctas[df_ctas['codigo'].str.startswith('22', na=False) | df_ctas['codigo'].str.startswith('23', na=False)]
+                                                if not cta_cxp.empty: id_cta_cxp = cta_cxp.iloc[0]['id']
+
                                             # 2. Crear Asiento Contable Maestro
                                             desc_asiento = f"ALTA ACTIVO: {nombre_act.strip().upper()} ({cod_final})"
                                             res_ast = supabase.table("fin_asientos").insert({
@@ -1814,24 +1800,34 @@ def mostrar_modulo_inmuebles(supabase):
                                             if id_cta_activo:
                                                 supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_activo), "debito": float(valor_compra), "credito": 0.0, "descripcion_linea": desc_asiento}).execute()
 
-                                            if origen_activo == "COMPRA DIRECTA" and id_cta_bancaria:
-                                                if id_cta_banco:
-                                                    # Crédito al Banco (Disminuye)
-                                                    supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_banco), "debito": 0.0, "credito": float(valor_compra), "descripcion_linea": "Pago por compra activo"}).execute()
+                                            if origen_activo == "COMPRA DIRECTA":
+                                                # Crédito a CxP (Pasivo Contable)
+                                                if id_cta_cxp:
+                                                    supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_cxp), "debito": 0.0, "credito": float(valor_compra), "descripcion_linea": "CxP por compra activo"}).execute()
                                                 
-                                                # Descontar del Banco Físico en la UI
-                                                supabase.table("fin_movimientos_banco").insert({
-                                                    "id_cuenta_bancaria": int(id_cta_bancaria), "fecha_movimiento": str(fecha_compra), 
-                                                    "tipo": "EGRESO", "monto": float(valor_compra), "concepto": desc_asiento, "estado_conciliacion": "PENDIENTE"
+                                                # 🚀 MOTOR AUTOMÁTICO: Generar Cuenta Por Pagar Operativa
+                                                supabase.table("fin_cuentas_pagar").insert({
+                                                    "modulo_origen": "ACTIVOS", "id_origen": res_ins.data[0]['id'],
+                                                    "acreedor": "PROVEEDOR DE ACTIVOS", "concepto": desc_asiento,
+                                                    "monto_total": float(valor_compra), "saldo_pendiente": float(valor_compra),
+                                                    "moneda": moneda_sesion, "estado": "PENDIENTE"
                                                 }).execute()
-                                                supabase.table("fin_cuentas_bancarias").update({"saldo_actual": saldo_actual_banco - float(valor_compra)}).eq("id", int(id_cta_bancaria)).execute()
+                                                
+                                                # 🚀 MOTOR AUTOMÁTICO: Log de Auditoría
+                                                supabase.table("sys_motor_automatico_logs").insert({
+                                                    "evento": "compra_activo_fijo", "modulo_origen": "ACTIVOS", "id_origen": res_ins.data[0]['id'],
+                                                    "regla_evaluada": "SI origen=COMPRA DIRECTA -> generar_cxp",
+                                                    "accion_ejecutada": "generar_cxp",
+                                                    "periodo": pd.Timestamp.now().strftime("%Y-%m"), "resultado": "EXITO",
+                                                    "detalles": f"CxP Generada: {valor_compra}"
+                                                }).execute()
 
                                             elif origen_activo == "APORTACIÓN DE SOCIO":
                                                 if id_cta_patrimonio:
                                                     # Crédito al Patrimonio (Aumenta el capital)
                                                     supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_patrimonio), "debito": 0.0, "credito": float(valor_compra), "descripcion_linea": "Aporte No Dinerario de Socio"}).execute()
                                         except Exception as e:
-                                            st.error(f"⚠️ Activo guardado, pero hubo un error en la cascada contable: {e}")                                    
+                                            st.error(f"⚠️ Activo guardado, pero hubo un error en la cascada contable: {e}")
                                     st.success(f"✅ Activo **{cod_final}** y contabilidad registrados.");
                                     log_accion(supabase, usuario_actual, "CREAR ACTIVO", f"{cod_final} - {nombre_act.strip().upper()}")
                                     time.sleep(2.5); 
@@ -1913,29 +1909,20 @@ def mostrar_modulo_inmuebles(supabase):
                                 lista_origen = ["COMPRA DIRECTA", "APORTACIÓN DE SOCIO", "PROPIETARIO"]
                                 idx_ori = lista_origen.index(datos_act.get('origen', 'COMPRA DIRECTA')) if datos_act.get('origen') in lista_origen else 0
                                 e_ori = cf2.selectbox("Origen del Activo", lista_origen, index=idx_ori)
-                                
-                                id_cta_bancaria_edit = None
-                                saldo_actual_banco_edit = 0.0
-                                try: res_b = supabase.table("fin_cuentas_bancarias").select("id, nombre_interno, banco, saldo_actual").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_b = pd.DataFrame(res_b.data) if res_b.data else pd.DataFrame()
-                                except: df_b = pd.DataFrame()
-                                
-                                if not df_b.empty:
-                                    op_b = [f"{r['nombre_interno']} ({r['banco']})" for _, r in df_b.iterrows()]
-                                    cta_sel = cf3.selectbox("Banco (Solo si cambia a Compra Directa)", op_b)
-                                    idx_b = op_b.index(cta_sel)
-                                    id_cta_bancaria_edit = df_b.iloc[idx_b]['id']
-                                    saldo_actual_banco_edit = float(df_b.iloc[idx_b]['saldo_actual'])
-                                else: cf3.warning("Sin bancos.")
+                                if e_ori == "COMPRA DIRECTA":
+                                    cf3.info("🧾 Actualizará CxP en Tesorería.")
+                                elif e_ori == "APORTACIÓN DE SOCIO":
+                                    cf3.info("📈 Actualizará Patrimonio.")
+                                else:
+                                    cf3.info("No afecta contabilidad.")
                             else:
                                 e_val = 0.0
                                 e_ori = "PROPIETARIO"
 
                             st.markdown("---")
-                            col_b1, col_b2, _ = st.columns([2.0, 1.5, 6.5])
-                            
-                            if col_b1.form_submit_button("💾 Guardar Cambios"):
-                                if not e_nom: st.error("❌ El nombre no puede estar vacío.")
-                                else:
+                            col_b1, col_b2, _ = st.columns([2.0, 1.5, 6.5])                                
+                            if not e_nom: st.error("❌ El nombre no puede estar vacío.")
+                            else:
                                     # 🚀 1. REVERSIÓN CONTABLE DEL PASADO (Si hubo cambios financieros)
                                     cambio_financiero = es_op and (float(e_val) != float(datos_act.get('valor_compra', 0.0)) or e_ori != datos_act.get('origen'))
                                     
@@ -1945,16 +1932,9 @@ def mostrar_modulo_inmuebles(supabase):
                                             res_v = supabase.table("fin_asientos").select("id").like("descripcion", f"%({cod_seleccionado})%").execute()
                                             if res_v.data:
                                                 for asnt in res_v.data: supabase.table("fin_asientos").delete().eq("id", asnt['id']).execute()
-                                            # Devolver dinero al banco si era compra
-                                            res_mb = supabase.table("fin_movimientos_banco").select("id, id_cuenta_bancaria, monto").like("concepto", f"%({cod_seleccionado})%").execute()
-                                            if res_mb.data:
-                                                for mb in res_mb.data:
-                                                    cta = supabase.table("fin_cuentas_bancarias").select("saldo_actual").eq("id", mb['id_cuenta_bancaria']).execute()
-                                                    if cta.data:
-                                                        n_saldo = float(cta.data[0]['saldo_actual']) + float(mb['monto'])
-                                                        supabase.table("fin_cuentas_bancarias").update({"saldo_actual": n_saldo}).eq("id", mb['id_cuenta_bancaria']).execute()
-                                                    supabase.table("fin_movimientos_banco").delete().eq("id", mb['id']).execute()
-
+                                            
+                                            # Borrar la CxP vieja si seguía PENDIENTE
+                                            supabase.table("fin_cuentas_pagar").delete().eq("modulo_origen", "ACTIVOS").like("concepto", f"%({cod_seleccionado})%").eq("estado", "PENDIENTE").execute()
                                     # 🚀 2. ACTUALIZAR ACTIVO
                                     upd_data = {
                                         "nombre": e_nom.strip().upper(), "categoria": e_cat, "estado": e_est,
@@ -1998,20 +1978,17 @@ def mostrar_modulo_inmuebles(supabase):
                                             if id_cta_activo: 
                                                 supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_activo), "debito": float(e_val), "credito": 0.0, "descripcion_linea": desc_asiento}).execute()
 
-                                            if e_ori == "COMPRA DIRECTA" and id_cta_bancaria_edit:
-                                                if id_cta_banco: 
-                                                    supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_banco), "debito": 0.0, "credito": float(e_val), "descripcion_linea": "Pago ajustado"}).execute()
+                                            if e_ori == "COMPRA DIRECTA":
+                                                res_cxp = supabase.table("fin_cuentas_contables").select("id").like("codigo", "22%").eq("moneda", moneda_sesion).execute()
+                                                if res_cxp.data:
+                                                    supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(res_cxp.data[0]['id']), "debito": 0.0, "credito": float(e_val), "descripcion_linea": "CxP ajustada"}).execute()
                                                 
-                                                supabase.table("fin_movimientos_banco").insert({
-                                                    "id_cuenta_bancaria": int(id_cta_bancaria_edit), "fecha_movimiento": fecha_hoy, 
-                                                    "tipo": "EGRESO", "monto": float(e_val), "concepto": desc_asiento, "estado_conciliacion": "PENDIENTE"
+                                                supabase.table("fin_cuentas_pagar").insert({
+                                                    "modulo_origen": "ACTIVOS", "id_origen": int(id_act),
+                                                    "acreedor": "PROVEEDOR DE ACTIVOS", "concepto": desc_asiento,
+                                                    "monto_total": float(e_val), "saldo_pendiente": float(e_val),
+                                                    "moneda": moneda_sesion, "estado": "PENDIENTE"
                                                 }).execute()
-                                                
-                                                res_b_act = supabase.table("fin_cuentas_bancarias").select("saldo_actual").eq("id", int(id_cta_bancaria_edit)).execute()
-                                                if res_b_act.data:
-                                                    saldo_fresco = float(res_b_act.data[0]['saldo_actual'])
-                                                    supabase.table("fin_cuentas_bancarias").update({"saldo_actual": saldo_fresco - float(e_val)}).eq("id", int(id_cta_bancaria_edit)).execute()
-
                                             elif e_ori == "APORTACIÓN DE SOCIO":
                                                 if id_cta_patrimonio: 
                                                     supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_patrimonio), "debito": 0.0, "credito": float(e_val), "descripcion_linea": "Aporte ajustado"}).execute()
