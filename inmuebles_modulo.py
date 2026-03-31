@@ -783,15 +783,20 @@ def mostrar_modulo_inmuebles(supabase):
                     clave_estado_cerrar="modo_propiedad",
                     prefijo_ruta="inm"
                 )
-        # --- PANEL: REPORTES INTEGRADOS ---
+    # --- PANEL: REPORTES INTEGRADOS ---
         elif st.session_state.modo_propiedad == "REPORTES" and not df_inm.empty:
             st.markdown("---")
+            # 🛡️ Lógica para el título del PDF
+            titulo_encabezado = "INMOLEASING"
+            if not df_ops.empty and len(df_ops) == 1:
+                titulo_encabezado = str(df_ops.iloc[0]['nombre']).upper()
+                
             # Llamamos a nuestra super herramienta de reportes
             panel_reportes_y_compartir(
                 df_datos=df_display.drop(columns=['id']), 
                 nombre_base=f"propiedades_activas",
                 modulo_origen="Propiedades",
-                funcion_pdf=generar_pdf_propiedades,
+                funcion_pdf=lambda df: generar_pdf_propiedades(df, titulo_encabezado),
                 df_operadores=df_ops,
                 supabase=supabase,
                 usuario_actual=usuario_actual,
