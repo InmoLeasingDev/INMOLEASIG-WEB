@@ -1300,19 +1300,49 @@ def mostrar_modulo_inmuebles(supabase):
                                         "estado_contrato": "FIRMADO", "estado_financiero": "PENDIENTE_FIANZA"
                                     }
                                     res = supabase.table("mandatos").insert(datos).execute()
+                                    id_mandato_nuevo = res.data[0]['id']
                                     
+                                    # 🚀 1. MOTOR AUTOMÁTICO: Registrar Fianza (Activo - Entregada a Propietario)
+                                    if m_fianza > 0:
+                                        supabase.table("fin_fianzas").insert({
+                                            "tipo": "ENTREGADA", "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo,
+                                            "id_inmueble": int(id_inm), "tercero": m_prop_sel_1,
+                                            "importe_inicial": m_fianza, "saldo_pendiente": m_fianza,
+                                            "moneda": moneda_sesion, "estado": "REGISTRADA"
+                                        }).execute()
+
+                                    # 🚀 2. MOTOR AUTOMÁTICO: Generar Cuenta por Pagar (CxP de la primera Renta)
+                                    if m_renta > 0:
+                                        supabase.table("fin_cuentas_pagar").insert({
+                                            "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo,
+                                            "acreedor": m_prop_sel_1, "concepto": f"Renta Garantizada - Mandato {id_mandato_nuevo}",
+                                            "monto_total": m_renta, "saldo_pendiente": m_renta,
+                                            "moneda": moneda_sesion, "estado": "PENDIENTE"
+                                        }).execute()
+
+                                    # 🚀 3. MOTOR AUTOMÁTICO: Auditoría Estricta del Evento
+                                    periodo_actual = pd.Timestamp.now().strftime("%Y-%m")
+                                    supabase.table("sys_motor_automatico_logs").insert({
+                                        "evento": "contrato_activado", "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo,
+                                        "regla_evaluada": "SI mandato_activo -> generar_cxp_y_fianza",
+                                        "accion_ejecutada": "generar_cxp, registrar_fianza",
+                                        "periodo": periodo_actual, "resultado": "EXITO",
+                                        "detalles": f"CxP: {m_renta} | Fianza: {m_fianza}"
+                                    }).execute()
+
+                                    # Log Tradicional Historial de Inmuebles
                                     var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
                                     usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
-
+                                    
                                     supabase.table("historial_mandatos").insert({
-                                        "id_mandato": res.data[0]['id'], 
+                                        "id_mandato": id_mandato_nuevo, 
                                         "accion": f"CREACIÓN MANDATO (Firma: {f_suscripcion}). Operador: {nom_op}",
                                         "usuario": usuario_actual
                                     }).execute()
 
-                                    st.success("✅ Mandato registrado con éxito.")
-                                    st.session_state.modo_mandato = "NADA"; time.sleep(1.5); st.rerun()
-                                except Exception as e: st.error(f"❌ Error al guardar: {e}")
+                                    st.success("✅ Mandato registrado. Motor automático: CxP y Fianza generadas.")
+                                    st.session_state.modo_mandato = "NADA"; time.sleep(2.5); st.rerun()
+                                except Exception as e: st.error(f"❌ Error al orquestar: {e}")
 
                     if col_b2.form_submit_button("❌ Cancelar"): st.session_state.modo_mandato = "NADA"; st.rerun()
 
