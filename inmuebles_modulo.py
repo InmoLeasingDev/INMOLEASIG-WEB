@@ -633,17 +633,16 @@ def mostrar_modulo_inmuebles(supabase):
                 st.session_state.modo_propiedad = "NADA"
             st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")            
 
-        
         # ==========================================
         # 🛠️ BARRA DE HERRAMIENTAS (MODO PRO - 4 BOTONES)
         # ==========================================
         t_c1, t_c2, t_c3, t_c4, t_c5 = st.columns([1.5, 1.5, 1.5, 1.5, 4.0]) 
         
-        def set_crear_propiedad():
+        if t_c1.button("➕ Nueva", key="btn_nueva_prop", use_container_width=True):
             st.session_state.modo_propiedad = "CREAR"
-
-        t_c1.button("➕ Nueva", key="btn_nueva_prop", use_container_width=True, on_click=set_crear_propiedad)    
-        if not df_inm.empty:
+            st.rerun()
+            
+        if not df_inm.empty:        
             if t_c2.button("⚙️ Gestionar", key="btn_edit_prop", use_container_width=True):
                 st.session_state.modo_propiedad = "EDITAR"
                 st.rerun()
