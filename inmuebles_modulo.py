@@ -629,7 +629,9 @@ def mostrar_modulo_inmuebles(supabase):
             
             st.dataframe(df_display.drop(columns=['id']), use_container_width=True, hide_index=True)
         else:
-            st.session_state.modo_propiedad = "NADA"  # 🛡️ Cierra los paneles si la tabla se vacía
+            # 🛡️ ESCUDO CORREGIDO: Permitir crear la primera propiedad
+            if st.session_state.modo_propiedad != "CREAR":
+                st.session_state.modo_propiedad = "NADA"
             st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
 
         
@@ -1978,7 +1980,7 @@ def mostrar_modulo_inmuebles(supabase):
                                             if id_cta_activo: 
                                                 supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_activo), "debito": float(e_val), "credito": 0.0, "descripcion_linea": desc_asiento}).execute()
 
-                                            if e_ori == "COMPRA DIRECTA":
+                                        if e_ori == "COMPRA DIRECTA":
                                                 res_cxp = supabase.table("fin_cuentas_contables").select("id").like("codigo", "22%").eq("moneda", moneda_sesion).execute()
                                                 if res_cxp.data:
                                                     supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(res_cxp.data[0]['id']), "debito": 0.0, "credito": float(e_val), "descripcion_linea": "CxP ajustada"}).execute()
