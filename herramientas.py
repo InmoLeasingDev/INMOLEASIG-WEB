@@ -312,29 +312,68 @@ def panel_reportes_y_compartir(
 def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_registro, nombre_registro, fotos_actuales, clave_estado_cerrar, prefijo_ruta="img"):
     """
     Renderiza un panel estandarizado para ver, subir y eliminar fotos de cualquier tabla de la base de datos.
-    Permite el borrado individual o masivo.
+    Permite el borrado individual o masivo. Incluye Visor Interactivo.
     """
-    import time # Asegurarnos de que time esté disponible localmente
+    import time 
     
     st.markdown("---")
     st.markdown(f"**📸 Galería de Marketing: {nombre_registro}**")
     
+    fotos_lista = fotos_actuales if isinstance(fotos_actuales, list) else []
+
+    # --- 0. VISOR PRINCIPAL INTERACTIVO (FUERA DEL FORMULARIO) ---
+    if len(fotos_lista) > 0:
+        visor_key = f"visor_{tabla_db}_{id_registro}"
+        
+        # Inicializar el índice si no existe
+        if visor_key not in st.session_state:
+            st.session_state[visor_key] = 0
+            
+        # Candado de seguridad: Asegurar que el índice esté dentro del rango
+        if st.session_state[visor_key] >= len(fotos_lista):
+            st.session_state[visor_key] = 0
+        elif st.session_state[visor_key] < 0:
+            st.session_state[visor_key] = len(fotos_lista) - 1
+            
+        idx = st.session_state[visor_key]
+        
+        # Contenedor visual del visor
+        with st.container(border=True):
+            st.markdown(f"**📺 Visor Principal** (Foto {idx + 1} de {len(fotos_lista)})")
+            
+            # Botones de navegación con Callbacks (Rápidos y sin recargas pesadas)
+            def prev_img(): st.session_state[visor_key] -= 1
+            def next_img(): st.session_state[visor_key] += 1
+            
+            # Diseño 1 - 4 - 1 (Flechas a los lados, foto grande al centro)
+            c_nav1, c_nav2, c_nav3 = st.columns([1, 6, 1])
+            
+            # Botón Anterior 
+            c_nav1.markdown("<div style='margin-top: 40%;'></div>", unsafe_allow_html=True)
+            c_nav1.button("⬅️ Ant.", use_container_width=True, key=f"prev_{visor_key}", on_click=prev_img)
+            
+            # Imagen Central
+            c_nav2.image(fotos_lista[idx], use_container_width=True)
+            
+            # Botón Siguiente
+            c_nav3.markdown("<div style='margin-top: 40%;'></div>", unsafe_allow_html=True)
+            c_nav3.button("Sig. ➡️", use_container_width=True, key=f"next_{visor_key}", on_click=next_img)
+        
+        st.write("") # Pequeño respiro visual
+        
+    # --- 1. ZONA DE GESTIÓN Y BORRADO (DENTRO DEL FORMULARIO) ---
     with st.form(key=f"form_galeria_{tabla_db}_{id_registro}"):
-        # --- 1. MOSTRAR FOTOS ACTUALES Y CONTROLES DE BORRADO INDIVIDUAL ---
-        st.write("**Fotos Registradas (Seleccione para BORRAR):**")
-        fotos_lista = fotos_actuales if isinstance(fotos_actuales, list) else []
-        borrar_indices = [] # Guardaremos los índices que el usuario quiera borrar
+        st.write("**Miniaturas (Seleccione la casilla para BORRAR):**")
+        borrar_indices = []
 
         if len(fotos_lista) > 0:
-            # Usamos columnas fijas para la vista de cuadrícula
             cols_fotos = st.columns(4) 
             for i, url_foto in enumerate(fotos_lista):
                 with cols_fotos[i % 4]:
                     st.image(url_foto, width=150)
-                    # Control Individual: Checkbox único para esta foto
                     key_borrar = f"chk_borrar_{tabla_db}_{id_registro}_{i}"
-                    if st.checkbox(f"Borrar", key=key_borrar):
-                        borrar_indices.append(i) # Marcada para borrar
+                    if st.checkbox(f"Borrar foto {i+1}", key=key_borrar):
+                        borrar_indices.append(i)
         else:
             st.info("No hay fotos registradas para este elemento.")
         
@@ -345,9 +384,7 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
         
         st.markdown("---")
         
-        # --- 3. BOTONERA MINIMALISTA (ORDEN TÁCTICO: Guardar | Borrar | Cerrar) ---
-        # Ajustamos los anchos de columna para el nuevo texto más corto
-        # --- 3. BOTONERA MINIMALISTA (AJUSTE PERFECTO) ---
+        # --- 3. BOTONERA MINIMALISTA ---
         col_b1, col_b2, col_b3, col_esp = st.columns([1.8, 1.6, 1.1, 5.5])
         
         btn_guardar = col_b1.form_submit_button("💾 Guardar Cambios", use_container_width=True)
@@ -356,7 +393,6 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
             btn_borrar_fotos = col_b2.form_submit_button("🗑️ Borrar Galería", use_container_width=True)
         btn_cerrar = col_b3.form_submit_button("❌ Cerrar", use_container_width=True)
 
-       
         # --- 4. LÓGICA DE BOTONES ---
         if btn_cerrar:
             st.session_state[clave_estado_cerrar] = "NADA"
@@ -364,18 +400,18 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
             
         elif btn_borrar_fotos:
             supabase.table(tabla_db).update({"fotos": []}).eq("id", int(id_registro)).execute()
-            try:
-                log_accion(supabase, usuario_actual, f"VACIAR GALERÍA {tabla_db.upper()}", nombre_registro)
+            try: log_accion(supabase, usuario_actual, f"VACIAR GALERÍA {tabla_db.upper()}", nombre_registro)
             except: pass
+            
+            if f"visor_{tabla_db}_{id_registro}" in st.session_state:
+                st.session_state[f"visor_{tabla_db}_{id_registro}"] = 0
+                
             st.success("✅ Galería vaciada COMPLETAMENTE con éxito.")
             time.sleep(1)
             st.rerun()
             
         elif btn_guardar:
-            # A) Procesar Borrado Individual
             fotos_filtradas = [foto for idx, foto in enumerate(fotos_lista) if idx not in borrar_indices]
-            
-            # B) Procesar Nuevas Subidas
             urls_nuevas = []
             hubo_error = False
             
@@ -398,19 +434,18 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
                             hubo_error = True
                             st.error(f"Error subiendo {foto.name}: {e}")
             
-            # C) Guardar el resultado final si no hay errores
             if not hubo_error:
                 fotos_finales = fotos_filtradas + urls_nuevas
-                
-                # Candado para prevenir errores al guardar array vacío
                 array_db = fotos_finales if len(fotos_finales) > 0 else '{}'
                 
                 supabase.table(tabla_db).update({"fotos": array_db}).eq("id", int(id_registro)).execute()
                 
-                try:
-                    log_accion(supabase, usuario_actual, f"GUARDAR CAMBIOS GALERÍA {tabla_db.upper()}", nombre_registro)
+                try: log_accion(supabase, usuario_actual, f"GUARDAR CAMBIOS GALERÍA {tabla_db.upper()}", nombre_registro)
                 except: pass
                 
+                if f"visor_{tabla_db}_{id_registro}" in st.session_state:
+                    st.session_state[f"visor_{tabla_db}_{id_registro}"] = 0
+                    
                 st.success("✅ Cambios en la galería guardados con éxito.")
                 st.session_state[clave_estado_cerrar] = "NADA"
                 time.sleep(1)
