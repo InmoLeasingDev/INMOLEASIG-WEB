@@ -1165,18 +1165,16 @@ def mostrar_modulo_inmuebles(supabase):
         else:
             st.info(f"ℹ️ No hay mandatos vigentes en el entorno {moneda_sesion}.")
 
-        # --- 3. BARRA DE HERRAMIENTAS ---
+        # --- 3. BARRA DE HERRAMIENTAS (SIN BOTÓN DE PAGOS) ---
         st.markdown("---")
-        m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns([1.5, 1.5, 1.8, 1.5, 1.6, 1.7])
+        m_c1, m_c2, m_c3, m_c4, m_c5 = st.columns([1.5, 1.5, 1.8, 1.6, 1.7])
         
         if m_c1.button("➕ Nuevo", key="btn_nuevo_man", use_container_width=True): st.session_state.modo_mandato = "CREAR"; st.rerun()
         if not df_man.empty:
             if m_c2.button("⚙️ Gestionar", key="btn_edit_man", use_container_width=True): st.session_state.modo_mandato = "EDITAR"; st.rerun()
             if m_c3.button("📁 Documentos", key="btn_docs_man", use_container_width=True): st.session_state.modo_mandato = "DOCUMENTOS"; st.rerun()
-            if m_c4.button("💰 Pagos", key="btn_pagos_man", use_container_width=True): st.session_state.modo_mandato = "PAGOS"; st.rerun()
-            if m_c5.button("📜 Historial", key="btn_hist_man", use_container_width=True): st.session_state.modo_mandato = "HISTORIAL"; st.rerun()
-            if m_c6.button("📊 Reportes", key="btn_rep_man", use_container_width=True): st.session_state.modo_mandato = "REPORTES"; st.rerun()
-
+            if m_c4.button("📜 Historial", key="btn_hist_man", use_container_width=True): st.session_state.modo_mandato = "HISTORIAL"; st.rerun()
+            if m_c5.button("📊 Reportes", key="btn_rep_man", use_container_width=True): st.session_state.modo_mandato = "REPORTES"; st.rerun()
         # --- 4. PANEL CREAR ---
         if st.session_state.modo_mandato == "CREAR":
             from dateutil.relativedelta import relativedelta
@@ -1452,19 +1450,24 @@ def mostrar_modulo_inmuebles(supabase):
             st.markdown("---")
             if st.button("❌ Cerrar Historial"): st.session_state.modo_mandato = "NADA"; st.rerun()
 
+# --- PANEL EDITAR (AHORA CON BÓVEDA DOCUMENTAL) ---
         elif st.session_state.modo_mandato == "EDITAR" and not df_man.empty:
             st.markdown("---")
-            st.markdown("### ⚙️ Gestionar y Modificar Contrato")
+            st.markdown("### ⚙️ Gestionar Contrato y Documentos")
             op_man_edit = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel_edit = st.selectbox("Selecciona el Mandato a gestionar:", op_man_edit)
+            
             if m_sel_edit:
                 idx = op_man_edit.index(m_sel_edit)
                 d_m = df_man.iloc[idx]
                 id_m = str(d_m['id'])
+                
                 with st.form(f"form_edit_man_{id_m}", clear_on_submit=False):
+                    st.write("**1. Condiciones Financieras**")
                     c1, c2, c3 = st.columns(3)
                     e_renta = c1.number_input(f"Renta Garantizada ({simbolo_mon})", value=float(d_m.get('ingreso_garantizado', 0.0)), step=50.0)
                     e_fianza = c2.number_input(f"Fianza ({simbolo_mon})", value=float(d_m.get('valor_fianza', 0.0)), step=50.0)
+                    
                     lista_act = ["IPC", "FIJO", "NO APLICA"]
                     idx_act = lista_act.index(d_m.get('tipo_actualizacion', 'IPC')) if d_m.get('tipo_actualizacion') in lista_act else 0
                     e_act = c3.selectbox("Actualización Anual", lista_act, index=idx_act)
@@ -1473,15 +1476,65 @@ def mostrar_modulo_inmuebles(supabase):
                     e_cta1 = c4.text_input("Cuenta / IBAN Principal", value=str(d_m.get('cuenta_pago', '')))
                     e_cta2 = c5.text_input("Cuenta / IBAN Secundaria", value=str(d_m.get('cuenta_pago_2', '')).replace("None", ""))
                     
+                    st.markdown("---")
+                    st.write("**2. Anexar Documentos Faltantes (Opcional)**")
+                    st.caption("Sube un archivo solo si deseas reemplazar el actual o si estaba pendiente.")
+                    cd1, cd2 = st.columns(2)
+                    doc_contrato = cd1.file_uploader("Contrato Firmado", type=["pdf", "jpg", "png"], key="edit_doc_c")
+                    doc_empadrona = cd2.file_uploader("Aut. Empadronamiento", type=["pdf", "jpg", "png"], key="edit_doc_e")
+                    cd3, cd4 = st.columns(2)
+                    doc_inv = cd3.file_uploader("Acta Inventario", type=["pdf", "jpg", "png"], key="edit_doc_i")
+                    doc_sum = cd4.file_uploader("Recibos Suministros", type=["pdf", "jpg", "png"], key="edit_doc_s")
+
+                    st.markdown("---")
                     col_b1, col_b2, _ = st.columns([2, 1.5, 6.5])
+                    
                     if col_b1.form_submit_button("💾 Guardar Cambios"):
-                        supabase.table("mandatos").update({"ingreso_garantizado": e_renta, "valor_fianza": e_fianza, "tipo_actualizacion": e_act, "cuenta_pago": e_cta1.strip(), "cuenta_pago_2": e_cta2.strip()}).eq("id", int(id_m)).execute()
-                        var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
-                        usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
-                        supabase.table("historial_mandatos").insert({"id_mandato": int(id_m), "accion": f"CONDICIONES ACTUALIZADAS: Renta {e_renta}, Fianza {e_fianza}, Act: {e_act}", "usuario": usuario_actual}).execute()
-                        st.success("✅ Contrato actualizado."); st.session_state.modo_mandato = "NADA"; time.sleep(1); st.rerun()
-                    if col_b2.form_submit_button("❌ Cerrar"): st.session_state.modo_mandato = "NADA"; st.rerun()
+                        with st.spinner("Actualizando contrato y subiendo documentos..."):
+                            # Preparar URLs actuales
+                            url_c = d_m.get('url_contrato')
+                            url_e = d_m.get('url_empadronamiento')
+                            url_i = d_m.get('url_inventario')
+                            url_s = d_m.get('url_suministros')
+                            
+                            # Función auxiliar de subida
+                            def subir_reemplazo(archivo, prefijo):
+                                if not archivo: return None
+                                ext = archivo.name.split('.')[-1].lower()
+                                tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
+                                n_nube = f"{prefijo}_edit_{id_m}_{int(time.time())}.{ext}"
+                                supabase.storage.from_("documentos_mandatos").upload(n_nube, archivo.getvalue(), file_options={"content-type": tipo_mime})
+                                return supabase.storage.from_("documentos_mandatos").get_public_url(n_nube)
+                            
+                            # Si hay archivo nuevo, sobrescribe la variable
+                            if doc_contrato: url_c = subir_reemplazo(doc_contrato, "contrato")
+                            if doc_empadrona: url_e = subir_reemplazo(doc_empadrona, "empadronamiento")
+                            if doc_inv: url_i = subir_reemplazo(doc_inv, "inventario")
+                            if doc_sum: url_s = subir_reemplazo(doc_sum, "suministros")
+
+                            # Actualizar Base de Datos
+                            datos_upd = {
+                                "ingreso_garantizado": e_renta, "valor_fianza": e_fianza, 
+                                "tipo_actualizacion": e_act, "cuenta_pago": e_cta1.strip(), "cuenta_pago_2": e_cta2.strip(),
+                                "url_contrato": url_c, "url_empadronamiento": url_e,
+                                "url_inventario": url_i, "url_suministros": url_s
+                            }
+                            supabase.table("mandatos").update(datos_upd).eq("id", int(id_m)).execute()
+                            
+                            var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                            usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+                            supabase.table("historial_mandatos").insert({"id_mandato": int(id_m), "accion": f"CONDICIONES / DOCS ACTUALIZADOS", "usuario": usuario_actual}).execute()
+                            
+                            st.success("✅ Contrato actualizado con éxito.")
+                            st.session_state.modo_mandato = "NADA"
+                            time.sleep(1)
+                            st.rerun()
+                            
+                    if col_b2.form_submit_button("❌ Cerrar"): 
+                        st.session_state.modo_mandato = "NADA"
+                        st.rerun()
                 
+                # ZONA DE PELIGRO (Se mantiene intacta)
                 st.write("")
                 st.error("🚨 Zona de Peligro: Finalización de Contrato")
                 c_del1, c_del2 = st.columns([7, 3])
@@ -1491,7 +1544,11 @@ def mostrar_modulo_inmuebles(supabase):
                     var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
                     usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
                     supabase.table("historial_mandatos").insert({"id_mandato": int(id_m), "accion": "CONTRATO FINALIZADO POR EL USUARIO", "usuario": usuario_actual}).execute()
-                    st.success("✅ El contrato ha sido finalizado."); st.session_state.modo_mandato = "NADA"; time.sleep(1.5); st.rerun()
+                    # 💡 Próximamente: El Motor Automático atrapará esto para devolver la fianza
+                    st.success("✅ El contrato ha sido finalizado.")
+                    st.session_state.modo_mandato = "NADA"
+                    time.sleep(1.5)
+                    st.rerun()
 
         elif st.session_state.modo_mandato == "REPORTES" and not df_man.empty:
             st.markdown("---")
