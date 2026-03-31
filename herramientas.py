@@ -8,7 +8,7 @@ import pandas as pd
 import time
 import urllib.parse
 import re
-
+from datetime import datetime, timedelta
 # ==========================================
 # 1. LOG DE ACTIVIDAD
 # ==========================================
@@ -415,3 +415,28 @@ def panel_gestor_galeria(supabase, usuario_actual, tabla_db, bucket_storage, id_
                 st.session_state[clave_estado_cerrar] = "NADA"
                 time.sleep(1)
                 st.rerun()
+# ==========================================
+# 5. MANTENIMIENTO DE BASE DE DATOS
+# ==========================================
+def limpiar_logs_antiguos(supabase, usuario_actual):
+    """
+    Elimina los registros de 'logs_actividad' que tienen más de un año de antigüedad (365 días).
+    """
+    try:
+        # 1. Calcular la fecha límite (hace 365 días) usando la misma zona horaria
+        zona_madrid = zoneinfo.ZoneInfo("Europe/Madrid")
+        fecha_limite = (datetime.now(zona_madrid) - timedelta(days=365)).strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 2. Ejecutar el borrado en Supabase donde la 'fecha' sea menor (lt) a la fecha límite
+        # Nota: La tabla debe llamarse exactamente como en tu función log_accion ("logs_actividad")
+        respuesta = supabase.table("logs_actividad").delete().lt("fecha", fecha_limite).execute()
+        
+        # 3. Registrar que se hizo la limpieza (¡Ironía! Un log para la limpieza de logs)
+        log_accion(supabase, usuario_actual, "MANTENIMIENTO DB", f"Borrado anual de logs anteriores a {fecha_limite}")
+        
+        return True, f"Se han eliminado los logs anteriores a {fecha_limite}."
+        
+    except Exception as e:
+        error_msg = f"Error al limpiar logs antiguos: {e}"
+        print(error_msg)
+        return False, error_msg
