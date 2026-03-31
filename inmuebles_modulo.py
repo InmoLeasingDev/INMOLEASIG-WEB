@@ -601,7 +601,6 @@ def mostrar_modulo_inmuebles(supabase):
         # --- LECTURA DE DATOS (LA CUADRÍCULA) ---
         query = supabase.table("inmuebles").select("*").eq("estado", "ACTIVO")
         if moneda_sesion != "ALL": query = query.eq("moneda", moneda_sesion)
-            
         res_inm = query.execute()
         df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
         
@@ -632,7 +631,7 @@ def mostrar_modulo_inmuebles(supabase):
             # 🛡️ ESCUDO CORREGIDO: Permitir crear la primera propiedad
             if st.session_state.modo_propiedad != "CREAR":
                 st.session_state.modo_propiedad = "NADA"
-            st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")
+            st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")            
 
         
         # ==========================================
