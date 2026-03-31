@@ -13,13 +13,12 @@ from herramientas import log_accion, enviar_reporte_correo, generar_excel_bytes,
 # =========================================
 # 1. MOTOR PDF PROPIEDADES
 # =========================================
-def generar_pdf_propiedades(df):
+def generar_pdf_propiedades(df, titulo_empresa="INMOLEASING"):
     pdf = FPDF(orientation="L")
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "INMOLEASING - DIRECTORIO DE PROPIEDADES", ln=True, align="C")
+    pdf.cell(0, 10, f"{titulo_empresa} - DIRECTORIO DE PROPIEDADES", ln=True, align="C")
     pdf.ln(5)
-
     pdf.set_font("Arial", "B", 9)
     pdf.set_fill_color(200, 220, 255)
     # Ajustamos anchos: quitamos ID y agregamos MONEDA
@@ -576,14 +575,7 @@ def mostrar_modulo_inmuebles(supabase):
         if 'modo_propiedad' not in st.session_state:
             st.session_state.modo_propiedad = "NADA"
 
-        # 2. Cargar Operadores (para uso de reportes)
-        try:
-            res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
-            df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
-        except:
-            df_ops = pd.DataFrame()
-
-        # 3. Lógica dinámica de región
+        # 2. Lógica dinámica de región (La movemos arriba)
         moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
         if moneda_sesion == "EUR": 
             opciones_tipo = ["PISO", "OFICINA", "LOCAL", "NAVE", "BODEGA"]
@@ -598,6 +590,15 @@ def mostrar_modulo_inmuebles(supabase):
             opciones_moneda = ["EUR", "COP"]
             label_catastro = "Ref. Catastral / Matrícula"
 
+        # 3. Cargar Operadores FILTRADOS POR REGIÓN (Para reportes)
+        try:
+            q_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO")
+            if moneda_sesion != "ALL":
+                q_ops = q_ops.eq("moneda", moneda_sesion)
+            res_ops = q_ops.execute()
+            df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+        except:
+            df_ops = pd.DataFrame()
         # --- LECTURA DE DATOS (LA CUADRÍCULA) ---
         query = supabase.table("inmuebles").select("*").eq("estado", "ACTIVO")
         if moneda_sesion != "ALL": query = query.eq("moneda", moneda_sesion)
@@ -1989,7 +1990,7 @@ def mostrar_modulo_inmuebles(supabase):
                                                     "monto_total": float(e_val), "saldo_pendiente": float(e_val),
                                                     "moneda": moneda_sesion, "estado": "PENDIENTE"
                                                 }).execute()
-                                            elif e_ori == "APORTACIÓN DE SOCIO":
+                                        elif e_ori == "APORTACIÓN DE SOCIO":
                                                 if id_cta_patrimonio: 
                                                     supabase.table("fin_apuntes").insert({"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_patrimonio), "debito": 0.0, "credito": float(e_val), "descripcion_linea": "Aporte ajustado"}).execute()
                                     log_accion(supabase, usuario_actual, "EDITAR ACTIVO", f"{cod_seleccionado} - {e_nom.strip().upper()}")
@@ -2170,7 +2171,6 @@ def mostrar_modulo_inmuebles(supabase):
                                 st.session_state.modo_activo = "NADA"
                                 st.rerun()
 
-# --- PANEL: REPORTES DE ACTIVOS ---
 # --- PANEL: REPORTES DE ACTIVOS ---
         elif st.session_state.modo_activo == "REPORTES":
             st.markdown("---")
