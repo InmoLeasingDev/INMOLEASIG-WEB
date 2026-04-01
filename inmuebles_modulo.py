@@ -1198,28 +1198,31 @@ def mostrar_modulo_inmuebles(supabase):
             from dateutil.relativedelta import relativedelta
             st.markdown("---")
             with st.form("form_nuevo_mandato_pro", clear_on_submit=False):
-                st.markdown("### 📝 Redactar Nuevo Contrato de Gestión")
-                st.markdown("#### 💼 1. Titularidad y Vínculo de Unidad")
+                st.markdown("**Nuevo Contrato de Gestión**")
                 
                 if df_inm_m.empty or df_prop_m.empty:
-                    st.error(f"❌ Necesitas crear al menos una propiedad y un propietario en {moneda_sesion} antes de crear un mandato.")
+                    st.error(f"Necesitas crear al menos una propiedad y un propietario en {moneda_sesion} antes de crear un mandato.")
                 else:
-                    col_inm, col_uni = st.columns(2)
-                    m_inm_sel = col_inm.selectbox("Inmueble a gestionar *", df_inm_m['nombre'].tolist())
+                    st.write("**1. Titularidad y Propiedad**")
+                    col_inm, col_op = st.columns(2)
+                    m_inm_sel = col_inm.selectbox("Propiedad a gestionar *", df_inm_m['nombre'].tolist())
                     id_inm = df_inm_m[df_inm_m['nombre'] == m_inm_sel].iloc[0]['id']
                     
-                    res_u = supabase.table("unidades").select("id, nombre, id_operador, operadores(nombre)").eq("id_inmueble", int(id_inm)).eq("estado", "ACTIVO").execute()
-                    df_u_man = pd.DataFrame(res_u.data) if res_u.data else pd.DataFrame()
-                    
-                    id_op_heredado = None
-                    if not df_u_man.empty:
-                        u_sel_man = col_uni.selectbox("Unidad específica *", df_u_man['nombre'].tolist())
-                        u_data = df_u_man[df_u_man['nombre'] == u_sel_man].iloc[0]
-                        id_op_heredado = u_data.get('id_operador')
-                        nom_op = u_data['operadores']['nombre'] if isinstance(u_data.get('operadores'), dict) and 'nombre' in u_data['operadores'] else "No definido"
-                        st.info(f"🛡️ **Operador Fiscal que facturará esta unidad:** {nom_op}")
-                    else:
-                        col_uni.warning("⚠️ Este edificio no tiene unidades activas.")
+                    # 💡 SOLUCIÓN: El operador ahora se selecciona directamente para el mandato, no a través de una unidad
+                    try:
+                        res_ops_man = supabase.table("operadores").select("id, nombre").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
+                        df_ops_man = pd.DataFrame(res_ops_man.data) if res_ops_man.data else pd.DataFrame()
+                        if not df_ops_man.empty:
+                            m_op_sel = col_op.selectbox("Operador que facturará *", df_ops_man['nombre'].tolist())
+                            id_op_heredado = df_ops_man[df_ops_man['nombre'] == m_op_sel].iloc[0]['id']
+                            nom_op = m_op_sel
+                        else:
+                            col_op.warning("No hay operadores activos en esta región.")
+                            id_op_heredado = None
+                            nom_op = "No definido"
+                    except:
+                        id_op_heredado = None
+                        nom_op = "No definido"
                     
                     st.write("**Titular 1 (Principal)**")
                     c1, c2, c3, c4 = st.columns([3, 1.2, 1.2, 4.6])
@@ -1237,7 +1240,7 @@ def mostrar_modulo_inmuebles(supabase):
                     m_porc_pago_2 = c7.number_input("% Cobro 2", 0.0, 100.0, 0.0, key="pg2")
                     m_iban_2 = c8.text_input("IBAN / Cuenta Pago 2", key="ib2")
 
-                    st.markdown("#### 📅 2. Cronograma Automático (Smart Dates)")
+                    st.write("**2. Cronograma (Smart Dates)**")
                     d1, d2, d3 = st.columns(3)
                     f_suscripcion = d1.date_input("Fecha de Suscripción / Firma *")
                     duracion_anos = d2.number_input("Duración Contrato (Años)", 1, 20, 5)
@@ -1253,7 +1256,7 @@ def mostrar_modulo_inmuebles(supabase):
                     c_res1.success(f"🗓️ **Resumen:** Pagos inician: **{f_inicio_pagos}** | Vence: **{f_vencimiento}** | Preaviso: **{f_limite_aviso}**")
                     c_res2.form_submit_button("🔄 Recalcular")
                     
-                    st.markdown("#### 💰 3. Acuerdo Económico")
+                    st.write("**3. Acuerdo Económico**")
                     e1, e2, e3 = st.columns(3)
                     m_renta = e1.number_input(f"Renta Garantizada ({simbolo_mon}) *", min_value=0.0, step=50.0)
                     m_fianza = e2.number_input(f"Fianza a Entregar ({simbolo_mon}) *", min_value=0.0, step=50.0)
@@ -1266,7 +1269,7 @@ def mostrar_modulo_inmuebles(supabase):
                     m_tipo_ind_db = mapa_ind[m_tipo_ind_ui]
                     m_indemnizacion = c_ind2.number_input(f"Monto Base 100% ({simbolo_mon})", min_value=0.0, step=50.0)
 
-                    st.markdown("#### 📁 4. Documentación Escaneada")
+                    st.write("**4. Documentación Escaneada**")
                     cd1, cd2 = st.columns(2)
                     doc_contrato = cd1.file_uploader("Contrato Firmado", type=["pdf", "jpg", "png"])
                     doc_empadrona = cd2.file_uploader("Aut. Empadronamiento", type=["pdf", "jpg", "png"])
@@ -1276,12 +1279,11 @@ def mostrar_modulo_inmuebles(supabase):
 
                     st.markdown("---")
                     col_b1, col_b2, _ = st.columns([2.0, 1.5, 6.5])
-                    
                     if col_b1.form_submit_button("💾 Generar Mandato"):
                         if (m_porc_pago_1 + m_porc_pago_2) > 100.1 or (m_porc_prop_1 + m_porc_prop_2) > 100.1:
                             st.error("❌ Los porcentajes superan el 100%.")
-                        elif df_u_man.empty:
-                            st.error("❌ No puedes crear un mandato en un inmueble sin unidades.")
+                        elif not id_op_heredado:
+                            st.error("❌ Debes seleccionar un operador fiscal.")
                         else:
                             with st.spinner("Registrando contrato y vinculando operador..."):
                                 try:
