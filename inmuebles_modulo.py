@@ -48,11 +48,11 @@ def generar_pdf_propiedades(df, titulo_empresa="INMOLEASING"):
 # ==========================================
 # 2. MOTOR PDF UNIDADES (CON TOTALIZADOR)
 # ==========================================
-def generar_pdf_unidades(df):
+def generar_pdf_unidades(df, titulo_empresa="INMOLEASING"):
     pdf = FPDF(orientation="L") # Horizontal (Landscape)
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "INMOLEASING - DIRECTORIO DE UNIDADES", ln=True, align="C")
+    pdf.cell(0, 10, f"{titulo_empresa} - DIRECTORIO DE UNIDADES", ln=True, align="C")
     pdf.ln(5)
 
     pdf.set_font("Arial", "B", 9)
@@ -810,18 +810,25 @@ def mostrar_modulo_inmuebles(supabase):
         if 'modo_unidad' not in st.session_state:
             st.session_state.modo_unidad = "NADA"
 
-        # --- Cargar Operadores (para uso de reportes) ---
+        
+        # 0. Obtener moneda de sesión primero
+        moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
+
+        # --- Cargar Operadores (para uso de reportes, filtrados por región) ---
         try:
-            res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").execute()
+            q_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO")
+            if moneda_sesion != "ALL":
+                q_ops = q_ops.eq("moneda", moneda_sesion)
+            res_ops = q_ops.execute()
             df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
         except:
             df_ops = pd.DataFrame()
 
         # 1. Traer los inmuebles activos CON SU MONEDA
         query_inm = supabase.table("inmuebles").select("id, nombre, moneda").eq("estado", "ACTIVO")
-        moneda_sesion = st.session_state.get("moneda_usuario", "ALL")
         if moneda_sesion != "ALL": query_inm = query_inm.eq("moneda", moneda_sesion)
         res_prop = query_inm.order("nombre").execute()
+
         df_prop = pd.DataFrame(res_prop.data) if res_prop.data else pd.DataFrame()
         
         if df_prop.empty:
@@ -1103,12 +1110,17 @@ def mostrar_modulo_inmuebles(supabase):
                                 st.session_state.modo_unidad = "NADA"
                                 st.rerun()
                         else:
+                            # 🛡️ Lógica para el título del PDF
+                            titulo_encabezado = "INMOLEASING"
+                            if not df_ops.empty and len(df_ops) == 1:
+                                titulo_encabezado = str(df_ops.iloc[0]['nombre']).upper()
+
                             # 🚀 LÁNZALO A NUESTRO MOTOR CENTRAL
                             panel_reportes_y_compartir(
                                 df_datos=df_final, 
                                 nombre_base=f"unidades_{etiqueta_prop}_{etiqueta_est}",
                                 modulo_origen=f"Unidades",
-                                funcion_pdf=generar_pdf_unidades,
+                                funcion_pdf=lambda df: generar_pdf_unidades(df, titulo_encabezado),
                                 df_operadores=df_ops,
                                 supabase=supabase,
                                 usuario_actual=st.session_state.usuario.get("nombre", "ADMIN"),
