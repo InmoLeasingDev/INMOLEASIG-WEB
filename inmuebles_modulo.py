@@ -1305,7 +1305,7 @@ def mostrar_modulo_inmuebles(supabase):
 
                                     datos = {
                                         "id_inmueble": int(id_inm), "id_propietario": int(id_p1), "id_propietario_2": id_p2,
-                                        "id_operador": id_op_heredado, "moneda": moneda_sesion, 
+                                        "id_operador": int(id_op_heredado), "moneda": moneda_sesion, 
                                         "porcentaje_propiedad": m_porc_prop_1, "porcentaje_propiedad_2": m_porc_prop_2,
                                         "porcentaje_pago_1": m_porc_pago_1, "porcentaje_pago_2": m_porc_pago_2,
                                         "cuenta_pago": m_iban_1, "cuenta_pago_2": m_iban_2,
