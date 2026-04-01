@@ -1144,7 +1144,7 @@ def mostrar_modulo_inmuebles(supabase):
         moneda_sesion = st.session_state.get("moneda_usuario", "EUR")
         simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
 
-        st.write("** CONTRATOS DE MANDATOS **")
+        st.write("CONTRATO DE MANDATO")
                     
         # --- 1. CARGA DE DATOS BASE (¡FILTRADA POR REGIÓN!) ---
         try:
