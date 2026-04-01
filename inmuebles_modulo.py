@@ -635,9 +635,9 @@ def mostrar_modulo_inmuebles(supabase):
             st.info("ℹ️ Aún no hay propiedades registradas o activas en tu región.")            
 
         # ==========================================
-        # 🛠️ BARRA DE HERRAMIENTAS (MODO PRO - 4 BOTONES)
+        # 🛠️ BARRA DE HERRAMIENTAS (MODO PRO - 5 BOTONES)
         # ==========================================
-        t_c1, t_c2, t_c3, t_c4, t_c5 = st.columns([1.5, 1.5, 1.5, 1.5, 4.0]) 
+        t_c1, t_c2, t_c3, t_c4, t_c5, t_c6 = st.columns([1.5, 1.5, 1.5, 1.5, 1.5, 2.5]) 
         
         if t_c1.button("➕ Nueva", key="btn_nueva_prop", use_container_width=True):
             st.session_state.modo_propiedad = "CREAR"
@@ -652,10 +652,13 @@ def mostrar_modulo_inmuebles(supabase):
                 st.session_state.modo_propiedad = "GALERIA"
                 st.rerun()
                 
-            if t_c4.button("📊 Reportes", key="btn_rep_prop", use_container_width=True):
+            if t_c4.button("📁 Docs", key="btn_doc_prop", use_container_width=True):
+                st.session_state.modo_propiedad = "DOCUMENTOS"
+                st.rerun()
+                
+            if t_c5.button("📊 Reportes", key="btn_rep_prop", use_container_width=True):
                 st.session_state.modo_propiedad = "REPORTES"
                 st.rerun()
-
         # ==========================================
         # 🗂️ PANELES DINÁMICOS
         # ==========================================
@@ -680,19 +683,32 @@ def mostrar_modulo_inmuebles(supabase):
                 n_pol = c7.text_input("Número de Póliza")
                 n_tel_ase = c8.text_input("Teléfono Aseguradora")
                 
+                st.write("**Documento Físico (Opcional)**")
+                doc_croquis = st.file_uploader("Plano o Croquis del Inmueble", type=["pdf", "jpg", "png"], key="croquis_crear")
+                
                 st.markdown("---")
                 # Botonera Minimalista
                 col_b1, col_b2, col_esp = st.columns([1.5, 1.2, 7.3])
                 
                 if col_b1.form_submit_button("💾 Guardar"):
                     if n_nom and n_ciu:
-                        datos_insert = {
-                            "nombre": n_nom.strip().upper(), "tipo": n_tip, "ciudad": n_ciu.strip().upper(),
-                            "moneda": n_mon, "referencia_catastral": n_cat.strip().upper(),
-                            "aseguradora": n_ase.strip().upper(), "numero_poliza": n_pol.strip().upper(), 
-                            "telefono_aseguradora": n_tel_ase.strip(), "estado": "ACTIVO"
-                        }
-                        supabase.table("inmuebles").insert(datos_insert).execute()
+                        with st.spinner("Guardando propiedad..."):
+                            url_croquis_final = None
+                            if doc_croquis:
+                                ext = doc_croquis.name.split('.')[-1].lower()
+                                tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
+                                n_nube = f"croquis_{int(time.time())}.{ext}"
+                                supabase.storage.from_("documentos_propiedades").upload(n_nube, doc_croquis.getvalue(), file_options={"content-type": tipo_mime})
+                                url_croquis_final = supabase.storage.from_("documentos_propiedades").get_public_url(n_nube)
+
+                            datos_insert = {
+                                "nombre": n_nom.strip().upper(), "tipo": n_tip, "ciudad": n_ciu.strip().upper(),
+                                "moneda": n_mon, "referencia_catastral": n_cat.strip().upper(),
+                                "aseguradora": n_ase.strip().upper(), "numero_poliza": n_pol.strip().upper(), 
+                                "telefono_aseguradora": n_tel_ase.strip(), "estado": "ACTIVO",
+                                "url_croquis": url_croquis_final
+                            }
+                            supabase.table("inmuebles").insert(datos_insert).execute()                        
                         log_accion(supabase, usuario_actual, "CREAR PROPIEDAD", n_nom.strip().upper())
                         st.session_state.modo_propiedad = "NADA"
                         st.success("✅ Propiedad registrada.")
@@ -729,17 +745,32 @@ def mostrar_modulo_inmuebles(supabase):
                     e_ase = e_c5.text_input("Aseguradora", str(datos_p.get('aseguradora', '')))
                     e_pol = e_c6.text_input("Número Póliza", str(datos_p.get('numero_poliza', '')))
                     
+                    st.write("**Actualizar Documento Físico (Opcional)**")
+                    st.caption("Solo sube un archivo si deseas reemplazar el plano/croquis actual.")
+                    edit_croquis = st.file_uploader("Nuevo Plano o Croquis", type=["pdf", "jpg", "png"], key=f"croquis_edit_{p_id}")
+                    
                     st.markdown("---")
                     # Botonera Minimalista de Gestión
                     col_b1, col_b2, col_esp = st.columns([1.5, 1.2, 7.3])
                     
                     if col_b1.form_submit_button("💾 Guardar"):
-                        datos_upd = {
-                            "nombre": e_nom.strip().upper(), "ciudad": e_ciu.strip().upper(),
-                            "moneda": e_mon, "referencia_catastral": e_cat.strip().upper(),
-                            "aseguradora": e_ase.strip().upper(), "numero_poliza": e_pol.strip().upper()
-                        }
-                        supabase.table("inmuebles").update(datos_upd).eq("id", int(p_id)).execute()
+                        with st.spinner("Actualizando propiedad..."):
+                            url_croquis_actualizado = datos_p.get('url_croquis')
+                            
+                            if edit_croquis:
+                                ext = edit_croquis.name.split('.')[-1].lower()
+                                tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
+                                n_nube = f"croquis_edit_{p_id}_{int(time.time())}.{ext}"
+                                supabase.storage.from_("documentos_propiedades").upload(n_nube, edit_croquis.getvalue(), file_options={"content-type": tipo_mime})
+                                url_croquis_actualizado = supabase.storage.from_("documentos_propiedades").get_public_url(n_nube)
+
+                            datos_upd = {
+                                "nombre": e_nom.strip().upper(), "ciudad": e_ciu.strip().upper(),
+                                "moneda": e_mon, "referencia_catastral": e_cat.strip().upper(),
+                                "aseguradora": e_ase.strip().upper(), "numero_poliza": e_pol.strip().upper(),
+                                "url_croquis": url_croquis_actualizado
+                            }
+                            supabase.table("inmuebles").update(datos_upd).eq("id", int(p_id)).execute()                        
                         log_accion(supabase, usuario_actual, "EDITAR PROPIEDAD", e_nom.strip().upper())
                         st.session_state.modo_propiedad = "NADA"
                         st.success("✅ Actualizado.")
@@ -761,6 +792,27 @@ def mostrar_modulo_inmuebles(supabase):
                     st.session_state.modo_propiedad = "NADA" 
                     time.sleep(1)
                     st.rerun()
+        # --- PANEL: DOCUMENTOS (CROQUIS/PLANOS) ---
+        elif st.session_state.modo_propiedad == "DOCUMENTOS" and not df_inm.empty:
+            st.markdown("---")
+            st.markdown("### 📁 Bóveda de Documentos (Planos y Croquis)")
+            prop_sel = st.selectbox("Selecciona la propiedad:", df_display['NOMBRE'].tolist(), key="sel_doc_prop")
+            if prop_sel:
+                datos_p = df_inm[df_inm['nombre'] == prop_sel].iloc[0]
+                url_croquis = datos_p.get('url_croquis')
+                
+                with st.container(border=True):
+                    st.write(f"**Documentos de {prop_sel}**")
+                    if url_croquis and str(url_croquis).strip() != "None" and str(url_croquis).strip() != "":
+                        st.success("✅ Plano / Croquis Registrado")
+                        st.markdown(f"📄 **[Clic aquí para abrir o descargar el documento]({url_croquis})**")
+                    else:
+                        st.warning("❌ No hay plano o croquis registrado para esta propiedad. Súbelo desde '⚙️ Gestionar' o al crear una nueva.")
+                    
+            st.markdown("---")
+            if st.button("❌ Cerrar Bóveda"): 
+                st.session_state.modo_propiedad = "NADA"
+                st.rerun()
 
         # --- PANEL: GALERÍA DE FOTOS (NUEVO) ---
         elif st.session_state.modo_propiedad == "GALERIA" and not df_inm.empty:
