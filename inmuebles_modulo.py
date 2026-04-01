@@ -1144,8 +1144,8 @@ def mostrar_modulo_inmuebles(supabase):
         moneda_sesion = st.session_state.get("moneda_usuario", "EUR")
         simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
 
-        st.markdown(f"### 🤝 Contratos de Gestión Integral ({moneda_sesion})")
-
+        st.write("** CONTRATOS DE MANDATOS **")
+                    
         # --- 1. CARGA DE DATOS BASE (¡FILTRADA POR REGIÓN!) ---
         try:
             res_inm = supabase.table("inmuebles").select("id, nombre, moneda").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
