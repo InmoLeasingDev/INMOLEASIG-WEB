@@ -1509,14 +1509,21 @@ def mostrar_modulo_inmuebles(supabase):
                 st.write("**3. Tratamiento de los Propietarios**")
                 c_trat1, c_trat2 = st.columns(2)
                 
+                # 🌍 Lógica de Tratamiento por Región
+                if moneda_sesion == "EUR":
+                    opciones_tratamiento = ["D.", "Dña."]
+                elif moneda_sesion == "COP":
+                    opciones_tratamiento = ["Sr.", "Sra."]
+                else:
+                    opciones_tratamiento = ["D.", "Dña.", "Sr.", "Sra."]
+                
                 # Botones de radio para el Propietario 1
-                trat_p1 = c_trat1.radio(f"Tratamiento para: **{datos_p1['nombre']}**", ["D.", "Dña.", "Sr.", "Sra."], horizontal=True)
+                trat_p1 = c_trat1.radio(f"Tratamiento para: **{datos_p1['nombre']}**", opciones_tratamiento, horizontal=True)
                 
                 # Botones de radio para el Propietario 2 (Solo si existe)
                 trat_p2 = None
                 if datos_p2:
-                    trat_p2 = c_trat2.radio(f"Tratamiento para: **{datos_p2['nombre']}**", ["D.", "Dña.", "Sr.", "Sra."], horizontal=True)
-                
+                    trat_p2 = c_trat2.radio(f"Tratamiento para: **{datos_p2['nombre']}**", opciones_tratamiento, horizontal=True)
                 st.markdown("---")
                 
                 # ⚙️ 1. CÁLCULOS Y PLANTILLA EN VIVO
