@@ -1551,6 +1551,12 @@ def mostrar_modulo_inmuebles(supabase):
                 meses_preaviso = (f_vence.year - f_aviso.year) * 12 + (f_vence.month - f_aviso.month) if pd.notna(f_vence) and pd.notna(f_aviso) else 2
                 meses_carencia = (f_pagos.year - f_entrega.year) * 12 + (f_pagos.month - f_entrega.month) if pd.notna(f_pagos) and pd.notna(f_entrega) else 0
                 
+                # 🗓️ Formateador de Fecha al Español Legal
+                meses_es = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+                try:
+                    fecha_firma_formateada = f"{f_firma.day} de {meses_es[f_firma.month - 1]} de {f_firma.year}"
+                except:
+                    fecha_firma_formateada = str(d_m.get('fecha_suscripcion', 'N/A'))                
                 # 📝 MOTOR DE PLANTILLA
                 plantilla = f"""CONTRATO DE GESTIÓN INTEGRAL DE ALQUILER POR HABITACIONES CON GARANTÍA DE INGRESOS
 
