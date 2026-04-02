@@ -1581,7 +1581,7 @@ SEGUNDA. Objeto
 La Gestora asumirá la gestión integral del alquiler por habitaciones del inmueble, incluyendo: Estudio de viabilidad, Adecuación no estructural, Captación y selección de ocupantes, Formalización de contratos temporales, Gestión de cobros, Gestión de incidencias, Supervisión periódica, Coordinación de mantenimiento ordinario, Gestión de empadronamiento.
 
 TERCERA. Garantía de ingresos
-La Gestora garantiza a {txt_propietario} un ingreso mínimo mensual de {d_m.get('ingreso_garantizado', 0.0):.2f} {simbolo_mon}. El pago se efectuará dentro de los cinco primeros días de cada mes. La garantía opera con independencia del nivel de ocupación. A la firma del presente contrato la Gestora pagará el valor de {d_m.get('valor_fianza', 0.0):.2f} {simbolo_mon} como fianza.
+La Gestora garantiza a {txt_propietario} un ingreso mínimo mensual de {d_m.get('ingreso_garantizado', 0.0):.0f} {simbolo_mon}. El pago se efectuará dentro de los cinco primeros días de cada mes. La garantía opera con independencia del nivel de ocupación. A la firma del presente contrato la Gestora pagará el valor de {d_m.get('valor_fianza', 0.0):.0f} {simbolo_mon} como fianza.
 
 CUARTA. Retribución de la Gestora
 La Gestora percibirá como honorarios la diferencia entre ingresos brutos obtenidos y el ingreso mínimo garantizado. La Gestora emitirá factura mensual con IVA conforme a la normativa vigente.
@@ -1603,7 +1603,7 @@ NOVENA. Jurisdicción
 Juzgados y Tribunales de {datos_inm['ciudad'].capitalize()}.
 
 DÉCIMA. Recuperación anticipada por venta
-En caso de que {txt_propietario} decida vender el inmueble antes del vencimiento del contrato, deberá comunicarlo con un preaviso mínimo de 90 días. {txt_propietario.capitalize()} deberá abonar a la Gestora el importe de la inversión de {d_m.get('indemnizacion_anticipada', 0.0):.2f} {simbolo_mon}. La transmisión del inmueble quedará supeditada a la liquidación previa de las cantidades indicadas y a la terminación de los contratos vigentes de alquiler de las habitaciones. Las mejoras quedarán incorporadas al inmueble sin derecho a retirada.
+En caso de que {txt_propietario} decida vender el inmueble antes del vencimiento del contrato, deberá comunicarlo con un preaviso mínimo de 90 días. {txt_propietario.capitalize()} deberá abonar a la Gestora el importe de la inversión de {d_m.get('indemnizacion_anticipada', 0.0):.0f} {simbolo_mon}. La transmisión del inmueble quedará supeditada a la liquidación previa de las cantidades indicadas y a la terminación de los contratos vigentes de alquiler de las habitaciones. Las mejoras quedarán incorporadas al inmueble sin derecho a retirada.
 
 DÉCIMA PRIMERA. Carencia
 Las partes acuerdan {meses_carencia} meses de carencia contados a partir de la entrega del inmueble a la Gestora.
