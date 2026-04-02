@@ -1624,7 +1624,7 @@ Representada por: {admin_nombre}
 
 ANEXO I - POLÍTICA DE PRIVACIDAD
 RESPONSABLE: {datos_op['nombre']}
-CIF: {admin_cif}
+CIF: {datos_op['identificacion']}
 EMAIL: puentevallrooms@gmail.com
 
 FINALIDAD: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
