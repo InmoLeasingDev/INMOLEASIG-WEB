@@ -1558,6 +1558,11 @@ def mostrar_modulo_inmuebles(supabase):
                 except:
                     fecha_firma_formateada = str(d_m.get('fecha_suscripcion', 'N/A'))                
                 
+                try:
+                    fecha_entrega_formateada = f"{f_entrega.day} de {meses_es[f_entrega.month - 1]} de {f_entrega.year}"
+                except:
+                    fecha_entrega_formateada = str(d_m.get('fecha_entrega', 'N/A'))
+
                 # 🔢 Formateador Legal de Números a Letras (Cero decimales)
                 def num_a_letras(n):
                     n = int(n)
@@ -1639,8 +1644,7 @@ En caso de que {txt_propietario} decida vender el inmueble antes del vencimiento
 DÉCIMA PRIMERA. Carencia
 Las partes acuerdan {meses_carencia} meses de carencia contados a partir de la entrega del inmueble a la Gestora.
 --- SALTO DE PÁGINA ---
-DÉCIMA SEGUNDA. Entrega 
-La fecha de entrega a la Gestora será {d_m.get('fecha_entrega', 'N/A')}.
+DÉCIMA SEGUNDA. Entrega: La fecha de entrega a la Gestora será el {fecha_entrega_formateada}.
 
 DÉCIMA TERCERA. Protección de datos
 Las partes declaran haber sido informadas del tratamiento de sus datos personales conforme al Reglamento (UE) 2016/679 y normativa vigente, remitiéndose al Anexo I - Política de Privacidad.
