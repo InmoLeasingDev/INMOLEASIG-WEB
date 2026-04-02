@@ -1595,16 +1595,25 @@ Representada por: {admin_nombre}
 ------------------------------------------------------
 --- SALTO DE PÁGINA ---
 ANEXO I - POLÍTICA DE PRIVACIDAD
+
 Responsable: {datos_op['nombre']}
 CIF: {admin_cif}
 Email: puentevallrooms@gmail.com
+
 Finalidad: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
+
 Base jurídica: Ejecución del contrato y obligaciones legales.
+
 Destinatarios: Administraciones públicas, entidades financieras, aseguradoras y proveedores necesarios.
+
 Conservación: Durante la relación contractual y plazos legales.
+
 Derechos: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
+
 El interesado declara haber sido informado mediante la firma del contrato.
 
+
+{txt_propietario}
 Firma:
 """
                     st.session_state[f"borrador_{id_m}"] = plantilla
