@@ -1504,20 +1504,31 @@ def mostrar_modulo_inmuebles(supabase):
                 admin_cif = c_rep2.text_input("CIF del Operador", value=datos_op['identificacion'])
                 
                 st.markdown("---")
+                st.write("**3. Tratamiento de los Propietarios**")
+                c_trat1, c_trat2 = st.columns(2)
+                
+                # Botones de radio para el Propietario 1
+                trat_p1 = c_trat1.radio(f"Tratamiento para: **{datos_p1['nombre']}**", ["D.", "Dña.", "Sr.", "Sra."], horizontal=True)
+                
+                # Botones de radio para el Propietario 2 (Solo si existe)
+                trat_p2 = None
+                if datos_p2:
+                    trat_p2 = c_trat2.radio(f"Tratamiento para: **{datos_p2['nombre']}**", ["D.", "Dña.", "Sr.", "Sra."], horizontal=True)
+                
+                st.markdown("---")
                 if st.button("✨ Generar Borrador Inteligente"):
-                # 🧠 Lógica Gramatical Dinámica
+                    # 🧠 Lógica Gramatical Dinámica
                     if datos_p2:
-                        # 🆔 Cambio: DNI/NIE -> DNI
-                        bloque_props = f"De una parte, D./Dña. {datos_p1['nombre']} con DNI {datos_p1['identificacion']} y D./Dña. {datos_p2['nombre']} con DNI {datos_p2['identificacion']}, propietarios del inmueble sito en {datos_inm['nombre']}, en adelante, LOS PROPIETARIOS."
+                        # 🆔 Inyecta el tratamiento seleccionado para ambos
+                        bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']} y {trat_p2} {datos_p2['nombre']} con DNI {datos_p2['identificacion']}, propietarios del inmueble sito en {datos_inm['nombre']}, en adelante, LOS PROPIETARIOS."
                         txt_propietario = "LOS PROPIETARIOS"
                         txt_titularidad = "son titulares plenos"
                     else:
-                        # 🆔 Cambio: DNI/NIE -> DNI
-                        bloque_props = f"De una parte, D./Dña. {datos_p1['nombre']} con DNI {datos_p1['identificacion']}, propietario del inmueble sito en {datos_inm['nombre']}, en adelante, EL PROPIETARIO."
+                        # 🆔 Inyecta el tratamiento seleccionado para el único propietario
+                        bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']}, propietario del inmueble sito en {datos_inm['nombre']}, en adelante, EL PROPIETARIO."
                         txt_propietario = "EL PROPIETARIO"
-                        txt_titularidad = "es titular pleno"        
-                    # Cálculos de Fechas
-                    f_firma = pd.to_datetime(d_m['fecha_suscripcion'])                        
+                        txt_titularidad = "es titular pleno"
+                        
                     # Cálculos de Fechas
                     f_firma = pd.to_datetime(d_m['fecha_suscripcion'])
                     f_vence = pd.to_datetime(d_m['fecha_terminacion'])
