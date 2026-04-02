@@ -1616,6 +1616,8 @@ Las partes declaran haber sido informadas del tratamiento de sus datos personale
 
 
 Firmado en {datos_inm['ciudad'].capitalize()}, a {fecha_firma_formateada}.
+
+
 {txt_propietario}
 
 
