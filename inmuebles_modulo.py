@@ -1530,7 +1530,7 @@ def mostrar_modulo_inmuebles(supabase):
 REUNIDOS
 {bloque_props}
 
-Y de otra, {datos_op['nombre']}, con CIF {admin_cif} y domicilio en [DIRECCIÓN OPERADOR], representada por D./Dña. {admin_nombre}, en su condición de administrador, en adelante, LA GESTORA.
+Y de otra, {datos_op['nombre']}, con CIF {admin_cif} y domicilio en calle puente colgante 16, Valladolid CP 47007, representada por D./Dña. {admin_nombre}, en su condición de administrador, en adelante, LA GESTORA.
 
 MANIFIESTAN
 1) Que {txt_propietario} es titular pleno del inmueble descrito.
