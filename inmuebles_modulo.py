@@ -1474,9 +1474,11 @@ def mostrar_modulo_inmuebles(supabase):
                 id_m = str(d_m['id'])
                 
                 # Extracción de datos maestros
-                res_inm = supabase.table("inmuebles").select("nombre, ciudad").eq("id", d_m['id_inmueble']).execute()
-                datos_inm = res_inm.data[0] if res_inm.data else {"nombre": "N/A", "ciudad": "N/A"}
+                res_inm = supabase.table("inmuebles").select("nombre, ciudad, referencia_catastral").eq("id", d_m['id_inmueble']).execute()
+                datos_inm = res_inm.data[0] if res_inm.data else {"nombre": "N/A", "ciudad": "N/A", "referencia_catastral": "N/A"}
                 
+                # Etiqueta dinámica según el país
+                lbl_catastro = "Matrícula Inmobiliaria" if moneda_sesion == "COP" else "Referencia Catastral"
                 res_p1 = supabase.table("propietarios").select("nombre, identificacion").eq("id", d_m['id_propietario']).execute()
                 datos_p1 = res_p1.data[0] if res_p1.data else {"nombre": "N/A", "identificacion": "N/A"}
                 
@@ -1548,7 +1550,7 @@ REUNIDOS
 Y de otra, {datos_op['nombre']}, con CIF {admin_cif} y domicilio en [DIRECCIÓN OPERADOR], representada por D. {admin_nombre}, en su condición de administrador, en adelante, LA GESTORA.
 
 MANIFIESTAN
-1) Que {txt_propietario} {txt_titularidad} del inmueble descrito.
+1) Que {txt_propietario} {txt_titularidad} del inmueble descrito, con {lbl_catastro} {datos_inm.get('referencia_catastral', 'N/A')}.
 2) Que LA GESTORA desarrolla actividad empresarial de gestión inmobiliaria. 
 3) Que ambas partes desean formalizar contrato de gestión integral con garantía de ingresos.
 
@@ -1614,17 +1616,19 @@ RESPONSABLE: {datos_op['nombre']}
 CIF: {admin_cif}
 EMAIL: puentevallrooms@gmail.com
 
-Finalidad: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
+FINALIDAD: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
 
-Base jurídica: Ejecución del contrato y obligaciones legales.
+BASE JURIDICA: Ejecución del contrato y obligaciones legales.
 
-Destinatarios: Administraciones públicas, entidades financieras, aseguradoras y proveedores necesarios.
+DESTINATARIOS: Administraciones públicas, entidades financieras, aseguradoras y proveedores necesarios.
 
-Conservación: Durante la relación contractual y plazos legales.
+CONSERVACION: Durante la relación contractual y plazos legales.
 
-Derechos: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
+DERECHOS: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
 
 El interesado declara haber sido informado mediante la firma del contrato.
+
+
 
 Firma:
 """
