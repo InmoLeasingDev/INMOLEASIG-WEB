@@ -1594,9 +1594,10 @@ Las partes acuerdan {meses_carencia} meses de carencia contados a partir de la e
 
 DÉCIMA SEGUNDA. Entrega 
 La fecha de entrega a la Gestora será {d_m.get('fecha_entrega', 'N/A')}.
-
+--- SALTO DE PÁGINA ---
 DÉCIMA TERCERA. Protección de datos
 Las partes declaran haber sido informadas del tratamiento de sus datos personales conforme al Reglamento (UE) 2016/679 y normativa vigente, remitiéndose al Anexo I - Política de Privacidad.
+
 
 Firmado en {datos_inm['ciudad'].capitalize()}, a {d_m.get('fecha_suscripcion', 'N/A')}
 
@@ -1604,27 +1605,30 @@ Firmado en {datos_inm['ciudad'].capitalize()}, a {d_m.get('fecha_suscripcion', '
 [Firma]
 
 
+
+
 {datos_op['nombre']}
 Representada por: {admin_nombre}
 [Firma]
 
-------------------------------------------------------
+
+
 --- SALTO DE PÁGINA ---
 ANEXO I - POLÍTICA DE PRIVACIDAD
 
-Responsable: {datos_op['nombre']}
+RESPONSABLE: {datos_op['nombre']}
 CIF: {admin_cif}
 Email: puentevallrooms@gmail.com
 
-Finalidad: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
+FINALIDAD: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
 
-Base jurídica: Ejecución del contrato y obligaciones legales.
+BASE JURIDICA: Ejecución del contrato y obligaciones legales.
 
-Destinatarios: Administraciones públicas, entidades financieras, aseguradoras y proveedores necesarios.
+DESTINATARIOS: Administraciones públicas, entidades financieras, aseguradoras y proveedores necesarios.
 
-Conservación: Durante la relación contractual y plazos legales.
+CONSERVACION: Durante la relación contractual y plazos legales.
 
-Derechos: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
+DERECHOS: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
 
 El interesado declara haber sido informado mediante la firma del contrato.
 
