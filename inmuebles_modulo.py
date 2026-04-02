@@ -1682,6 +1682,8 @@ Firmado en {datos_inm['ciudad'].capitalize()}, a {fecha_firma_formateada}.
 
 Por {txt_propietario}:
 
+
+
 {txt_firmas_propietarios}
 
 
@@ -1714,6 +1716,9 @@ DERECHOS: Acceso, rectificación, supresión, oposición, limitación y portabil
 El interesado declara haber sido informado mediante la firma del presente Anexo.
 
 Por {txt_propietario}:
+
+
+
 
 {txt_firmas_propietarios}
 
