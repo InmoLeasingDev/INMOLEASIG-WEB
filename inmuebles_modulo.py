@@ -1620,6 +1620,7 @@ RESPONSABLE: {datos_op['nombre']}
 CIF: {admin_cif}
 Email: puentevallrooms@gmail.com
 
+
 FINALIDAD: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
 
 BASE JURIDICA: Ejecución del contrato y obligaciones legales.
