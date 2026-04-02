@@ -1659,7 +1659,11 @@ Firma:
                     pdf.set_auto_page_break(auto=True, margin=25)
                     pdf.add_page()
                     pdf.set_font("Arial", "", 11)
-                    for linea in texto.split('\n'):
+                    
+                    # 💡 PARCHE FPDF: Reemplazar símbolo por palabra formal para evitar borrados
+                    texto_limpio = texto.replace('€', 'Euros')
+                    
+                    for linea in texto_limpio.split('\n'):
                         if "--- SALTO DE PÁGINA ---" in linea:
                             pdf.add_page()
                             continue
@@ -1670,7 +1674,6 @@ Firma:
                         else:
                             pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
                     return pdf.output(dest='S').encode('latin-1')
-
                 # 🚀 3. BOTONERA BIFURCADA
                 st.write("**4. Acciones de Generación**")
                 c_acc1, c_acc2 = st.columns(2)
