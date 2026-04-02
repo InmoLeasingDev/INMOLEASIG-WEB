@@ -1235,17 +1235,17 @@ def mostrar_modulo_inmuebles(supabase):
         else:
             st.info(f"ℹ️ No hay mandatos vigentes en el entorno {moneda_sesion}.")
 
-        # --- 3. BARRA DE HERRAMIENTAS (SIN BOTÓN DE PAGOS) ---
+# --- 3. BARRA DE HERRAMIENTAS ---
         st.markdown("---")
-        m_c1, m_c2, m_c3, m_c4, m_c5 = st.columns([1.5, 1.5, 1.8, 1.6, 1.7])
+        m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns([1.5, 1.5, 1.5, 1.6, 1.5, 1.5])
         
         if m_c1.button("➕ Nuevo", key="btn_nuevo_man", use_container_width=True): st.session_state.modo_mandato = "CREAR"; st.rerun()
         if not df_man.empty:
             if m_c2.button("⚙️ Gestionar", key="btn_edit_man", use_container_width=True): st.session_state.modo_mandato = "EDITAR"; st.rerun()
-            if m_c3.button("📁 Documentos", key="btn_docs_man", use_container_width=True): st.session_state.modo_mandato = "DOCUMENTOS"; st.rerun()
-            if m_c4.button("📜 Historial", key="btn_hist_man", use_container_width=True): st.session_state.modo_mandato = "HISTORIAL"; st.rerun()
-            if m_c5.button("📊 Reportes", key="btn_rep_man", use_container_width=True): st.session_state.modo_mandato = "REPORTES"; st.rerun()
-        # --- 4. PANEL CREAR ---
+            if m_c3.button("📄 Contrato", key="btn_gen_doc_man", use_container_width=True): st.session_state.modo_mandato = "GENERAR_CONTRATO"; st.rerun()
+            if m_c4.button("📁 Documentos", key="btn_docs_man", use_container_width=True): st.session_state.modo_mandato = "DOCUMENTOS"; st.rerun()
+            if m_c5.button("📜 Historial", key="btn_hist_man", use_container_width=True): st.session_state.modo_mandato = "HISTORIAL"; st.rerun()
+            if m_c6.button("📊 Reportes", key="btn_rep_man", use_container_width=True): st.session_state.modo_mandato = "REPORTES"; st.rerun()        # --- 4. PANEL CREAR ---
         if st.session_state.modo_mandato == "CREAR":
             from dateutil.relativedelta import relativedelta
             st.markdown("---")
@@ -1460,7 +1460,187 @@ def mostrar_modulo_inmuebles(supabase):
                 else: st.info("ℹ️ No hay registros en el historial.")
             st.markdown("---")
             if st.button("❌ Cerrar Historial"): st.session_state.modo_mandato = "NADA"; st.rerun()
+# --- PANEL: GENERADOR DE CONTRATO (BORRADOR INTERACTIVO) ---
+        elif st.session_state.modo_mandato == "GENERAR_CONTRATO" and not df_man.empty:
+            st.markdown("---")
+            st.markdown("### 📄 Generador Interactivo de Contratos Legales")
+            
+            op_man_gen = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
+            m_sel_gen = st.selectbox("1. Selecciona el Mandato para redactar su contrato:", op_man_gen)
+            
+            if m_sel_gen:
+                idx = op_man_gen.index(m_sel_gen)
+                d_m = df_man.iloc[idx]
+                id_m = str(d_m['id'])
+                
+                # Extracción de datos maestros
+                res_inm = supabase.table("inmuebles").select("nombre, ciudad").eq("id", d_m['id_inmueble']).execute()
+                datos_inm = res_inm.data[0] if res_inm.data else {"nombre": "N/A", "ciudad": "N/A"}
+                
+                res_p1 = supabase.table("propietarios").select("nombre, identificacion").eq("id", d_m['id_propietario']).execute()
+                datos_p1 = res_p1.data[0] if res_p1.data else {"nombre": "N/A", "identificacion": "N/A"}
+                
+                datos_p2 = None
+                if d_m.get('id_propietario_2'):
+                    res_p2 = supabase.table("propietarios").select("nombre, identificacion").eq("id", d_m['id_propietario_2']).execute()
+                    datos_p2 = res_p2.data[0] if res_p2.data else None
+                    
+                res_op = supabase.table("operadores").select("nombre, identificacion").eq("id", d_m['id_operador']).execute()
+                datos_op = res_op.data[0] if res_op.data else {"nombre": "N/A", "identificacion": "N/A"}
+                
+                # Interfaz "Listbox" Inteligente
+                st.write("**2. Firma de la Gestora**")
+                c_rep1, c_rep2 = st.columns(2)
+                
+                if 'lista_admins' not in st.session_state:
+                    st.session_state.lista_admins = ["JORGE SALAZAR", "GIANFRANCO VOLI", "Añadir nuevo..."]
+                    
+                sel_admin = c_rep1.selectbox("Representante Legal (Historial)", st.session_state.lista_admins)
+                if sel_admin == "Añadir nuevo...":
+                    admin_nombre = c_rep1.text_input("Escribe el nombre del nuevo Representante *")
+                else:
+                    admin_nombre = sel_admin
+                    
+                admin_cif = c_rep2.text_input("CIF del Operador", value=datos_op['identificacion'])
+                
+                st.markdown("---")
+                if st.button("✨ Generar Borrador Inteligente"):
+                    # 🧠 Lógica Gramatical Dinámica
+                    if datos_p2:
+                        bloque_props = f"De una parte, D./Dña. {datos_p1['nombre']} con DNI/NIE {datos_p1['identificacion']} y D./Dña. {datos_p2['nombre']} con DNI/NIE {datos_p2['identificacion']}, propietarios del inmueble sito en {datos_inm['nombre']}, en adelante, LOS PROPIETARIOS."
+                        txt_propietario = "LOS PROPIETARIOS"
+                    else:
+                        bloque_props = f"De una parte, D./Dña. {datos_p1['nombre']} con DNI/NIE {datos_p1['identificacion']}, propietario del inmueble sito en {datos_inm['nombre']}, en adelante, EL PROPIETARIO."
+                        txt_propietario = "EL PROPIETARIO"
+                        
+                    # Cálculos de Fechas
+                    f_firma = pd.to_datetime(d_m['fecha_suscripcion'])
+                    f_vence = pd.to_datetime(d_m['fecha_terminacion'])
+                    f_entrega = pd.to_datetime(d_m['fecha_entrega'])
+                    f_pagos = pd.to_datetime(d_m['fecha_inicio_pagos'])
+                    f_aviso = pd.to_datetime(d_m['fecha_aviso_no_renovacion'])
+                    
+                    anos = (f_vence.year - f_firma.year) if pd.notna(f_vence) and pd.notna(f_firma) else 5
+                    meses_preaviso = (f_vence.year - f_aviso.year) * 12 + (f_vence.month - f_aviso.month) if pd.notna(f_vence) and pd.notna(f_aviso) else 2
+                    meses_carencia = (f_pagos.year - f_entrega.year) * 12 + (f_pagos.month - f_entrega.month) if pd.notna(f_pagos) and pd.notna(f_entrega) else 0
+                    
+                    # 📝 MOTOR DE PLANTILLA (Borrador Editable)
+                    plantilla = f"""CONTRATO DE GESTIÓN INTEGRAL DE ALQUILER POR HABITACIONES CON GARANTÍA DE INGRESOS
 
+REUNIDOS
+{bloque_props}
+
+Y de otra, {datos_op['nombre']}, con CIF {admin_cif} y domicilio en [DIRECCIÓN OPERADOR], representada por D./Dña. {admin_nombre}, en su condición de administrador, en adelante, LA GESTORA.
+
+MANIFIESTAN
+1) Que {txt_propietario} es titular pleno del inmueble descrito.
+2) Que LA GESTORA desarrolla actividad empresarial de gestión inmobiliaria. 
+3) Que ambas partes desean formalizar contrato de gestión integral con garantía de ingresos.
+
+ACUERDAN
+
+PRIMERA. Naturaleza jurídica
+1) El presente contrato tiene naturaleza mercantil. 
+2) No constituye contrato de arrendamiento entre las partes.
+3) La Gestora no adquiere derecho real ni posesión plena del inmueble. 
+4) {txt_propietario.capitalize()} mantiene la condición de arrendador frente a los ocupantes finales.
+
+SEGUNDA. Objeto
+La Gestora asumirá la gestión integral del alquiler por habitaciones del inmueble, incluyendo: Estudio de viabilidad, Adecuación no estructural, Captación y selección de ocupantes, Formalización de contratos temporales, Gestión de cobros, Gestión de incidencias, Supervisión periódica, Coordinación de mantenimiento ordinario, Gestión de empadronamiento.
+
+TERCERA. Garantía de ingresos
+La Gestora garantiza a {txt_propietario} un ingreso mínimo mensual de {d_m.get('ingreso_garantizado', 0.0):.2f} {simbolo_mon}. El pago se efectuará dentro de los cinco primeros días de cada mes. La garantía opera con independencia del nivel de ocupación. A la firma del presente contrato la Gestora pagará el valor de {d_m.get('valor_fianza', 0.0):.2f} {simbolo_mon} como fianza.
+
+CUARTA. Retribución de la Gestora
+La Gestora percibirá como honorarios la diferencia entre ingresos brutos obtenidos y el ingreso mínimo garantizado. La Gestora emitirá factura mensual con IVA conforme a la normativa vigente.
+
+QUINTA. Duración
+Duración de {anos} años, con prórroga automática a menos que alguna de las partes notifique a la otra su decisión de no hacerlo con una antelación no inferior a {meses_preaviso} meses.
+
+SEXTA. Inversión
+La Gestora podrá realizar mejoras no estructurales. {txt_propietario.capitalize()} recibió y aceptó de la Gestora informe previo con detalle de inversión. Las mejoras quedarán en beneficio del inmueble. Esto excluye muebles y enseres.
+
+SÉPTIMA. Gastos
+A cargo de {txt_propietario}: IBI, Comunidad y Seguro de hogar con responsabilidad civil.
+A cargo de la Gestora: Suministros, Internet, Gestión Operativa y Tasa de Basuras.
+
+OCTAVA. Responsabilidad
+La Gestora responderá frente a {txt_propietario} por negligencia grave en la gestión. {txt_propietario.capitalize()} mantendrá responsabilidad estructural del inmueble.
+
+NOVENA. Jurisdicción 
+Juzgados y Tribunales de {datos_inm['ciudad'].capitalize()}.
+
+DÉCIMA. Recuperación anticipada por venta
+En caso de que {txt_propietario} decida vender el inmueble antes del vencimiento del contrato, deberá comunicarlo con un preaviso mínimo de 90 días. {txt_propietario.capitalize()} deberá abonar a la Gestora el importe de la inversión de {d_m.get('indemnizacion_anticipada', 0.0):.2f} {simbolo_mon}. La transmisión del inmueble quedará supeditada a la liquidación previa de las cantidades indicadas y a la terminación de los contratos vigentes de alquiler de las habitaciones. Las mejoras quedarán incorporadas al inmueble sin derecho a retirada.
+
+DÉCIMA PRIMERA. Carencia
+Las partes acuerdan {meses_carencia} meses de carencia contados a partir de la entrega del inmueble a la Gestora.
+
+DÉCIMA SEGUNDA. Entrega 
+La fecha de entrega a la Gestora será {d_m.get('fecha_entrega', 'N/A')}.
+
+DÉCIMA TERCERA. Protección de datos
+Las partes declaran haber sido informadas del tratamiento de sus datos personales conforme al Reglamento (UE) 2016/679 y normativa vigente, remitiéndose al Anexo I - Política de Privacidad.
+
+Firmado en {datos_inm['ciudad'].capitalize()}, a {d_m.get('fecha_suscripcion', 'N/A')}
+
+{txt_propietario}
+[Firma]
+
+
+{datos_op['nombre']}
+Representada por: {admin_nombre}
+[Firma]
+
+------------------------------------------------------
+ANEXO I - POLÍTICA DE PRIVACIDAD
+Responsable: {datos_op['nombre']}
+CIF: {admin_cif}
+Email: puentevallrooms@gmail.com
+Finalidad: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
+Base jurídica: Ejecución del contrato y obligaciones legales.
+Destinatarios: Administraciones públicas, entidades financieras, aseguradoras y proveedores necesarios.
+Conservación: Durante la relación contractual y plazos legales.
+Derechos: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
+El interesado declara haber sido informado mediante la firma del contrato.
+
+Firma:
+"""
+                    st.session_state[f"borrador_{id_m}"] = plantilla
+                    
+                if f"borrador_{id_m}" in st.session_state:
+                    st.success("✅ **Borrador Generado.** Lee, edita o elimina lo que necesites en esta caja antes de descargar.")
+                    
+                    # 📝 EL BORRADOR INTERACTIVO
+                    texto_final = st.text_area("Borrador del Contrato (Edición Libre)", value=st.session_state[f"borrador_{id_m}"], height=600)
+                    
+                    # MOTOR FPDF DE CÓDIGO AL VUELO
+                    def generar_pdf_contrato_legal(texto):
+                        pdf = FPDF()
+                        pdf.add_page()
+                        pdf.set_font("Arial", "", 11)
+                        for linea in texto.split('\n'):
+                            if linea.isupper() and len(linea) > 0 and len(linea) < 90:
+                                pdf.set_font("Arial", "B", 11)
+                                pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
+                                pdf.set_font("Arial", "", 11)
+                            else:
+                                pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
+                        return pdf.output(dest='S').encode('latin-1')
+
+                    # BOTÓN DE DESCARGA PDF 
+                    st.download_button(
+                        label="🔒 Confirmar Texto y Descargar PDF Definitivo", 
+                        data=generar_pdf_contrato_legal(texto_final), 
+                        file_name=f"Contrato_{datos_inm['nombre'].replace(' ','_')}.pdf", 
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+            
+            st.markdown("---")
+            if st.button("❌ Cerrar Panel"): 
+                st.session_state.modo_mandato = "NADA"
+                st.rerun()
 # --- PANEL EDITAR (AHORA CON BÓVEDA DOCUMENTAL) ---
         elif st.session_state.modo_mandato == "EDITAR" and not df_man.empty:
             st.markdown("---")
