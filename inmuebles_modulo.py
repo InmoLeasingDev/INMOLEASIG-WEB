@@ -1634,49 +1634,47 @@ MANIFIESTAN
 3) Que ambas partes desean formalizar contrato de gestión integral con garantía de ingresos.
 
 ACUERDAN
-
-PRIMERA. Naturaleza jurídica
+PRIMERO. Naturaleza jurídica
 1) El presente contrato tiene naturaleza mercantil. 
 2) No constituye contrato de arrendamiento entre las partes.
 3) La Gestora no adquiere derecho real ni posesión plena del inmueble. 
 4) {txt_propietario.capitalize()} mantiene la condición de arrendador frente a los ocupantes finales.
 
-SEGUNDA. Objeto
+SEGUNDO. Objeto
 La Gestora asumirá la gestión integral del alquiler por habitaciones del inmueble, incluyendo: Estudio de viabilidad, Adecuación no estructural, Captación y selección de ocupantes, Formalización de contratos temporales, Gestión de cobros, Gestión de incidencias, Supervisión periódica, Coordinación de mantenimiento ordinario, Gestión de empadronamiento.
 
-TERCERA. Garantía de ingresos
+TERCERO. Garantía de ingresos
 La Gestora garantiza a {txt_propietario} un ingreso mínimo mensual de {txt_renta}. El pago se efectuará dentro de los cinco primeros días de cada mes. La garantía opera con independencia del nivel de ocupación. A la firma del presente contrato la Gestora pagará el valor de {txt_fianza} como fianza.
 
-CUARTA. Retribución de la Gestora
+CUARTO. Retribución de la Gestora
 La Gestora percibirá como honorarios la diferencia entre ingresos brutos obtenidos y el ingreso mínimo garantizado. La Gestora emitirá factura mensual con IVA conforme a la normativa vigente.
 
-QUINTA. Duración
+QUINTO. Duración
 Duración de {anos} años, con prórroga automática a menos que alguna de las partes notifique a la otra su decisión de no hacerlo con una antelación no inferior a {meses_preaviso} meses.
 
-SEXTA. Inversión
+SEXTO. Inversión
 La Gestora podrá realizar mejoras no estructurales. {txt_propietario.capitalize()} recibió y aceptó de la Gestora informe previo con detalle de inversión. Las mejoras quedarán en beneficio del inmueble. Esto excluye muebles y enseres.
 
-SÉPTIMA. Gastos
+SÉPTIMO. Gastos
 A cargo de {txt_propietario}: IBI, Comunidad y Seguro de hogar con responsabilidad civil.
 A cargo de la Gestora: Suministros, Internet, Gestión Operativa y Tasa de Basuras.
 
-OCTAVA. Responsabilidad
+OCTAVO. Responsabilidad
 La Gestora responderá frente a {txt_propietario} por negligencia grave en la gestión. {txt_propietario.capitalize()} mantendrá responsabilidad estructural del inmueble.
 
-NOVENA. Jurisdicción 
+NOVENO. Jurisdicción 
 Juzgados y Tribunales de {datos_inm['ciudad'].capitalize()}.
 
-DÉCIMA. Recuperación anticipada por venta
+DÉCIMO. Recuperación anticipada por venta
 En caso de que {txt_propietario} decida vender el inmueble antes del vencimiento del contrato, deberá comunicarlo con un preaviso mínimo de 90 días. {txt_propietario.capitalize()} deberá abonar a la Gestora el importe de la inversión de {txt_indem}. La transmisión del inmueble quedará supeditada a la liquidación previa de las cantidades indicadas y a la terminación de los contratos vigentes de alquiler de las habitaciones. Las mejoras quedarán incorporadas al inmueble sin derecho a retirada.
 
-DÉCIMA PRIMERA. Carencia
+DÉCIMO PRIMERO. Carencia
 Las partes acuerdan {meses_carencia} meses de carencia contados a partir de la entrega del inmueble a la Gestora.
 --- SALTO DE PÁGINA ---
-DÉCIMA SEGUNDA. Entrega: La fecha de entrega a la Gestora será el {fecha_entrega_formateada}.
+DÉCIMO SEGUNDO. Entrega: La fecha de entrega a la Gestora será el {fecha_entrega_formateada}.
 
-DÉCIMA TERCERA. Protección de datos
+DÉCIMO TERCERO. Protección de datos
 Las partes declaran haber sido informadas del tratamiento de sus datos personales conforme al Reglamento (UE) 2016/679 y normativa vigente, remitiéndose al Anexo I - Política de Privacidad.
-
 
 Firmado en {datos_inm['ciudad'].capitalize()}, a {fecha_firma_formateada}.
 
