@@ -1593,6 +1593,7 @@ Representada por: {admin_nombre}
 [Firma]
 
 ------------------------------------------------------
+--- SALTO DE PÁGINA ---
 ANEXO I - POLÍTICA DE PRIVACIDAD
 Responsable: {datos_op['nombre']}
 CIF: {admin_cif}
@@ -1620,6 +1621,11 @@ Firma:
                         pdf.add_page()
                         pdf.set_font("Arial", "", 11)
                         for linea in texto.split('\n'):
+                            # 🚀 MAGIA: Detector de Salto de Página
+                            if "--- SALTO DE PÁGINA ---" in linea:
+                                pdf.add_page()
+                                continue  # Salta a la siguiente línea sin imprimir el texto
+                                
                             if linea.isupper() and len(linea) > 0 and len(linea) < 90:
                                 pdf.set_font("Arial", "B", 11)
                                 pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
@@ -1627,7 +1633,6 @@ Firma:
                             else:
                                 pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
                         return pdf.output(dest='S').encode('latin-1')
-
                     # BOTÓN DE DESCARGA PDF 
                     st.download_button(
                         label="🔒 Confirmar Texto y Descargar PDF Definitivo", 
