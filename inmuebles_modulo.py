@@ -1558,11 +1558,15 @@ def mostrar_modulo_inmuebles(supabase):
                     bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']} y {trat_p2} {datos_p2['nombre']} con DNI {datos_p2['identificacion']}, propietarios del inmueble sito en {datos_inm['nombre']}, en adelante, LOS PROPIETARIOS."
                     txt_propietario = "LOS PROPIETARIOS"
                     txt_titularidad = "son titulares plenos"
+                    # Inyectamos ambos nombres con espacio de 3 líneas entre ellos para firmar
+                    txt_firmas_propietarios = f"{trat_p1} {datos_p1['nombre']}\n\n\n{trat_p2} {datos_p2['nombre']}"
                 else:
                     bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']}, propietario del inmueble sito en {datos_inm['nombre']}, en adelante, EL PROPIETARIO."
                     txt_propietario = "EL PROPIETARIO"
                     txt_titularidad = "es titular pleno"
-                    
+                    # Inyectamos el único nombre
+                    txt_firmas_propietarios = f"{trat_p1} {datos_p1['nombre']}"
+
                 # Cálculos de Fechas
                 f_firma = pd.to_datetime(d_m['fecha_suscripcion'])
                 f_vence = pd.to_datetime(d_m['fecha_terminacion'])
@@ -1676,12 +1680,13 @@ Las partes declaran haber sido informadas del tratamiento de sus datos personale
 
 Firmado en {datos_inm['ciudad'].capitalize()}, a {fecha_firma_formateada}.
 
+Por {txt_propietario}:
 
-{txt_propietario}
+{txt_firmas_propietarios}
 
 
 
-
+Por LA GESTORA:
 
 {datos_op['nombre']}
 Representada por: {admin_nombre}
@@ -1706,12 +1711,18 @@ CONSERVACION: Durante la relación contractual y plazos legales.
 
 DERECHOS: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
 
-El interesado declara haber sido informado mediante la firma del contrato.
+El interesado declara haber sido informado mediante la firma del presente Anexo.
+
+Por {txt_propietario}:
+
+{txt_firmas_propietarios}
 
 
 
+Por LA GESTORA:
 
-Firma:
+{datos_op['nombre']}
+Representada por: {admin_nombre}
 """
                 # ⚙️ 2. MOTOR FPDF DE CÓDIGO AL VUELO
                 def generar_pdf_contrato_legal(texto):
