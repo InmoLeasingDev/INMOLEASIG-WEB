@@ -1558,15 +1558,14 @@ def mostrar_modulo_inmuebles(supabase):
                     bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']} y {trat_p2} {datos_p2['nombre']} con DNI {datos_p2['identificacion']}, propietarios del inmueble sito en {datos_inm['nombre']}, en adelante, LOS PROPIETARIOS."
                     txt_propietario = "LOS PROPIETARIOS"
                     txt_titularidad = "son titulares plenos"
-                    # Inyectamos ambos nombres con espacio de 3 líneas entre ellos para firmar
-                    txt_firmas_propietarios = f"{trat_p1} {datos_p1['nombre']}\n\n\n{trat_p2} {datos_p2['nombre']}"
+                    # Inyectamos ambos nombres en MAYÚSCULAS (para forzar negrita) y con 4 líneas de espacio
+                    txt_firmas_propietarios = f"{trat_p1.upper()} {datos_p1['nombre'].upper()}\n\n\n\n{trat_p2.upper()} {datos_p2['nombre'].upper()}"
                 else:
                     bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']}, propietario del inmueble sito en {datos_inm['nombre']}, en adelante, EL PROPIETARIO."
                     txt_propietario = "EL PROPIETARIO"
                     txt_titularidad = "es titular pleno"
-                    # Inyectamos el único nombre
-                    txt_firmas_propietarios = f"{trat_p1} {datos_p1['nombre']}"
-
+                    # Inyectamos el único nombre en MAYÚSCULAS
+                    txt_firmas_propietarios = f"{trat_p1.upper()} {datos_p1['nombre'].upper()}"
                 # Cálculos de Fechas
                 f_firma = pd.to_datetime(d_m['fecha_suscripcion'])
                 f_vence = pd.to_datetime(d_m['fecha_terminacion'])
