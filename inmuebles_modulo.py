@@ -1487,24 +1487,28 @@ def mostrar_modulo_inmuebles(supabase):
                     res_p2 = supabase.table("propietarios").select("nombre, identificacion").eq("id", d_m['id_propietario_2']).execute()
                     datos_p2 = res_p2.data[0] if res_p2.data else None
                     
-                res_op = supabase.table("operadores").select("nombre, identificacion").eq("id", d_m['id_operador']).execute()
-                datos_op = res_op.data[0] if res_op.data else {"nombre": "N/A", "identificacion": "N/A"}
+                # Extracción de la DB incluyendo la dirección
+                res_op = supabase.table("operadores").select("nombre, identificacion, direccion").eq("id", d_m['id_operador']).execute()
+                datos_op = res_op.data[0] if res_op.data else {"nombre": "N/A", "identificacion": "N/A", "direccion": "DIRECCIÓN NO REGISTRADA"}
                 
-                # Interfaz "Listbox" Inteligente
+                # Interfaz "Listbox" Inteligente para Representantes
                 st.write("**2. Firma de la Gestora**")
                 c_rep1, c_rep2 = st.columns(2)
                 
-                if 'lista_admins' not in st.session_state:
-                    st.session_state.lista_admins = ["JORGE SALAZAR", "GIANFRANCO VOLI", "Añadir nuevo..."]
+                # 🧠 Diccionario inteligente (Nombre: DNI/NIE)
+                if 'dict_admins' not in st.session_state:
+                    st.session_state.dict_admins = {"JORGE SALAZAR": "Y9720117D", "GIANFRANCO VOLI": "X2211568A"}
                     
-                sel_admin = c_rep1.selectbox("Representante Legal (Historial)", st.session_state.lista_admins)
+                opciones_admins = list(st.session_state.dict_admins.keys()) + ["Añadir nuevo..."]
+                sel_admin = c_rep1.selectbox("Representante Legal (Historial)", opciones_admins)
+                
                 if sel_admin == "Añadir nuevo...":
-                    admin_nombre = c_rep1.text_input("Escribe el nombre del nuevo Representante *")
+                    admin_nombre = c_rep1.text_input("Nombre del nuevo Representante *")
+                    admin_id = c_rep2.text_input("DNI/NIE del Representante *")
                 else:
                     admin_nombre = sel_admin
-                    
-                admin_cif = c_rep2.text_input("CIF del Operador", value=datos_op['identificacion'])
-                
+                    # Autocompleta el ID basado en el nombre seleccionado
+                    admin_id = c_rep2.text_input("DNI/NIE del Representante", value=st.session_state.dict_admins[sel_admin])                
                 st.markdown("---")
                 st.write("**3. Tratamiento de los Propietarios**")
                 c_trat1, c_trat2 = st.columns(2)
@@ -1554,8 +1558,7 @@ def mostrar_modulo_inmuebles(supabase):
 REUNIDOS
 {bloque_props}
 
-Y de otra, {datos_op['nombre']}, con CIF {admin_cif} y domicilio en [DIRECCIÓN OPERADOR], representada por D. {admin_nombre}, en su condición de administrador, en adelante, LA GESTORA.
-
+Y de otra, {datos_op['nombre']}, con CIF {datos_op['identificacion']} y domicilio en {datos_op.get('direccion', 'DIRECCIÓN NO REGISTRADA')}, representada por D./Dña. {admin_nombre} con DNI/NIE {admin_id}, en su condición de administrador, en adelante, LA GESTORA.
 MANIFIESTAN
 1) Que {txt_propietario} {txt_titularidad} del inmueble descrito, con {lbl_catastro} {datos_inm.get('referencia_catastral', 'N/A')}.
 2) Que LA GESTORA desarrolla actividad empresarial de gestión inmobiliaria. 
