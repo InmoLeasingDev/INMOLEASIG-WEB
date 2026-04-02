@@ -1632,6 +1632,13 @@ Firma:
                     # MOTOR FPDF DE CÓDIGO AL VUELO
                     def generar_pdf_contrato_legal(texto):
                         pdf = FPDF()
+                        
+                        # 📏 CONFIGURACIÓN DE MÁRGENES LEGALES (en milímetros)
+                        # Izquierda: 30mm | Superior: 25mm | Derecha: 30mm
+                        pdf.set_margins(left=30, top=25, right=30)
+                        # Inferior: 25mm (Auto salto de página)
+                        pdf.set_auto_page_break(auto=True, margin=25)
+                        
                         pdf.add_page()
                         pdf.set_font("Arial", "", 11)
                         for linea in texto.split('\n'):
@@ -1646,8 +1653,7 @@ Firma:
                                 pdf.set_font("Arial", "", 11)
                             else:
                                 pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
-                        return pdf.output(dest='S').encode('latin-1')
-                    # BOTÓN DE DESCARGA PDF 
+                        return pdf.output(dest='S').encode('latin-1')                    # BOTÓN DE DESCARGA PDF 
                     st.download_button(
                         label="🔒 Confirmar Texto y Descargar PDF Definitivo", 
                         data=generar_pdf_contrato_legal(texto_final), 
