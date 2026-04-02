@@ -1516,37 +1516,36 @@ def mostrar_modulo_inmuebles(supabase):
                     trat_p2 = c_trat2.radio(f"Tratamiento para: **{datos_p2['nombre']}**", ["D.", "Dña.", "Sr.", "Sra."], horizontal=True)
                 
                 st.markdown("---")
-                if st.button("✨ Generar Borrador Inteligente"):
-                    # 🧠 Lógica Gramatical Dinámica
-                    if datos_p2:
-                        # 🆔 Inyecta el tratamiento seleccionado para ambos
-                        bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']} y {trat_p2} {datos_p2['nombre']} con DNI {datos_p2['identificacion']}, propietarios del inmueble sito en {datos_inm['nombre']}, en adelante, LOS PROPIETARIOS."
-                        txt_propietario = "LOS PROPIETARIOS"
-                        txt_titularidad = "son titulares plenos"
-                    else:
-                        # 🆔 Inyecta el tratamiento seleccionado para el único propietario
-                        bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']}, propietario del inmueble sito en {datos_inm['nombre']}, en adelante, EL PROPIETARIO."
-                        txt_propietario = "EL PROPIETARIO"
-                        txt_titularidad = "es titular pleno"
-                        
-                    # Cálculos de Fechas
-                    f_firma = pd.to_datetime(d_m['fecha_suscripcion'])
-                    f_vence = pd.to_datetime(d_m['fecha_terminacion'])
-                    f_entrega = pd.to_datetime(d_m['fecha_entrega'])
-                    f_pagos = pd.to_datetime(d_m['fecha_inicio_pagos'])
-                    f_aviso = pd.to_datetime(d_m['fecha_aviso_no_renovacion'])
+                
+                # ⚙️ 1. CÁLCULOS Y PLANTILLA EN VIVO
+                # 🧠 Lógica Gramatical Dinámica
+                if datos_p2:
+                    bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']} y {trat_p2} {datos_p2['nombre']} con DNI {datos_p2['identificacion']}, propietarios del inmueble sito en {datos_inm['nombre']}, en adelante, LOS PROPIETARIOS."
+                    txt_propietario = "LOS PROPIETARIOS"
+                    txt_titularidad = "son titulares plenos"
+                else:
+                    bloque_props = f"De una parte, {trat_p1} {datos_p1['nombre']} con DNI {datos_p1['identificacion']}, propietario del inmueble sito en {datos_inm['nombre']}, en adelante, EL PROPIETARIO."
+                    txt_propietario = "EL PROPIETARIO"
+                    txt_titularidad = "es titular pleno"
                     
-                    anos = (f_vence.year - f_firma.year) if pd.notna(f_vence) and pd.notna(f_firma) else 5
-                    meses_preaviso = (f_vence.year - f_aviso.year) * 12 + (f_vence.month - f_aviso.month) if pd.notna(f_vence) and pd.notna(f_aviso) else 2
-                    meses_carencia = (f_pagos.year - f_entrega.year) * 12 + (f_pagos.month - f_entrega.month) if pd.notna(f_pagos) and pd.notna(f_entrega) else 0
-                    
-                    # 📝 MOTOR DE PLANTILLA (Borrador Editable)
-                    plantilla = f"""CONTRATO DE GESTIÓN INTEGRAL DE ALQUILER POR HABITACIONES CON GARANTÍA DE INGRESOS
+                # Cálculos de Fechas
+                f_firma = pd.to_datetime(d_m['fecha_suscripcion'])
+                f_vence = pd.to_datetime(d_m['fecha_terminacion'])
+                f_entrega = pd.to_datetime(d_m['fecha_entrega'])
+                f_pagos = pd.to_datetime(d_m['fecha_inicio_pagos'])
+                f_aviso = pd.to_datetime(d_m['fecha_aviso_no_renovacion'])
+                
+                anos = (f_vence.year - f_firma.year) if pd.notna(f_vence) and pd.notna(f_firma) else 5
+                meses_preaviso = (f_vence.year - f_aviso.year) * 12 + (f_vence.month - f_aviso.month) if pd.notna(f_vence) and pd.notna(f_aviso) else 2
+                meses_carencia = (f_pagos.year - f_entrega.year) * 12 + (f_pagos.month - f_entrega.month) if pd.notna(f_pagos) and pd.notna(f_entrega) else 0
+                
+                # 📝 MOTOR DE PLANTILLA
+                plantilla = f"""CONTRATO DE GESTIÓN INTEGRAL DE ALQUILER POR HABITACIONES CON GARANTÍA DE INGRESOS
 
 REUNIDOS
 {bloque_props}
 
-Y de otra, {datos_op['nombre']}, con CIF {admin_cif} y domicilio en calle puente colgante 16, Valladolid CP 47007, representada por D./Dña. {admin_nombre}, en su condición de administrador, en adelante, LA GESTORA.
+Y de otra, {datos_op['nombre']}, con CIF {admin_cif} y domicilio en [DIRECCIÓN OPERADOR], representada por D. {admin_nombre}, en su condición de administrador, en adelante, LA GESTORA.
 
 MANIFIESTAN
 1) Que {txt_propietario} {txt_titularidad} del inmueble descrito.
@@ -1594,10 +1593,9 @@ Las partes acuerdan {meses_carencia} meses de carencia contados a partir de la e
 
 DÉCIMA SEGUNDA. Entrega 
 La fecha de entrega a la Gestora será {d_m.get('fecha_entrega', 'N/A')}.
---- SALTO DE PÁGINA ---
+
 DÉCIMA TERCERA. Protección de datos
 Las partes declaran haber sido informadas del tratamiento de sus datos personales conforme al Reglamento (UE) 2016/679 y normativa vigente, remitiéndose al Anexo I - Política de Privacidad.
-
 
 Firmado en {datos_inm['ciudad'].capitalize()}, a {d_m.get('fecha_suscripcion', 'N/A')}
 
@@ -1605,79 +1603,83 @@ Firmado en {datos_inm['ciudad'].capitalize()}, a {d_m.get('fecha_suscripcion', '
 [Firma]
 
 
-
-
 {datos_op['nombre']}
 Representada por: {admin_nombre}
 [Firma]
 
-
-
 --- SALTO DE PÁGINA ---
-ANEXO I - POLÍTICA DE PRIVACIDAD
 
+ANEXO I - POLÍTICA DE PRIVACIDAD
 RESPONSABLE: {datos_op['nombre']}
 CIF: {admin_cif}
-Email: puentevallrooms@gmail.com
+EMAIL: puentevallrooms@gmail.com
 
+Finalidad: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
 
-FINALIDAD: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
+Base jurídica: Ejecución del contrato y obligaciones legales.
 
-BASE JURIDICA: Ejecución del contrato y obligaciones legales.
+Destinatarios: Administraciones públicas, entidades financieras, aseguradoras y proveedores necesarios.
 
-DESTINATARIOS: Administraciones públicas, entidades financieras, aseguradoras y proveedores necesarios.
+Conservación: Durante la relación contractual y plazos legales.
 
-CONSERVACION: Durante la relación contractual y plazos legales.
-
-DERECHOS: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
+Derechos: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
 
 El interesado declara haber sido informado mediante la firma del contrato.
 
-
-{txt_propietario}
 Firma:
 """
-                    st.session_state[f"borrador_{id_m}"] = plantilla
-                    
-                if f"borrador_{id_m}" in st.session_state:
-                    st.success("✅ **Borrador Generado.** Lee, edita o elimina lo que necesites en esta caja antes de descargar.")
-                    
-                    # 📝 EL BORRADOR INTERACTIVO
-                    texto_final = st.text_area("Borrador del Contrato (Edición Libre)", value=st.session_state[f"borrador_{id_m}"], height=600)
-                    
-                    # MOTOR FPDF DE CÓDIGO AL VUELO
-                    def generar_pdf_contrato_legal(texto):
-                        pdf = FPDF()
-                        
-                        # 📏 CONFIGURACIÓN DE MÁRGENES LEGALES (en milímetros)
-                        # Izquierda: 30mm | Superior: 25mm | Derecha: 30mm
-                        pdf.set_margins(left=30, top=25, right=30)
-                        # Inferior: 25mm (Auto salto de página)
-                        pdf.set_auto_page_break(auto=True, margin=25)
-                        
-                        pdf.add_page()
-                        pdf.set_font("Arial", "", 11)
-                        for linea in texto.split('\n'):
-                            # 🚀 MAGIA: Detector de Salto de Página
-                            if "--- SALTO DE PÁGINA ---" in linea:
-                                pdf.add_page()
-                                continue  # Salta a la siguiente línea sin imprimir el texto
-                                
-                            if linea.isupper() and len(linea) > 0 and len(linea) < 90:
-                                pdf.set_font("Arial", "B", 11)
-                                pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
-                                pdf.set_font("Arial", "", 11)
-                            else:
-                                pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
-                        return pdf.output(dest='S').encode('latin-1')                    # BOTÓN DE DESCARGA PDF 
+                # ⚙️ 2. MOTOR FPDF DE CÓDIGO AL VUELO
+                def generar_pdf_contrato_legal(texto):
+                    pdf = FPDF()
+                    pdf.set_margins(left=30, top=25, right=30)
+                    pdf.set_auto_page_break(auto=True, margin=25)
+                    pdf.add_page()
+                    pdf.set_font("Arial", "", 11)
+                    for linea in texto.split('\n'):
+                        if "--- SALTO DE PÁGINA ---" in linea:
+                            pdf.add_page()
+                            continue
+                        if linea.isupper() and len(linea) > 0 and len(linea) < 90:
+                            pdf.set_font("Arial", "B", 11)
+                            pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
+                            pdf.set_font("Arial", "", 11)
+                        else:
+                            pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
+                    return pdf.output(dest='S').encode('latin-1')
+
+                # 🚀 3. BOTONERA BIFURCADA
+                st.write("**4. Acciones de Generación**")
+                c_acc1, c_acc2 = st.columns(2)
+                
+                with c_acc1:
+                    # 🟢 Vía Rápida: Descarga directa
                     st.download_button(
-                        label="🔒 Confirmar Texto y Descargar PDF Definitivo", 
-                        data=generar_pdf_contrato_legal(texto_final), 
+                        label="⚡ Generar Contrato Automático (PDF)", 
+                        data=generar_pdf_contrato_legal(plantilla), 
                         file_name=f"Contrato_{datos_inm['nombre'].replace(' ','_')}.pdf", 
                         mime="application/pdf",
                         use_container_width=True
                     )
-            
+                    
+                with c_acc2:
+                    # 🟡 Vía Lenta: Borrador Editable
+                    if st.button("📝 Revisar/Editar Borrador (Opcional)", use_container_width=True):
+                        st.session_state[f"borrador_{id_m}"] = plantilla
+                        st.rerun()
+
+                # 📝 EL BORRADOR INTERACTIVO (Solo se muestra si hacen clic en Revisar)
+                if f"borrador_{id_m}" in st.session_state:
+                    st.success("✅ **Borrador Abierto.** Edita el texto libremente antes de descargar el PDF definitivo.")
+                    texto_final = st.text_area("Borrador del Contrato", value=st.session_state[f"borrador_{id_m}"], height=600)
+                    
+                    st.download_button(
+                        label="🔒 Confirmar Cambios y Descargar PDF", 
+                        data=generar_pdf_contrato_legal(texto_final), 
+                        file_name=f"Contrato_{datos_inm['nombre'].replace(' ','_')}_Editado.pdf", 
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key="btn_descarga_editado"
+                    )            
             st.markdown("---")
             if st.button("❌ Cerrar Panel"): 
                 st.session_state.modo_mandato = "NADA"
