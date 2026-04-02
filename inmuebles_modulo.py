@@ -795,7 +795,7 @@ def mostrar_modulo_inmuebles(supabase):
         # --- PANEL: DOCUMENTOS (CROQUIS/PLANOS) ---
         elif st.session_state.modo_propiedad == "DOCUMENTOS" and not df_inm.empty:
             st.markdown("---")
-            st.markdown("### 📁 Bóveda de Documentos (Planos y Croquis)")
+            st.markdown("## Bóveda de Documentos (Planos y Croquis)")
             prop_sel = st.selectbox("Selecciona la propiedad:", df_display['NOMBRE'].tolist(), key="sel_doc_prop")
             if prop_sel:
                 datos_p = df_inm[df_inm['nombre'] == prop_sel].iloc[0]
