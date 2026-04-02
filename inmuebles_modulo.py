@@ -1614,8 +1614,7 @@ La fecha de entrega a la Gestora será {d_m.get('fecha_entrega', 'N/A')}.
 DÉCIMA TERCERA. Protección de datos
 Las partes declaran haber sido informadas del tratamiento de sus datos personales conforme al Reglamento (UE) 2016/679 y normativa vigente, remitiéndose al Anexo I - Política de Privacidad.
 
-Firmado en {datos_inm['ciudad'].capitalize()}, a {d_m.get('fecha_suscripcion', 'N/A')}
-
+Firmado en {datos_inm['ciudad'].capitalize()}, a {fecha_firma_formateada}.
 {txt_propietario}
 
 
