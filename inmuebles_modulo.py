@@ -1487,10 +1487,9 @@ def mostrar_modulo_inmuebles(supabase):
                     res_p2 = supabase.table("propietarios").select("nombre, identificacion").eq("id", d_m['id_propietario_2']).execute()
                     datos_p2 = res_p2.data[0] if res_p2.data else None
                     
-                # Extracción de la DB incluyendo la dirección
-                res_op = supabase.table("operadores").select("nombre, identificacion, direccion").eq("id", d_m['id_operador']).execute()
-                datos_op = res_op.data[0] if res_op.data else {"nombre": "N/A", "identificacion": "N/A", "direccion": "DIRECCIÓN NO REGISTRADA"}
-                
+                # Extracción de la DB incluyendo la dirección y el correo
+                res_op = supabase.table("operadores").select("nombre, identificacion, direccion, correo").eq("id", d_m['id_operador']).execute()
+                datos_op = res_op.data[0] if res_op.data else {"nombre": "N/A", "identificacion": "N/A", "direccion": "DIRECCIÓN NO REGISTRADA", "correo": "CORREO NO REGISTRADO"}
                 # Interfaz "Listbox" Inteligente para Representantes
                 st.write("**2. Firma de la Gestora**")
                 c_rep1, c_rep2 = st.columns(2)
@@ -1623,9 +1622,11 @@ Representada por: {admin_nombre}
 --- SALTO DE PÁGINA ---
 
 ANEXO I - POLÍTICA DE PRIVACIDAD
+
+
 RESPONSABLE: {datos_op['nombre']}
 CIF: {datos_op['identificacion']}
-EMAIL: puentevallrooms@gmail.com
+EMAIL: {datos_op.get('correo', 'CORREO NO REGISTRADO')}
 
 FINALIDAD: Gestión contractual, administrativa, cobros, pagos, incidencias y cumplimiento legal.
 
