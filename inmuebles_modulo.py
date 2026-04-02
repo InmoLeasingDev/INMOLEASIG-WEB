@@ -1505,14 +1505,19 @@ def mostrar_modulo_inmuebles(supabase):
                 
                 st.markdown("---")
                 if st.button("✨ Generar Borrador Inteligente"):
-                    # 🧠 Lógica Gramatical Dinámica
+                # 🧠 Lógica Gramatical Dinámica
                     if datos_p2:
-                        bloque_props = f"De una parte, D./Dña. {datos_p1['nombre']} con DNI/NIE {datos_p1['identificacion']} y D./Dña. {datos_p2['nombre']} con DNI/NIE {datos_p2['identificacion']}, propietarios del inmueble sito en {datos_inm['nombre']}, en adelante, LOS PROPIETARIOS."
+                        # 🆔 Cambio: DNI/NIE -> DNI
+                        bloque_props = f"De una parte, D./Dña. {datos_p1['nombre']} con DNI {datos_p1['identificacion']} y D./Dña. {datos_p2['nombre']} con DNI {datos_p2['identificacion']}, propietarios del inmueble sito en {datos_inm['nombre']}, en adelante, LOS PROPIETARIOS."
                         txt_propietario = "LOS PROPIETARIOS"
+                        txt_titularidad = "son titulares plenos"
                     else:
-                        bloque_props = f"De una parte, D./Dña. {datos_p1['nombre']} con DNI/NIE {datos_p1['identificacion']}, propietario del inmueble sito en {datos_inm['nombre']}, en adelante, EL PROPIETARIO."
+                        # 🆔 Cambio: DNI/NIE -> DNI
+                        bloque_props = f"De una parte, D./Dña. {datos_p1['nombre']} con DNI {datos_p1['identificacion']}, propietario del inmueble sito en {datos_inm['nombre']}, en adelante, EL PROPIETARIO."
                         txt_propietario = "EL PROPIETARIO"
-                        
+                        txt_titularidad = "es titular pleno"        
+                    # Cálculos de Fechas
+                    f_firma = pd.to_datetime(d_m['fecha_suscripcion'])                        
                     # Cálculos de Fechas
                     f_firma = pd.to_datetime(d_m['fecha_suscripcion'])
                     f_vence = pd.to_datetime(d_m['fecha_terminacion'])
@@ -1533,7 +1538,7 @@ REUNIDOS
 Y de otra, {datos_op['nombre']}, con CIF {admin_cif} y domicilio en calle puente colgante 16, Valladolid CP 47007, representada por D./Dña. {admin_nombre}, en su condición de administrador, en adelante, LA GESTORA.
 
 MANIFIESTAN
-1) Que {txt_propietario} es titular pleno del inmueble descrito.
+1) Que {txt_propietario} {txt_titularidad} del inmueble descrito.
 2) Que LA GESTORA desarrolla actividad empresarial de gestión inmobiliaria. 
 3) Que ambas partes desean formalizar contrato de gestión integral con garantía de ingresos.
 
