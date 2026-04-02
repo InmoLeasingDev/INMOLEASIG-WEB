@@ -1602,12 +1602,13 @@ Las partes declaran haber sido informadas del tratamiento de sus datos personale
 Firmado en {datos_inm['ciudad'].capitalize()}, a {d_m.get('fecha_suscripcion', 'N/A')}
 
 {txt_propietario}
-[Firma]
+
+
 
 
 {datos_op['nombre']}
 Representada por: {admin_nombre}
-[Firma]
+
 
 --- SALTO DE PÁGINA ---
 
@@ -1627,6 +1628,7 @@ CONSERVACION: Durante la relación contractual y plazos legales.
 DERECHOS: Acceso, rectificación, supresión, oposición, limitación y portabilidad.
 
 El interesado declara haber sido informado mediante la firma del contrato.
+
 
 
 
