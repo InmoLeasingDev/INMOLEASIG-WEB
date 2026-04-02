@@ -1557,6 +1557,37 @@ def mostrar_modulo_inmuebles(supabase):
                     fecha_firma_formateada = f"{f_firma.day} de {meses_es[f_firma.month - 1]} de {f_firma.year}"
                 except:
                     fecha_firma_formateada = str(d_m.get('fecha_suscripcion', 'N/A'))                
+                
+                # 🔢 Formateador Legal de Números a Letras (Cero decimales)
+                def num_a_letras(n):
+                    n = int(n)
+                    if n == 0: return "cero"
+                    un = ["", "un", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve"]
+                    dec = ["", "diez", "veinte", "treinta", "cuarenta", "cincuenta", "sesenta", "setenta", "ochenta", "noventa"]
+                    esp = {10: "diez", 11: "once", 12: "doce", 13: "trece", 14: "catorce", 15: "quince", 16: "dieciséis", 17: "diecisiete", 18: "dieciocho", 19: "diecinueve", 20: "veinte", 21: "veintiún", 22: "veintidós", 23: "veintitrés", 24: "veinticuatro", 25: "veinticinco", 26: "veintiséis", 27: "veintisiete", 28: "veintiocho", 29: "veintinueve"}
+                    cen = ["", "ciento", "doscientos", "trescientos", "cuatrocientos", "quinientos", "seiscientos", "setecientos", "ochocientos", "novecientos"]
+                    def conv(num):
+                        if num == 100: return "cien"
+                        if num in esp: return esp[num]
+                        c, d, u = num // 100, (num % 100) // 10, num % 10
+                        r = cen[c]
+                        if d > 2: r += (" " if r else "") + dec[d] + (" y " + un[u] if u > 0 else "")
+                        elif d == 0 and u > 0: r += (" " if r else "") + un[u]
+                        return r.strip()
+                    m, resto = n // 1000, n % 1000
+                    res = "mil" if m == 1 else (conv(m) + " mil" if m > 1 else "")
+                    return (res + (" " if res else "") + conv(resto)).strip()
+
+                val_renta = int(float(d_m.get('ingreso_garantizado', 0) or 0))
+                val_fianza = int(float(d_m.get('valor_fianza', 0) or 0))
+                val_indem = int(float(d_m.get('indemnizacion_anticipada', 0) or 0))
+                
+                moneda_legal = "EUROS" if moneda_sesion == "EUR" else "PESOS"
+                
+                txt_renta = f"{num_a_letras(val_renta)} ({val_renta}) {moneda_legal}"
+                txt_fianza = f"{num_a_letras(val_fianza)} ({val_fianza}) {moneda_legal}"
+                txt_indem = f"{num_a_letras(val_indem)} ({val_indem}) {moneda_legal}"
+                
                 # 📝 MOTOR DE PLANTILLA
                 plantilla = f"""CONTRATO DE GESTIÓN INTEGRAL DE ALQUILER POR HABITACIONES CON GARANTÍA DE INGRESOS
 
