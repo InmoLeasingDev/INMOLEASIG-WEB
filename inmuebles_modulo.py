@@ -143,11 +143,11 @@ def generar_pdf_unidades(df, titulo_empresa="INMOLEASING"):
 # ==========================================
 # 3. MOTOR PDF MANDATOS / CONTRATOS
 # ==========================================
-def generar_pdf_mandatos(df):
+def generar_pdf_mandatos(df, titulo_empresa="INMOLEASING"):
     pdf = FPDF(orientation="L")
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "INMOLEASING - DIRECTORIO DE MANDATOS Y CONTRATOS", ln=True, align="C")
+    pdf.cell(0, 10, f"{titulo_empresa} - DIRECTORIO DE MANDATOS Y CONTRATOS", ln=True, align="C")
     pdf.ln(5)
 
     pdf.set_font("Arial", "B", 9)
@@ -186,7 +186,7 @@ def generar_pdf_mandatos(df):
 # ==========================================
 # 4. MOTOR PDF FICHA DETALLADA DE MANDATO
 # ==========================================
-def generar_pdf_ficha_mandato(df):
+def generar_pdf_ficha_mandato(df, titulo_empresa="INMOLEASING"):
     # 💡 EL TRUCO: Extraemos la única fila del DataFrame y la volvemos diccionario
     datos = df.iloc[0].to_dict()
     
@@ -194,7 +194,7 @@ def generar_pdf_ficha_mandato(df):
     pdf.add_page()
     pdf.set_font("Arial", "B", 15)
 
-    pdf.cell(0, 10, "INMOLEASING - FICHA TECNICA DE CONTRATO", ln=True, align="C")
+    pdf.cell(0, 10, f"{titulo_empresa} - FICHA TECNICA DE CONTRATO", ln=True, align="C")
     pdf.ln(5)
 
     def limpiar(texto):
@@ -267,11 +267,11 @@ def generar_pdf_ficha_mandato(df):
 # ==========================================
 # 5. MOTOR PDF HISTORIAL DE MANDATO
 # ==========================================
-def generar_pdf_historial_mandato(df):
+def generar_pdf_historial_mandato(df, titulo_empresa="INMOLEASING"):
     pdf = FPDF(orientation="L")
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "INMOLEASING - HISTORIAL DE AUDITORIA DEL CONTRATO", ln=True, align="C")
+    pdf.cell(0, 10, f"{titulo_empresa} - HISTORIAL DE AUDITORIA DEL CONTRATO", ln=True, align="C")
     pdf.ln(5)
 
     pdf.set_font("Arial", "B", 9)
@@ -652,7 +652,7 @@ def mostrar_modulo_inmuebles(supabase):
                 st.session_state.modo_propiedad = "GALERIA"
                 st.rerun()
                 
-            if t_c4.button("📁 Docs", key="btn_doc_prop", use_container_width=True):
+            if t_c4.button("📁 Plano", key="btn_doc_prop", use_container_width=True):
                 st.session_state.modo_propiedad = "DOCUMENTOS"
                 st.rerun()
                 
@@ -1561,7 +1561,6 @@ def mostrar_modulo_inmuebles(supabase):
                     time.sleep(1.5)
                     st.rerun()
 
-
         elif st.session_state.modo_mandato == "REPORTES" and not df_man.empty:
             st.markdown("---")
             st.markdown("## Centro de Reportes de Mandatos")
@@ -1570,12 +1569,22 @@ def mostrar_modulo_inmuebles(supabase):
             var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
             usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
 
+            # 🛡️ Lógica para Operadores y Título del PDF
+            try: 
+                res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
+                df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
+            except: 
+                df_ops = pd.DataFrame()
+                
+            titulo_encabezado = "INMOLEASING"
+            if not df_ops.empty and len(df_ops) == 1:
+                titulo_encabezado = str(df_ops.iloc[0]['nombre']).upper()
+
             if tipo_rep == "Directorio Global (Todos los Contratos)":
-                try: res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
-                except: df_ops = pd.DataFrame()
                 df_rep = df_view_display.copy()
                 if 'DOCS' in df_rep.columns: df_rep = df_rep.drop(columns=['DOCS'])
-                panel_reportes_y_compartir(df_rep, "directorio_mandatos", "Mandatos", generar_pdf_mandatos, df_ops, supabase, usuario_actual, "modo_mandato")
+                panel_reportes_y_compartir(df_rep, "directorio_mandatos", "Mandatos", lambda df: generar_pdf_mandatos(df, titulo_encabezado), df_ops, supabase, usuario_actual, "modo_mandato")
+            
             elif tipo_rep == "Ficha Detallada (Un Contrato)":
                 op_man_rep = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
                 m_sel_rep = st.selectbox("Selecciona el Mandato a exportar:", op_man_rep)
@@ -1585,9 +1594,8 @@ def mostrar_modulo_inmuebles(supabase):
                     datos_ficha = {
                         'inmueble': d_v['INMUEBLE'], 'propietario_1': d_v['TITULAR'], 'porc_prop_1': d_m.get('porcentaje_propiedad', 0), 'porc_pago_1': d_m.get('porcentaje_pago_1', 0), 'iban_1': d_m.get('cuenta_pago', ''), 'porc_prop_2': d_m.get('porcentaje_propiedad_2', 0), 'porc_pago_2': d_m.get('porcentaje_pago_2', 0), 'iban_2': d_m.get('cuenta_pago_2', ''), 'f_suscripcion': d_m.get('fecha_suscripcion', ''), 'f_entrega': d_m.get('fecha_entrega', ''), 'f_pagos': d_m.get('fecha_inicio_pagos', ''), 'f_vence': d_m.get('fecha_terminacion', ''), 'f_aviso': d_m.get('fecha_aviso_no_renovacion', ''), 'renta': d_m.get('ingreso_garantizado', 0), 'actualizacion': d_m.get('tipo_actualizacion', ''), 'fianza': d_m.get('valor_fianza', 0), 'tipo_ind': d_m.get('tipo_indemnizacion', ''), 'monto_ind': d_m.get('indemnizacion_anticipada', 0), 'estado_fin': d_m.get('estado_financiero', ''), 'url_c': d_m.get('url_contrato', ''), 'url_e': d_m.get('url_empadronamiento', ''), 'url_i': d_m.get('url_inventario', ''), 'url_s': d_m.get('url_suministros', '')
                     }
-                    try: res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
-                    except: df_ops = pd.DataFrame()
-                    panel_reportes_y_compartir(pd.DataFrame([datos_ficha]), f"Ficha_Mandato", "Ficha de Mandato", generar_pdf_ficha_mandato, df_ops, supabase, usuario_actual, "modo_mandato")
+                    panel_reportes_y_compartir(pd.DataFrame([datos_ficha]), f"Ficha_Mandato", "Ficha de Mandato", lambda df: generar_pdf_ficha_mandato(df, titulo_encabezado), df_ops, supabase, usuario_actual, "modo_mandato")
+            
             elif tipo_rep == "Historial de Auditoría (Un Contrato)":
                 op_man_aud = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
                 m_sel_aud = st.selectbox("Selecciona el Mandato para auditar:", op_man_aud)
@@ -1600,9 +1608,7 @@ def mostrar_modulo_inmuebles(supabase):
                         df_h['FECHA'] = pd.to_datetime(df_h['fecha_evento']).dt.strftime('%d/%m/%Y %H:%M')
                         df_h_rep = df_h[['FECHA', 'accion', 'usuario']].copy()
                         df_h_rep.rename(columns={'accion': 'ACCION REGISTRADA', 'usuario': 'USUARIO'}, inplace=True)
-                        try: res_ops = supabase.table("operadores").select("nombre, correo, telefono, estado").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute(); df_ops = pd.DataFrame(res_ops.data) if res_ops.data else pd.DataFrame()
-                        except: df_ops = pd.DataFrame()
-                        panel_reportes_y_compartir(df_h_rep, f"Auditoria_Mandato", "Historial Mandato", generar_pdf_historial_mandato, df_ops, supabase, usuario_actual, "modo_mandato")
+                        panel_reportes_y_compartir(df_h_rep, f"Auditoria_Mandato", "Historial Mandato", lambda df: generar_pdf_historial_mandato(df, titulo_encabezado), df_ops, supabase, usuario_actual, "modo_mandato")
                     else: st.info("ℹ️ No hay registros.")
             st.markdown("---")
             if st.button("❌ Cerrar Panel"): st.session_state.modo_mandato = "NADA"; st.rerun()
