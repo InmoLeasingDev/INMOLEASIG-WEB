@@ -1722,7 +1722,6 @@ Por {txt_propietario}:
 {txt_firmas_propietarios}
 
 
-
 Por LA GESTORA:
 
 
