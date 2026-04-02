@@ -1690,6 +1690,8 @@ Por {txt_propietario}:
 
 Por LA GESTORA:
 
+
+
 {datos_op['nombre']}
 Representada por: {admin_nombre}
 
@@ -1725,6 +1727,8 @@ Por {txt_propietario}:
 
 
 Por LA GESTORA:
+
+
 
 {datos_op['nombre']}
 Representada por: {admin_nombre}
