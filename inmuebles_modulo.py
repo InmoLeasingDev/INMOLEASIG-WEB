@@ -1638,7 +1638,7 @@ En caso de que {txt_propietario} decida vender el inmueble antes del vencimiento
 
 DÉCIMA PRIMERA. Carencia
 Las partes acuerdan {meses_carencia} meses de carencia contados a partir de la entrega del inmueble a la Gestora.
-
+--- SALTO DE PÁGINA ---
 DÉCIMA SEGUNDA. Entrega 
 La fecha de entrega a la Gestora será {d_m.get('fecha_entrega', 'N/A')}.
 
