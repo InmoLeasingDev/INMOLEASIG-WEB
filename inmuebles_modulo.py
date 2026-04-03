@@ -1429,7 +1429,6 @@ def mostrar_modulo_inmuebles(supabase):
 
                                     # ⚠️ NOTA: La causación de la Renta Garantizada se trasladó al Motor Mensual de Arrendamientos.
 
-
                                     # 🚀 3. MOTOR AUTOMÁTICO: Auditoría Estricta del Evento
                                     periodo_actual = pd.Timestamp.now().strftime("%Y-%m")
                                     supabase.table("sys_motor_automatico_logs").insert({
