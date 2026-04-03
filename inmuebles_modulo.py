@@ -1641,7 +1641,6 @@ def mostrar_modulo_inmuebles(supabase):
                     fecha_firma_formateada = f"{f_firma.day} de {meses_es[f_firma.month - 1]} de {f_firma.year}"
                 except:
                     fecha_firma_formateada = str(d_m.get('fecha_suscripcion', 'N/A'))                
-                
 
                 try:
                     fecha_entrega_formateada = f"{f_entrega.day} de {meses_es[f_entrega.month - 1]} de {f_entrega.year}"
