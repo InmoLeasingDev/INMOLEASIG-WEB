@@ -1318,7 +1318,7 @@ def mostrar_modulo_inmuebles(supabase):
                     m_fianza = e2.number_input(f"Fianza a Entregar ({simbolo_mon}) *", min_value=0.0, step=50.0)
                     m_act = e3.selectbox("Actualización Anual", ["IPC", "FIJO", "NO APLICA"])
 
-                    st.info("🛡️ Cláusula de protección (Amortización de Mejoras)")
+                    #st.info("🛡️ Cláusula de protección (Amortización de Mejoras)")
                     c_ind1, c_ind2 = st.columns([2, 1])
                     m_tipo_ind_ui = c_ind1.selectbox("Modalidad de Penalización", ["NO APLICA", "MONTO FIJO (Cualquier momento)", "AMORTIZACIÓN DECRECIENTE (5 Años)"])
                     mapa_ind = {"NO APLICA": "NINGUNA", "MONTO FIJO (Cualquier momento)": "FIJA", "AMORTIZACIÓN DECRECIENTE (5 Años)": "DECRECIENTE_5Y"}
