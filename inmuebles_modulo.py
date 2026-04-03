@@ -1394,19 +1394,28 @@ def mostrar_modulo_inmuebles(supabase):
                                             df_ctas['cod_str'] = df_ctas['codigo'].astype(str)
                                             df_ctas['nom_low'] = df_ctas['nombre'].astype(str).str.lower()
                                             
-                                            # Buscamos Activo: Fianzas Constituidas (26 o 15/11)
-                                            fianzas = df_ctas[df_ctas['cod_str'].str.startswith(('26', '15', '11')) | df_ctas['nom_low'].str.contains('fianza|deposito', regex=True)]
-                                            if not fianzas.empty: id_cta_fianza = int(fianzas.iloc[0]['id'])
+                                        # 🎯 Buscamos Activo: Fianzas Constituidas (Con estricto orden de prioridad)
+                                            for pref in ['260', '26', '15', '11']:
+                                                fianzas = df_ctas[df_ctas['cod_str'].str.startswith(pref)]
+                                                if not fianzas.empty: 
+                                                    id_cta_fianza = int(fianzas.iloc[0]['id'])
+                                                    break
+                                            if not id_cta_fianza: # Fallback de emergencia por nombre
+                                                fianzas = df_ctas[df_ctas['nom_low'].str.contains('fianza|deposito', regex=True)]
+                                                if not fianzas.empty: id_cta_fianza = int(fianzas.iloc[0]['id'])
                                             
-                                            # 🎯 LA MAGIA DEL TERCERO: Buscamos Pasivo Acreedores (410)
-                                            # Intento 1: Cuenta 410 específica del tercero (Ej: 410001 JOSE PEREZ GARCIA)
+                                            # 🎯 LA MAGIA DEL TERCERO: Pasivo Acreedores (Con estricto orden de prioridad)
+                                            # Intento 1: Cuenta 410 específica del tercero
                                             cta_tercero = df_ctas[(df_ctas['cod_str'].str.startswith('410')) & (df_ctas['nom_low'].str.contains(str(m_prop_sel_1).lower(), na=False, regex=False))]
                                             if not cta_tercero.empty:
                                                 id_cta_pasivo = int(cta_tercero.iloc[0]['id'])
                                             else:
-                                                # Intento 2: Cuenta genérica 410, 41 o 22 (Evitando impuestos)
-                                                pasivos = df_ctas[(df_ctas['cod_str'].str.startswith(('410', '41', '22'))) & (~df_ctas['nom_low'].str.contains('impuesto|retenci', regex=True))]
-                                                if not pasivos.empty: id_cta_pasivo = int(pasivos.iloc[0]['id'])
+                                                # Intento 2: Cuentas genéricas en ESTRICO ORDEN (Obligando a agarrar la 410000 primero)
+                                                for pref in ['410', '22', '41']:
+                                                    pasivos = df_ctas[(df_ctas['cod_str'].str.startswith(pref)) & (~df_ctas['nom_low'].str.contains('impuesto|retenci', regex=True))]
+                                                    if not pasivos.empty:
+                                                        id_cta_pasivo = int(pasivos.iloc[0]['id'])
+                                                        break
                                     except Exception as e:
                                         pass
 
@@ -1530,7 +1539,7 @@ def mostrar_modulo_inmuebles(supabase):
                 # Extracción de la DB incluyendo la dirección y el correo
                 res_op = supabase.table("operadores").select("nombre, identificacion, direccion, correo").eq("id", d_m['id_operador']).execute()
                 datos_op = res_op.data[0] if res_op.data else {"nombre": "N/A", "identificacion": "N/A", "direccion": "DIRECCIÓN NO REGISTRADA", "correo": "CORREO NO REGISTRADO"}
-# 🌍 Lógica de Tratamiento y Documentos por Región
+                # 🌍 Lógica de Tratamiento y Documentos por Región
                 if moneda_sesion == "EUR":
                     opc_trat_op = ["D.", "Dña."]
                     opc_doc_op = ["DNI", "NIE"]
