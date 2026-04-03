@@ -1260,13 +1260,18 @@ def mostrar_modulo_inmuebles(supabase):
                     m_inm_sel = col_inm.selectbox("Propiedad a gestionar *", df_inm_m['nombre'].tolist())
                     id_inm = df_inm_m[df_inm_m['nombre'] == m_inm_sel].iloc[0]['id']
                     
-                    # 💡 SOLUCIÓN: El operador ahora se selecciona directamente para el mandato, no a través de una unidad
+                    # 💡 SOLUCIÓN: El operador ahora se selecciona directamente para el mandato, auto-asignando si solo hay uno
                     try:
                         res_ops_man = supabase.table("operadores").select("id, nombre").eq("estado", "ACTIVO").eq("moneda", moneda_sesion).execute()
                         df_ops_man = pd.DataFrame(res_ops_man.data) if res_ops_man.data else pd.DataFrame()
-                        if not df_ops_man.empty:
+                        
+                        if len(df_ops_man) == 1:
+                            nom_op = df_ops_man.iloc[0]['nombre']
+                            id_op_heredado = int(df_ops_man.iloc[0]['id'])
+                            col_op.info(f"🏢 **Operador:** {nom_op} (Auto-asignado)")
+                        elif len(df_ops_man) > 1:
                             m_op_sel = col_op.selectbox("Operador que facturará *", df_ops_man['nombre'].tolist())
-                            id_op_heredado = df_ops_man[df_ops_man['nombre'] == m_op_sel].iloc[0]['id']
+                            id_op_heredado = int(df_ops_man[df_ops_man['nombre'] == m_op_sel].iloc[0]['id'])
                             nom_op = m_op_sel
                         else:
                             col_op.warning("No hay operadores activos en esta región.")
@@ -1275,7 +1280,6 @@ def mostrar_modulo_inmuebles(supabase):
                     except:
                         id_op_heredado = None
                         nom_op = "No definido"
-                    
                     st.write("**Titular 1 (Principal)**")
                     c1, c2, c3, c4 = st.columns([3, 1.2, 1.2, 4.6])
                     m_prop_sel_1 = c1.selectbox("Propietario 1 *", df_prop_m['nombre'].tolist(), key="p1")
