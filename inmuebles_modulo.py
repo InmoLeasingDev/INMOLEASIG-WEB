@@ -1268,7 +1268,7 @@ def mostrar_modulo_inmuebles(supabase):
                         if len(df_ops_man) == 1:
                             nom_op = df_ops_man.iloc[0]['nombre']
                             id_op_heredado = int(df_ops_man.iloc[0]['id'])
-                            col_op.info(f"🏢 **Operador:** {nom_op} (Auto-asignado)")
+                            #col_op.info(f"🏢 **Operador:** {nom_op} (Auto-asignado)")
                         elif len(df_ops_man) > 1:
                             m_op_sel = col_op.selectbox("Operador que facturará *", df_ops_man['nombre'].tolist())
                             id_op_heredado = int(df_ops_man[df_ops_man['nombre'] == m_op_sel].iloc[0]['id'])
