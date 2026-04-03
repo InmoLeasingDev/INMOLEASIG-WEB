@@ -608,8 +608,7 @@ def mostrar_modulo_inmuebles(supabase):
         st.write("") # Pequeño respiro visual
         
         if not df_inm.empty:
-            df_inm = df_inm.sort_values(by=['moneda', 'nombre'], ascending=[True, True])
-            
+            df_inm = df_inm.sort_values(by=['nombre'], ascending=[True])    
             # 1. Lógica para el Icono de Fotos en Propiedades
             def indicador_fotos_inm(fotos_array):
                 if isinstance(fotos_array, list) and len(fotos_array) > 0:
