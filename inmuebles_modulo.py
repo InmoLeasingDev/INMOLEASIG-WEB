@@ -1382,8 +1382,7 @@ def mostrar_modulo_inmuebles(supabase):
                                             "importe_inicial": m_fianza, "saldo_pendiente": m_fianza,
                                             "moneda": moneda_sesion, "estado": "REGISTRADA"
                                         }).execute()
-
-                                    # 🚀 2. MOTOR AUTOMÁTICO: Generar Cuenta por Pagar (CxP de la primera Renta)
+                                    # 🚀 2. MOTOR AUTOMÁTICO: Generar Cuenta por Pagar (CxP Operativa)
                                     if m_renta > 0:
                                         supabase.table("fin_cuentas_pagar").insert({
                                             "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo,
@@ -1392,14 +1391,43 @@ def mostrar_modulo_inmuebles(supabase):
                                             "moneda": moneda_sesion, "estado": "PENDIENTE"
                                         }).execute()
 
+                                        # 🚀 2.1 CASCADA CONTABLE: Asiento de Partida Doble (Gasto vs Pasivo/CxP)
+                                        try:
+                                            res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
+                                            df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
+                                            id_cta_gasto, id_cta_cxp = None, None
+                                            
+                                            if not df_ctas.empty:
+                                                cta_gas = df_ctas[df_ctas['codigo'].str.startswith('51', na=False) | df_ctas['codigo'].str.startswith('52', na=False)]
+                                                if not cta_gas.empty: id_cta_gasto = cta_gas.iloc[0]['id']
+                                                
+                                                cta_cxp = df_ctas[df_ctas['codigo'].str.startswith('22', na=False) | df_ctas['codigo'].str.startswith('23', na=False)]
+                                                if not cta_cxp.empty: id_cta_cxp = cta_cxp.iloc[0]['id']
+                                            
+                                            desc_asiento = f"PROVISIÓN RENTA GARANTIZADA - MANDATO {id_mandato_nuevo}"
+                                            res_ast = supabase.table("fin_asientos").insert({
+                                                "fecha_contable": str(f_inicio_pagos), "descripcion": desc_asiento,
+                                                "concepto_general": "Causación de Renta Garantizada", "origen": "MODULO_MANDATOS",
+                                                "moneda": moneda_sesion, "estado": "CONTABILIZADO"
+                                            }).execute()
+                                            
+                                            if id_cta_gasto and id_cta_cxp:
+                                                id_ast = res_ast.data[0]['id']
+                                                supabase.table("fin_apuntes").insert([
+                                                    {"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_gasto), "debito": float(m_renta), "credito": 0.0, "descripcion_linea": "Gasto por Renta Garantizada"},
+                                                    {"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_cxp), "debito": 0.0, "credito": float(m_renta), "descripcion_linea": "CxP a Propietario"}
+                                                ]).execute()
+                                        except Exception as e:
+                                            pass
+
                                     # 🚀 3. MOTOR AUTOMÁTICO: Auditoría Estricta del Evento
                                     periodo_actual = pd.Timestamp.now().strftime("%Y-%m")
                                     supabase.table("sys_motor_automatico_logs").insert({
                                         "evento": "contrato_activado", "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo,
                                         "regla_evaluada": "SI mandato_activo -> generar_cxp_y_fianza",
-                                        "accion_ejecutada": "generar_cxp, registrar_fianza",
+                                        "accion_ejecutada": "generar_cxp, generar_asiento, registrar_fianza",
                                         "periodo": periodo_actual, "resultado": "EXITO",
-                                        "detalles": f"CxP: {m_renta} | Fianza: {m_fianza}"
+                                        "detalles": f"CxP y Asiento: {m_renta} | Fianza: {m_fianza}"
                                     }).execute()
 
                                     # Log Tradicional Historial de Inmuebles
@@ -1411,8 +1439,11 @@ def mostrar_modulo_inmuebles(supabase):
                                         "accion": f"CREACIÓN MANDATO (Firma: {f_suscripcion}). Operador: {nom_op}",
                                         "usuario": usuario_actual
                                     }).execute()
+                                    
+                                    # 🚀 4. EL LOG GLOBAL QUE FALTABA (Dashboard de Actividad Principal)
+                                    log_accion(supabase, usuario_actual, "CREAR MANDATO", f"Propiedad: {m_inm_sel} | Propietario: {m_prop_sel_1}")
 
-                                    st.success("✅ Mandato registrado. Motor automático: CxP y Fianza generadas.")
+                                    st.success("✅ Mandato registrado. Motor automático: CxP, Asiento Contable y Fianza generadas.")
                                     st.session_state.modo_mandato = "NADA"; time.sleep(2.5); st.rerun()
                                 except Exception as e: st.error(f"❌ Error al orquestar: {e}")
 
