@@ -608,7 +608,9 @@ def mostrar_modulo_inmuebles(supabase):
         st.write("") # Pequeño respiro visual
         
         if not df_inm.empty:
-            df_inm = df_inm.sort_values(by=['nombre'], ascending=[True])    
+            df_inm = df_inm.sort_values(by=['moneda', 'nombre'], ascending=[True, True])
+        #if not df_inm.empty:
+        #    df_inm = df_inm.sort_values(by=['nombre'], ascending=[True])    
             # 1. Lógica para el Icono de Fotos en Propiedades
             def indicador_fotos_inm(fotos_array):
                 if isinstance(fotos_array, list) and len(fotos_array) > 0:
@@ -1640,10 +1642,23 @@ def mostrar_modulo_inmuebles(supabase):
                 except:
                     fecha_firma_formateada = str(d_m.get('fecha_suscripcion', 'N/A'))                
                 
+
                 try:
                     fecha_entrega_formateada = f"{f_entrega.day} de {meses_es[f_entrega.month - 1]} de {f_entrega.year}"
                 except:
                     fecha_entrega_formateada = str(d_m.get('fecha_entrega', 'N/A'))
+
+                # 🗓️ Formateador para las nuevas fechas de Carencia
+                try:
+                    fecha_inicio_pagos_formateada = f"{f_pagos.day} de {meses_es[f_pagos.month - 1]} de {f_pagos.year}"
+                except:
+                    fecha_inicio_pagos_formateada = str(d_m.get('fecha_inicio_pagos', 'N/A'))
+
+                try:
+                    f_fin_carencia = pd.to_datetime(d_m.get('fecha_fin_carencia'))
+                    fecha_fin_carencia_formateada = f"{f_fin_carencia.day} de {meses_es[f_fin_carencia.month - 1]} de {f_fin_carencia.year}"
+                except:
+                    fecha_fin_carencia_formateada = str(d_m.get('fecha_fin_carencia', 'N/A'))
 
                 # 🔢 Formateador Legal de Números a Letras (Cero decimales)
                 def num_a_letras(n):
