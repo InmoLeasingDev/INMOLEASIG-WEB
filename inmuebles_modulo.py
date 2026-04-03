@@ -1299,15 +1299,17 @@ def mostrar_modulo_inmuebles(supabase):
 
                     st.write("**2. Cronograma (Smart Dates)**")
                     d1, d2, d3 = st.columns(3)
-                    f_suscripcion = d1.date_input("Fecha de Suscripción / Firma *")
+
+                    f_suscripcion = d1.date_input("Fecha de Suscripción / Firma *", key="man_f_susc")
                     duracion_anos = d2.number_input("Duración Contrato (Años)", 1, 20, 5)
                     meses_aviso = d3.number_input("Meses Preaviso No Renovación", 1, 12, 2)
 
                     d4, d5, d6 = st.columns(3)
-                    f_entrega = d4.date_input("Fecha Entrega Llaves *")
-                    
+                    f_entrega = d4.date_input("Fecha Entrega Llaves *", key="man_f_ent")
+
                     # 💡 SOLUCIÓN: Carencia exacta por fecha fin, no por meses genéricos
-                    f_fin_carencia = d5.date_input("Fecha Fin de Carencia *", value=f_entrega)
+                    f_fin_carencia = d5.date_input("Fecha Fin de Carencia *", value=f_entrega, key="man_f_car")
+                    
                     
                     f_vencimiento = f_suscripcion + relativedelta(years=duracion_anos)
                     
