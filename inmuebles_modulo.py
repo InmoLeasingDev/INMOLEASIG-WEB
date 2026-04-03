@@ -1384,8 +1384,7 @@ def mostrar_modulo_inmuebles(supabase):
                                     res = supabase.table("mandatos").insert(datos).execute()
                                     id_mandato_nuevo = res.data[0]['id']
                                     
-                                    # 🚀 1. MOTOR AUTOMÁTICO: Registrar Fianza y su Causación Contable
-# 🚀 MOTOR AUTOMÁTICO CONTABLE: FIANZAS Y TERCEROS
+                                    # 🚀 MOTOR AUTOMÁTICO CONTABLE: FIANZAS Y TERCEROS
                                     # 1. Buscar Catálogo de Cuentas Inteligente
                                     id_cta_fianza, id_cta_pasivo = None, None
                                     try:
@@ -1430,44 +1429,6 @@ def mostrar_modulo_inmuebles(supabase):
 
                                     # ⚠️ NOTA: La causación de la Renta Garantizada se trasladó al Motor Mensual de Arrendamientos.
 
-                                    # 🚀 3. MOTOR AUTOMÁTICO: Auditoría Estricta del Evento
-                                    periodo_actual = pd.Timestamp.now().strftime("%Y-%m")
-                                    if m_renta > 0:
-                                        supabase.table("fin_cuentas_pagar").insert({
-                                            "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo,
-                                            "acreedor": m_prop_sel_1, "concepto": f"Renta Garantizada - Mandato {id_mandato_nuevo}",
-                                            "monto_total": m_renta, "saldo_pendiente": m_renta,
-                                            "moneda": moneda_sesion, "estado": "PENDIENTE"
-                                        }).execute()
-
-                                        # 🚀 2.1 CASCADA CONTABLE: Asiento de Partida Doble (Gasto vs Pasivo/CxP)
-                                        try:
-                                            res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
-                                            df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
-                                            id_cta_gasto, id_cta_cxp = None, None
-                                            
-                                            if not df_ctas.empty:
-                                                cta_gas = df_ctas[df_ctas['codigo'].str.startswith('51', na=False) | df_ctas['codigo'].str.startswith('52', na=False)]
-                                                if not cta_gas.empty: id_cta_gasto = cta_gas.iloc[0]['id']
-                                                
-                                                cta_cxp = df_ctas[df_ctas['codigo'].str.startswith('22', na=False) | df_ctas['codigo'].str.startswith('23', na=False)]
-                                                if not cta_cxp.empty: id_cta_cxp = cta_cxp.iloc[0]['id']
-                                            
-                                            desc_asiento = f"PROVISIÓN RENTA GARANTIZADA - MANDATO {id_mandato_nuevo}"
-                                            res_ast = supabase.table("fin_asientos").insert({
-                                                "fecha_contable": str(f_inicio_pagos), "descripcion": desc_asiento,
-                                                "concepto_general": "Causación de Renta Garantizada", "origen": "MODULO_MANDATOS",
-                                                "moneda": moneda_sesion, "estado": "CONTABILIZADO"
-                                            }).execute()
-                                            
-                                            if id_cta_gasto and id_cta_cxp:
-                                                id_ast = res_ast.data[0]['id']
-                                                supabase.table("fin_apuntes").insert([
-                                                    {"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_gasto), "debito": float(m_renta), "credito": 0.0, "descripcion_linea": "Gasto por Renta Garantizada"},
-                                                    {"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_cxp), "debito": 0.0, "credito": float(m_renta), "descripcion_linea": "CxP a Propietario"}
-                                                ]).execute()
-                                        except Exception as e:
-                                            pass
 
                                     # 🚀 3. MOTOR AUTOMÁTICO: Auditoría Estricta del Evento
                                     periodo_actual = pd.Timestamp.now().strftime("%Y-%m")
