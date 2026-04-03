@@ -1393,7 +1393,15 @@ def mostrar_modulo_inmuebles(supabase):
                                         if not df_ctas.empty:
                                             df_ctas['cod_str'] = df_ctas['codigo'].astype(str)
                                             df_ctas['nom_low'] = df_ctas['nombre'].astype(str).str.lower()
+                                            df_ctas['cod_str'] = df_ctas['codigo'].astype(str).str.strip() # Limpiamos espacios invisibles
+                                            df_ctas['nom_low'] = df_ctas['nombre'].astype(str).str.lower()
                                             
+                                            # --- 🛑 PRUEBA DEL ÁCIDO ---
+                                            st.error(f"🛑 DETENIDO: Encontré {len(df_ctas)} cuentas en la BD.")
+                                            st.warning(f"¿Python puede ver la 260000?: {'260000' in df_ctas['cod_str'].values}")
+                                            st.stop() # Esto APAGA el motor de golpe. ¡Es imposible que genere un asiento!
+                                            
+                                            # 🎯 Buscamos Activo: Fianzas Constituidas (Con estricto orden de prioridad)    
                                         # 🎯 Buscamos Activo: Fianzas Constituidas (Con estricto orden de prioridad)
                                             for pref in ['260', '26', '15', '11']:
                                                 fianzas = df_ctas[df_ctas['cod_str'].str.startswith(pref)]
