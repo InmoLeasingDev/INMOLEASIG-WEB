@@ -1378,14 +1378,56 @@ def mostrar_modulo_inmuebles(supabase):
                                     res = supabase.table("mandatos").insert(datos).execute()
                                     id_mandato_nuevo = res.data[0]['id']
                                     
-                                    # 🚀 1. MOTOR AUTOMÁTICO: Registrar Fianza (Activo - Entregada a Propietario)
+                                    # 🚀 1. MOTOR AUTOMÁTICO: Registrar Fianza y su Causación Contable
                                     if m_fianza > 0:
+                                        # A. Registrar en módulo de Fianzas
                                         supabase.table("fin_fianzas").insert({
                                             "tipo": "ENTREGADA", "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo,
                                             "id_inmueble": int(id_inm), "tercero": m_prop_sel_1,
                                             "importe_inicial": m_fianza, "saldo_pendiente": m_fianza,
                                             "moneda": moneda_sesion, "estado": "REGISTRADA"
                                         }).execute()
+
+                                        # B. Generar la Cuenta por Pagar (Para que Tesorería pueda desembolsarla)
+                                        supabase.table("fin_cuentas_pagar").insert({
+                                            "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo,
+                                            "acreedor": m_prop_sel_1, "concepto": f"Pago de Fianza - Mandato {id_mandato_nuevo}",
+                                            "monto_total": m_fianza, "saldo_pendiente": m_fianza,
+                                            "moneda": moneda_sesion, "estado": "PENDIENTE"
+                                        }).execute()
+
+                                        # C. Asiento Contable de Causación (Activo vs Pasivo)
+                                        try:
+                                            res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
+                                            df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
+                                            id_cta_fianza, id_cta_pasivo = None, None
+                                            
+                                            if not df_ctas.empty:
+                                                # Buscamos cuenta de fianzas constituidas (Normalmente grupo 26 o 15/11 dependiendo el plan)
+                                                cta_fian = df_ctas[df_ctas['codigo'].str.startswith('26', na=False) | df_ctas['codigo'].str.startswith('15', na=False)]
+                                                if not cta_fian.empty: id_cta_fianza = cta_fian.iloc[0]['id']
+                                                
+                                                # Buscamos cuenta de pasivos/acreedores (22 o 23)
+                                                cta_pas = df_ctas[df_ctas['codigo'].str.startswith('22', na=False) | df_ctas['codigo'].str.startswith('23', na=False)]
+                                                if not cta_pas.empty: id_cta_pasivo = cta_pas.iloc[0]['id']
+                                            
+                                            desc_asiento = f"CAUSACIÓN FIANZA ENTREGADA - MANDATO {id_mandato_nuevo}"
+                                            res_ast = supabase.table("fin_asientos").insert({
+                                                "fecha_contable": str(f_suscripcion), "descripcion": desc_asiento,
+                                                "concepto_general": "Fianza a Propietario", "origen": "MODULO_MANDATOS",
+                                                "moneda": moneda_sesion, "estado": "CONTABILIZADO"
+                                            }).execute()
+                                            
+                                            if id_cta_fianza and id_cta_pasivo:
+                                                id_ast = res_ast.data[0]['id']
+                                                # Inyectamos los apuntes y guardamos el TERCERO (Propietario)
+                                                supabase.table("fin_apuntes").insert([
+                                                    {"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_fianza), "debito": float(m_fianza), "credito": 0.0, "descripcion_linea": "Fianza constituida a largo plazo", "tercero": m_prop_sel_1},
+                                                    {"id_asiento": id_ast, "id_cuenta_contable": int(id_cta_pasivo), "debito": 0.0, "credito": float(m_fianza), "descripcion_linea": "CxP Fianza a Propietario", "tercero": m_prop_sel_1}
+                                                ]).execute()
+                                        except Exception as e:
+                                            pass
+
                                     # 🚀 2. MOTOR AUTOMÁTICO: Generar Cuenta por Pagar (CxP Operativa)
                                     if m_renta > 0:
                                         supabase.table("fin_cuentas_pagar").insert({
