@@ -166,7 +166,8 @@ def mostrar_modulo_contabilidad(supabase):
         try:
             res_ast = supabase.table("fin_asientos").select("id, fecha_contable").eq("moneda", moneda_sesion).order("fecha_contable", desc=False).execute()
             df_ast = pd.DataFrame(res_ast.data) if res_ast.data else pd.DataFrame()
-            res_ap = supabase.table("fin_apuntes").select("id_asiento, id_cuenta_contable, debito, credito").execute()
+            # 🎯 Añadimos 'tercero' a la consulta SQL de Supabase
+            res_ap = supabase.table("fin_apuntes").select("id_asiento, id_cuenta_contable, debito, credito, tercero").execute()
             df_ap = pd.DataFrame(res_ap.data) if res_ap.data else pd.DataFrame()
             res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo, nombre").eq("moneda", moneda_sesion).execute()
             df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
@@ -181,14 +182,20 @@ def mostrar_modulo_contabilidad(supabase):
                     df_diario = pd.merge(df_diario, df_ctas, left_on="id_cuenta_contable", right_on="id", how="left")
                     df_diario['Fecha'] = pd.to_datetime(df_diario['fecha_contable']).dt.strftime('%d/%m/%Y')
                     df_diario['Cuenta'] = df_diario['codigo'].astype(str) + ". " + df_diario['nombre'].fillna("CUENTA DESCONOCIDA")
+                    
+                    # 🎯 Limpiamos los nulos para que se vea bonito cuando no hay tercero
+                    df_diario['Tercero'] = df_diario.get('tercero', pd.Series()).fillna("---")
+                    
                     df_diario['debito'] = pd.to_numeric(df_diario['debito']).fillna(0)
                     df_diario['credito'] = pd.to_numeric(df_diario['credito']).fillna(0)
                     
                     simbolo_view = "€" if moneda_sesion == "EUR" else "$"
-                    df_view = df_diario[['Fecha', 'Cuenta', 'debito', 'credito']].copy()
+                    
+                    # 🎯 Añadimos 'Tercero' a las vistas finales
+                    df_view = df_diario[['Fecha', 'Cuenta', 'Tercero', 'debito', 'credito']].copy()
                     df_view[f"Debe {simbolo_view}"] = df_view['debito'].apply(lambda x: f"{x:,.2f}" if x > 0 else "")
                     df_view[f"Haber {simbolo_view}"] = df_view['credito'].apply(lambda x: f"{x:,.2f}" if x > 0 else "")
-                    df_final = df_view[['Fecha', 'Cuenta', f"Debe {simbolo_view}", f"Haber {simbolo_view}"]]
+                    df_final = df_view[['Fecha', 'Cuenta', 'Tercero', f"Debe {simbolo_view}", f"Haber {simbolo_view}"]]
                     st.dataframe(df_final, use_container_width=True, hide_index=True)
                     
                     st.markdown("---")
