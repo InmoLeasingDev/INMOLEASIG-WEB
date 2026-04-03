@@ -1624,12 +1624,13 @@ def mostrar_modulo_inmuebles(supabase):
                     txt_titularidad = "es titular pleno"
                     # Inyectamos el único nombre en MAYÚSCULAS
                     txt_firmas_propietarios = f"{trat_p1.upper()} {datos_p1['nombre'].upper()}"
-                # Cálculos de Fechas
-                f_firma = pd.to_datetime(d_m['fecha_suscripcion'])
-                f_vence = pd.to_datetime(d_m['fecha_terminacion'])
-                f_entrega = pd.to_datetime(d_m['fecha_entrega'])
-                f_pagos = pd.to_datetime(d_m['fecha_inicio_pagos'])
-                f_aviso = pd.to_datetime(d_m['fecha_aviso_no_renovacion'])
+
+                # Cálculos de Fechas (Con red de seguridad .get para contratos antiguos)
+                f_firma = pd.to_datetime(d_m.get('fecha_suscripcion'))
+                f_vence = pd.to_datetime(d_m.get('fecha_terminacion'))
+                f_entrega = pd.to_datetime(d_m.get('fecha_entrega'))
+                f_pagos = pd.to_datetime(d_m.get('fecha_inicio_pagos'))
+                f_aviso = pd.to_datetime(d_m.get('fecha_aviso_no_renovacion'))
                 
                 anos = (f_vence.year - f_firma.year) if pd.notna(f_vence) and pd.notna(f_firma) else 5
                 meses_preaviso = (f_vence.year - f_aviso.year) * 12 + (f_vence.month - f_aviso.month) if pd.notna(f_vence) and pd.notna(f_aviso) else 2
