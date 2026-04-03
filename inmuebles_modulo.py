@@ -1419,7 +1419,7 @@ def mostrar_modulo_inmuebles(supabase):
                                                 id_cta_pasivo = int(cta_tercero.iloc[0]['id'])
                                             else:
                                                 # Intento 2: Cuentas genéricas en ESTRICO ORDEN (Obligando a agarrar la 410000 primero)
-                                                for pref in ['410', '22', '41']:
+                                                for pref in ['410000', '4100', '22', '41']:    
                                                     pasivos = df_ctas[(df_ctas['cod_str'].str.startswith(pref)) & (~df_ctas['nom_low'].str.contains('impuesto|retenci', regex=True))]
                                                     if not pasivos.empty:
                                                         id_cta_pasivo = int(pasivos.iloc[0]['id'])
