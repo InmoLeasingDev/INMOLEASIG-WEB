@@ -1301,13 +1301,19 @@ def mostrar_modulo_inmuebles(supabase):
                     f_suscripcion = d1.date_input("Fecha de Suscripción / Firma *")
                     duracion_anos = d2.number_input("Duración Contrato (Años)", 1, 20, 5)
                     meses_aviso = d3.number_input("Meses Preaviso No Renovación", 1, 12, 2)
+
                     d4, d5, d6 = st.columns(3)
                     f_entrega = d4.date_input("Fecha Entrega Llaves *")
-                    meses_carencia = d5.number_input("Meses de Carencia", 0, 12, 0)
+                    
+                    # 💡 SOLUCIÓN: Carencia exacta por fecha fin, no por meses genéricos
+                    f_fin_carencia = d5.date_input("Fecha Fin de Carencia *", value=f_entrega)
+                    
                     f_vencimiento = f_suscripcion + relativedelta(years=duracion_anos)
-                    f_inicio_pagos = f_entrega + relativedelta(months=meses_carencia)
+                    
+                    # 🚀 Lógica contable NIIF: El pago se inicia EL DÍA DESPUÉS de terminar la carencia
+                    f_inicio_pagos = f_fin_carencia + relativedelta(days=1)
+                    
                     f_limite_aviso = f_vencimiento - relativedelta(months=meses_aviso)
-
                     c_res1, c_res2 = st.columns([8.5, 1.5])
                     c_res1.success(f"🗓️ **Resumen:** Pagos inician: **{f_inicio_pagos}** | Vence: **{f_vencimiento}** | Preaviso: **{f_limite_aviso}**")
                     c_res2.form_submit_button("🔄 Recalcular")
@@ -1370,7 +1376,7 @@ def mostrar_modulo_inmuebles(supabase):
                                         "indemnizacion_anticipada": m_indemnizacion,
                                         "fecha_suscripcion": str(f_suscripcion), "fecha_entrega": str(f_entrega),
                                         "fecha_inicio_pagos": str(f_inicio_pagos), "fecha_terminacion": str(f_vencimiento),
-                                        "fecha_aviso_no_renovacion": str(f_limite_aviso),
+                                        "fecha_aviso_no_renovacion": str(f_limite_aviso), "fecha_fin_carencia": str(f_fin_carencia),
                                         "url_contrato": url_c, "url_empadronamiento": url_e,
                                         "url_inventario": url_i, "url_suministros": url_s,
                                         "estado_contrato": "FIRMADO", "estado_financiero": "PENDIENTE_FIANZA"
@@ -1745,7 +1751,7 @@ DÉCIMO. Recuperación anticipada por venta
 En caso de que {txt_propietario} decida vender el inmueble antes del vencimiento del contrato, deberá comunicarlo con un preaviso mínimo de 90 días. {txt_propietario.capitalize()} deberá abonar a la Gestora el importe de la inversión de {txt_indem}. La transmisión del inmueble quedará supeditada a la liquidación previa de las cantidades indicadas y a la terminación de los contratos vigentes de alquiler de las habitaciones. Las mejoras quedarán incorporadas al inmueble sin derecho a retirada.
 
 DÉCIMO PRIMERO. Carencia
-Las partes acuerdan {meses_carencia} meses de carencia contados a partir de la entrega del inmueble a la Gestora.
+Las partes acuerdan un periodo de carencia desde el {fecha_entrega_formateada} y hasta el {fecha_fin_carencia_formateada}. El pago de la renta garantizada se iniciará el día {fecha_inicio_pagos_formateada}.
 --- SALTO DE PÁGINA ---
 DÉCIMO SEGUNDO. Entrega: La fecha de entrega a la Gestora será el {fecha_entrega_formateada}.
 
