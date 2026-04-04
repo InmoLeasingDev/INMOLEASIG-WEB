@@ -1480,7 +1480,7 @@ def mostrar_modulo_inmuebles(supabase):
 
         elif st.session_state.modo_mandato == "DOCUMENTOS" and not df_man.empty:
             st.markdown("---")
-            st.markdown("### 📁 Bóveda de Documentos Legales")
+            st.markdown("# 📁 Bóveda de Documentos del mandato ")
             op_man_docs = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel_doc = st.selectbox("Selecciona el Mandato para ver sus archivos:", op_man_docs)
             if m_sel_doc:
