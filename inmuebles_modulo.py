@@ -1502,7 +1502,7 @@ def mostrar_modulo_inmuebles(supabase):
             if st.button("❌ Cerrar Bóveda"): st.session_state.modo_mandato = "NADA"; st.rerun()
 
         elif st.session_state.modo_mandato == "FIANZA" and not df_man.empty:
-            st.markdown("### 🛡️ Gestión de Fianza")
+            st.markdown("**🛡️ Gestión de Fianza**")
             
             op_man_fianza = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel_fianza = st.selectbox("Selecciona el Contrato:", op_man_fianza)
@@ -1510,23 +1510,24 @@ def mostrar_modulo_inmuebles(supabase):
             if m_sel_fianza:
                 simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
                 
-                st.markdown("#### 1. Datos")
+                st.write("**1. Datos**")
                 c_d1, c_d2 = st.columns(2)
-                c_d1.info("**Tercero:** (Pendiente de BD)")
-                c_d2.info("**Contrato:** (Pendiente de BD)")
+                c_d1.info("Tercero: (Pendiente de BD)")
+                c_d2.info("Contrato: (Pendiente de BD)")
                 
-                st.markdown("#### 2. Situación")
+                st.write("**2. Situación**")
                 c_s1, c_s2, c_s3 = st.columns(3)
-                c_s1.metric("Importe Inicial", f"{simbolo_mon} 0.00")
-                c_s2.metric("Saldo Pendiente", f"{simbolo_mon} 0.00")
-                c_s3.metric("Estado", "REGISTRADA")
+                # Cambiamos st.metric (gigante) por st.info (compacto y elegante)
+                c_s1.info(f"Importe: **{simbolo_mon} 0.00**")
+                c_s2.info(f"Saldo: **{simbolo_mon} 0.00**")
+                c_s3.info("Estado: **REGISTRADA**")
                 
-                st.markdown("#### 3. Liquidación")
+                st.write("**3. Liquidación**")
                 tipo_liq = st.radio("Escenario de Liquidación:", [
                     "Devolución Total (Terminación normal)", 
                     "Retención Parcial (Daños en inmueble)", 
                     "Pérdida Total (Incumplimiento)"
-                ])
+                ], label_visibility="collapsed") # Ocultamos el título del radio para más minimalismo
                 
                 if tipo_liq == "Retención Parcial (Daños en inmueble)":
                     monto_retener = st.number_input(f"Monto a Retener (Gasto) {simbolo_mon}", min_value=0.00, value=0.00, step=50.0)
@@ -1538,6 +1539,7 @@ def mostrar_modulo_inmuebles(supabase):
                     st.toast("🛠️ Lógica pendiente en Paso 2")
                 
                 if c_btn2.button("❌ CERRAR PANEL", use_container_width=True):
+                    st.session_state.modo_mandato = "NADA"; st.rerun()
                     st.session_state.modo_mandato = "NADA"; st.rerun()
 # --- PANEL: GENERADOR DE CONTRATO (BORRADOR INTERACTIVO) ---
         elif st.session_state.modo_mandato == "GENERAR_CONTRATO" and not df_man.empty:
