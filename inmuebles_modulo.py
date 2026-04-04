@@ -1500,7 +1500,6 @@ def mostrar_modulo_inmuebles(supabase):
                 tarjeta_doc(c4, "Suministros", d_m.get('url_suministros'), "💧")
             st.markdown("---")
             if st.button("❌ Cerrar Bóveda"): st.session_state.modo_mandato = "NADA"; st.rerun()
-
         elif st.session_state.modo_mandato == "FIANZA" and not df_man.empty:
             st.markdown("**🛡️ Gestión de Fianza**")
             
@@ -1510,38 +1509,46 @@ def mostrar_modulo_inmuebles(supabase):
             if m_sel_fianza:
                 simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
                 
-                st.write("**1. Datos**")
+                st.write("**1. Datos de la Fianza**")
                 c_d1, c_d2 = st.columns(2)
-                c_d1.info("Tercero: (Pendiente de BD)")
-                c_d2.info("Contrato: (Pendiente de BD)")
+                with c_d1:
+                    st.write("**Tercero:** (Pendiente de BD)")
+                    st.write("**Contrato:** (Pendiente de BD)")
+                with c_d2:
+                    st.write("**Fecha exigibilidad:** (Pendiente de BD)")
+                    st.write("**Estado:** REGISTRADA")
                 
-                st.write("**2. Situación**")
+                st.write("**2. Situación Financiera**")
                 c_s1, c_s2, c_s3 = st.columns(3)
-                # Cambiamos st.metric (gigante) por st.info (compacto y elegante)
-                c_s1.info(f"Importe: **{simbolo_mon} 0.00**")
-                c_s2.info(f"Saldo: **{simbolo_mon} 0.00**")
-                c_s3.info("Estado: **REGISTRADA**")
+                c_s1.info(f"Monto Inicial: **{simbolo_mon} 0.00**")
+                c_s2.info(f"Saldo Fianza: **{simbolo_mon} 0.00**")
+                c_s3.info("CxP (Orden de pago): **PENDIENTE**")
                 
-                st.write("**3. Liquidación**")
-                tipo_liq = st.radio("Escenario de Liquidación:", [
-                    "Devolución Total (Terminación normal)", 
-                    "Retención Parcial (Daños en inmueble)", 
-                    "Pérdida Total (Incumplimiento)"
-                ], label_visibility="collapsed") # Ocultamos el título del radio para más minimalismo
+                c_s4, c_s5, c_s6 = st.columns(3)
+                c_s4.info("Asiento Contable: **---**")
+                c_s5.info("Fecha de pago: **---**")
+                c_s6.info("Mov. Banco asociado: **---**")
                 
-                if tipo_liq == "Retención Parcial (Daños en inmueble)":
-                    monto_retener = st.number_input(f"Monto a Retener (Gasto) {simbolo_mon}", min_value=0.00, value=0.00, step=50.0)
+                st.write("**3. Resumen de Liquidación**")
+                c_l1, c_l2, c_l3 = st.columns(3)
+                with c_l1:
+                    st.write(f"**Importe devuelto:** {simbolo_mon} 0.00")
+                with c_l2:
+                    st.write(f"**Importe retenido:** {simbolo_mon} 0.00")
+                with c_l3:
+                    st.write("**Fecha de liquidación:** ---")
+                    
+                st.write("**Motivo de importe retenido o no devuelto:** ---")
                 
                 st.markdown("---")
-                # Ajustamos columnas para que ocupen menos espacio y quitamos el estirado automático
                 c_btn1, c_btn2, c_btn3 = st.columns([1.5, 1.5, 6])
                 
                 if c_btn1.button("⚖️ Liquidar Fianza", type="primary"):
-                    st.toast("🛠️ Lógica pendiente en Paso 2")
+                    st.toast("🛠️ Formulario de liquidación pendiente en Paso 2")
                 
                 if c_btn2.button("❌ Cerrar Panel"):
                     st.session_state.modo_mandato = "NADA"; st.rerun()
-                
+
 # --- PANEL: GENERADOR DE CONTRATO (BORRADOR INTERACTIVO) ---
         elif st.session_state.modo_mandato == "GENERAR_CONTRATO" and not df_man.empty:
             st.markdown("---")
