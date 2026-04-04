@@ -1501,8 +1501,8 @@ def mostrar_modulo_inmuebles(supabase):
             st.markdown("---")
             if st.button("❌ Cerrar Bóveda"): st.session_state.modo_mandato = "NADA"; st.rerun()
             elif st.session_state.modo_mandato == "FIANZA" and not df_man.empty:
-            st.markdown("---")
-            st.markdown("### 🛡️ Panel de Gestión de Fianza (Propietario)")
+                st.markdown("---")
+                st.markdown("### 🛡️ Panel de Gestión de Fianza (Propietario)")
             
             op_man_fianza = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel_fianza = st.selectbox("Selecciona el Contrato para gestionar su Fianza:", op_man_fianza)
