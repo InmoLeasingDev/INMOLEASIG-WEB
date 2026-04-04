@@ -1480,7 +1480,7 @@ def mostrar_modulo_inmuebles(supabase):
 
         elif st.session_state.modo_mandato == "DOCUMENTOS" and not df_man.empty:
             st.markdown("---")
-            st.markdown("# 📁 Bóveda de Documentos del mandato ")
+            st.markdown("📁 Bóveda de Documentos del mandato ")
             op_man_docs = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
             m_sel_doc = st.selectbox("Selecciona el Mandato para ver sus archivos:", op_man_docs)
             if m_sel_doc:
@@ -1533,14 +1533,15 @@ def mostrar_modulo_inmuebles(supabase):
                     monto_retener = st.number_input(f"Monto a Retener (Gasto) {simbolo_mon}", min_value=0.00, value=0.00, step=50.0)
                 
                 st.markdown("---")
-                c_btn1, c_btn2, c_btn3 = st.columns([2, 2, 4])
+                # Ajustamos columnas para que ocupen menos espacio y quitamos el estirado automático
+                c_btn1, c_btn2, c_btn3 = st.columns([1.5, 1.5, 6])
                 
-                if c_btn1.button("⚖️ LIQUIDAR FIANZA", use_container_width=True, type="primary"):
+                if c_btn1.button("⚖️ Liquidar Fianza", type="primary"):
                     st.toast("🛠️ Lógica pendiente en Paso 2")
                 
-                if c_btn2.button("❌ CERRAR PANEL", use_container_width=True):
+                if c_btn2.button("❌ Cerrar Panel"):
                     st.session_state.modo_mandato = "NADA"; st.rerun()
-                    st.session_state.modo_mandato = "NADA"; st.rerun()
+                
 # --- PANEL: GENERADOR DE CONTRATO (BORRADOR INTERACTIVO) ---
         elif st.session_state.modo_mandato == "GENERAR_CONTRATO" and not df_man.empty:
             st.markdown("---")
