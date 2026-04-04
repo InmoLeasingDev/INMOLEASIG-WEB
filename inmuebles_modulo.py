@@ -1245,7 +1245,7 @@ def mostrar_modulo_inmuebles(supabase):
             if m_c2.button("⚙️ Gestionar", key="btn_edit_man", use_container_width=True): st.session_state.modo_mandato = "EDITAR"; st.rerun()
             if m_c3.button("📄 Contrato", key="btn_gen_doc_man", use_container_width=True): st.session_state.modo_mandato = "GENERAR_CONTRATO"; st.rerun()
             if m_c4.button("📁 Documentos", key="btn_docs_man", use_container_width=True): st.session_state.modo_mandato = "DOCUMENTOS"; st.rerun()
-            if m_c5.button("📜 Historial", key="btn_hist_man", use_container_width=True): st.session_state.modo_mandato = "HISTORIAL"; st.rerun()
+            if m_c5.button("🛡️ Fianza", key="btn_hist_man", use_container_width=True): st.session_state.modo_mandato = "FIANZA"; st.rerun()
             if m_c6.button("📊 Reportes", key="btn_rep_man", use_container_width=True): st.session_state.modo_mandato = "REPORTES"; st.rerun()        # --- 4. PANEL CREAR ---
         if st.session_state.modo_mandato == "CREAR":
             from dateutil.relativedelta import relativedelta
@@ -1309,7 +1309,6 @@ def mostrar_modulo_inmuebles(supabase):
 
                     # 💡 SOLUCIÓN: Carencia exacta por fecha fin, no por meses genéricos
                     f_fin_carencia = d5.date_input("Fecha Fin de Carencia *", value=f_entrega, key="man_f_car")
-                    
                     
                     f_vencimiento = f_suscripcion + relativedelta(years=duracion_anos)
                     
@@ -1501,25 +1500,47 @@ def mostrar_modulo_inmuebles(supabase):
                 tarjeta_doc(c4, "Suministros", d_m.get('url_suministros'), "💧")
             st.markdown("---")
             if st.button("❌ Cerrar Bóveda"): st.session_state.modo_mandato = "NADA"; st.rerun()
-
-        elif st.session_state.modo_mandato == "HISTORIAL" and not df_man.empty:
+            elif st.session_state.modo_mandato == "FIANZA" and not df_man.empty:
             st.markdown("---")
-            st.markdown("### 📜 Historial y Auditoría del Contrato")
-            op_man_hist = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
-            m_sel_hist = st.selectbox("Selecciona el Mandato para ver su actividad:", op_man_hist)
-            if m_sel_hist:
-                idx = op_man_hist.index(m_sel_hist)
-                id_m = df_man.iloc[idx]['id']
-                try:
-                    res_hist = supabase.table("historial_mandatos").select("fecha_evento, accion, usuario").eq("id_mandato", int(id_m)).order("fecha_evento", desc=True).execute()
-                    df_h = pd.DataFrame(res_hist.data) if res_hist.data else pd.DataFrame()
-                except Exception as e: df_h = pd.DataFrame()
-                if not df_h.empty:
-                    df_h['FECHA'] = pd.to_datetime(df_h['fecha_evento']).dt.strftime('%d/%m/%Y %H:%M')
-                    st.dataframe(df_h[['FECHA', 'accion', 'usuario']].copy(), use_container_width=True, hide_index=True)
-                else: st.info("ℹ️ No hay registros en el historial.")
-            st.markdown("---")
-            if st.button("❌ Cerrar Historial"): st.session_state.modo_mandato = "NADA"; st.rerun()
+            st.markdown("### 🛡️ Panel de Gestión de Fianza (Propietario)")
+            
+            op_man_fianza = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
+            m_sel_fianza = st.selectbox("Selecciona el Contrato para gestionar su Fianza:", op_man_fianza)
+            
+            if m_sel_fianza:
+                # Simularemos que tenemos la fianza cargada por ahora
+                simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
+                
+                st.markdown("#### 📄 1. Datos")
+                c_d1, c_d2 = st.columns(2)
+                c_d1.info("**Tercero:** (Se cargará de la BD)")
+                c_d2.info("**Contrato Origen:** (Se cargará de la BD)")
+                
+                st.markdown("#### 📊 2. Situación")
+                c_s1, c_s2, c_s3 = st.columns(3)
+                c_s1.metric("Importe Inicial", f"{simbolo_mon} 0.00")
+                c_s2.metric("Saldo Pendiente", f"{simbolo_mon} 0.00")
+                c_s3.metric("Estado Actual", "REGISTRADA")
+                
+                st.markdown("#### ⚖️ 3. Liquidación")
+                st.caption("Selecciona el tipo de liquidación para generar el asiento contable (Descargar Activo y/o Reconocer Gasto).")
+                tipo_liq = st.radio("Escenario de Liquidación:", [
+                    "Devolución Total (Terminación normal)", 
+                    "Retención Parcial (Daños en inmueble)", 
+                    "Pérdida Total (Incumplimiento de contrato)"
+                ])
+                
+                if tipo_liq == "Retención Parcial (Daños en inmueble)":
+                    monto_retener = st.number_input(f"Monto a Retener (Pérdida) {simbolo_mon}", min_value=0.00, value=0.00, step=50.0)
+                
+                st.markdown("---")
+                c_btn1, c_btn2, c_btn3 = st.columns([2, 2, 4])
+                
+                if c_btn1.button("⚖️ LIQUIDAR FIANZA", use_container_width=True, type="primary"):
+                    st.toast("🛠️ Botón Liquidar presionado (Lógica pendiente en Paso 2)")
+                
+                if c_btn2.button("❌ CERRAR PANEL", use_container_width=True):
+                    st.session_state.modo_mandato = "NADA"; st.rerun()
 # --- PANEL: GENERADOR DE CONTRATO (BORRADOR INTERACTIVO) ---
         elif st.session_state.modo_mandato == "GENERAR_CONTRATO" and not df_man.empty:
             st.markdown("---")
