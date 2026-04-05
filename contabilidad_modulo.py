@@ -329,27 +329,32 @@ def mostrar_modulo_contabilidad(supabase):
         # =========================================================
         # 2. LIBRO MAYOR (CUENTAS T / AUDITORÍA)
         # =========================================================
-        # =========================================================
-        # 2. LIBRO MAYOR (CUENTAS T / AUDITORÍA)
-        # =========================================================
         with tab_lm:
             st.markdown("### Libro Mayor (Auditoría por Cuenta)")
             st.caption("Revisa el extracto detallado y el saldo acumulado de las cuentas contables.")
             
             if not df_full.empty:
-                # 1. Filtros Superiores (Cuenta y Mes)
-                c_filtro1, c_filtro2 = st.columns([3, 1])
+                # 1. Filtros Superiores (Vista, Cuenta y Mes)
+                c_filtro1, c_filtro2, c_filtro3 = st.columns([1.5, 2.5, 1])
+                
+                # 💡 SOLUCIÓN: Separamos la decisión con un Radio Button
+                tipo_vista = c_filtro1.radio("Tipo de Consulta:", ["Cuenta Específica", "Todas las cuentas"])
+                
+                meses_opciones = ["Todos", "01 - Enero", "02 - Febrero", "03 - Marzo", "04 - Abril", "05 - Mayo", "06 - Junio", "07 - Julio", "08 - Agosto", "09 - Septiembre", "10 - Octubre", "11 - Noviembre", "12 - Diciembre"]
+                mes_sel = c_filtro3.selectbox("📅 Filtrar por Mes:", meses_opciones, index=0)
                 
                 opciones_ctas = df_bp.apply(lambda r: f"{r['codigo']} - {r['nombre']} ({r['naturaleza']})", axis=1).tolist()
                 
-                # 💡 SOLUCIÓN: Agregamos "Todas las cuentas" al selector
-                cta_sel = c_filtro1.selectbox("🔍 Selecciona la cuenta a auditar:", ["-- Seleccione --", "Todas las cuentas"] + opciones_ctas)
-                
-                meses_opciones = ["Todos", "01 - Enero", "02 - Febrero", "03 - Marzo", "04 - Abril", "05 - Mayo", "06 - Junio", "07 - Julio", "08 - Agosto", "09 - Septiembre", "10 - Octubre", "11 - Noviembre", "12 - Diciembre"]
-                mes_sel = c_filtro2.selectbox("📅 Filtrar por Mes:", meses_opciones, index=0)
+                # Lógica visual dependiendo del radio button
+                if tipo_vista == "Cuenta Específica":
+                    cta_sel = c_filtro2.selectbox("🔍 Selecciona la cuenta a auditar:", ["-- Seleccione --"] + opciones_ctas)
+                else:
+                    cta_sel = "Todas las cuentas"
+                    c_filtro2.info("Se mostrará el mayor de todas las cuentas con movimientos.")
                 
                 st.markdown("---")
                 
+                # Ejecutamos la búsqueda si está todo en orden
                 if cta_sel != "-- Seleccione --":
                     # 2. Preparamos el filtro global de mes
                     df_base_mayor = df_full.copy()
