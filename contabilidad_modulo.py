@@ -186,11 +186,14 @@ def mostrar_modulo_contabilidad(supabase):
                     # 🎯 Limpiamos los nulos para que se vea bonito cuando no hay tercero
                     df_diario['Tercero'] = df_diario.get('tercero', pd.Series()).fillna("---")
                     
+                    
                     df_diario['debito'] = pd.to_numeric(df_diario['debito']).fillna(0)
                     df_diario['credito'] = pd.to_numeric(df_diario['credito']).fillna(0)
                     
-                    simbolo_view = "€" if moneda_sesion == "EUR" else "$"
+                    # 💡 SOLUCIÓN: Ordenar por Fecha, Asiento y obligar a que el DEBE (>0) salga siempre primero
+                    df_diario = df_diario.sort_values(by=['fecha_contable', 'id_asiento', 'debito'], ascending=[True, True, False])
                     
+                    simbolo_view = "€" if moneda_sesion == "EUR" else "$"
                     # 🎯 Añadimos 'Tercero' a las vistas finales
                     df_view = df_diario[['Fecha', 'Cuenta', 'Tercero', 'debito', 'credito']].copy()
                     df_view[f"Debe {simbolo_view}"] = df_view['debito'].apply(lambda x: f"{x:,.2f}" if x > 0 else "")

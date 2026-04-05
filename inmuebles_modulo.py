@@ -1592,7 +1592,7 @@ def mostrar_modulo_inmuebles(supabase):
 
                     # --- UI DEL MOTOR DE LIQUIDACIÓN ---
                     if st.session_state.get('abrir_modal_liq', False) and estado_f != 'LIQUIDADA':
-                        st.markdown("### 🧮 Asistente de Liquidación de Fianza")
+                        st.markdown("🧮 Asistente de Liquidación de Fianza")
                         st.info(f"**Fianza Total a Liquidar: {simbolo_mon} {saldo:,.2f}** (Se descargará de la Cta. 260000)")
                         
                         st.write("Indica los montos a retener por cada concepto (Si aplica):")
