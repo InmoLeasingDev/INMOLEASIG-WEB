@@ -261,7 +261,7 @@ def mostrar_modulo_contabilidad(supabase):
                 ids_asientos = df_ast['id'].tolist()
                 
                 # 3. Traer Apuntes (El detalle del DEBE y HABER)
-                res_ap = supabase.table("fin_apuntes").select("id_asiento, id_cuenta_contable, debito, credito, descripcion_linea").execute()
+                res_ap = supabase.table("fin_apuntes").select("id_asiento, id_cuenta_contable, debito, credito, descripcion_linea, tercero").execute()
                 df_ap_raw = pd.DataFrame(res_ap.data) if res_ap.data else pd.DataFrame()
                 
                 if not df_ap_raw.empty:
@@ -330,7 +330,7 @@ def mostrar_modulo_contabilidad(supabase):
         # 2. LIBRO MAYOR (CUENTAS T / AUDITORÍA)
         # =========================================================
         with tab_lm:
-            st.markdown("### Libro Mayor (Auditoría por Cuenta)")
+            st.markdown("#Libro Mayor (Auditoría por Cuenta)")
             st.caption("Revisa el extracto detallado y el saldo acumulado de cualquier cuenta contable.")
             
             if not df_full.empty:
@@ -354,15 +354,16 @@ def mostrar_modulo_contabilidad(supabase):
                         saldos.append(saldo_acum)
                     
                     df_mayor['saldo_acumulado'] = saldos
-                    
-                    # Preparar vista
-                    df_mayor_view = df_mayor[['fecha_contable', 'descripcion', 'debito', 'credito', 'saldo_acumulado']].copy()
-                    df_mayor_view.columns = ['FECHA', 'ORIGEN DEL ASIENTO', 'DEBE', 'HABER', 'SALDO ACUM.']
+                    # Preparar vista (AHORA CON EL TERCERO)
+                    df_mayor['tercero'] = df_mayor.get('tercero', pd.Series()).fillna("---")
+                    df_mayor_view = df_mayor[['fecha_contable', 'tercero', 'descripcion', 'debito', 'credito', 'saldo_acumulado']].copy()
+                    df_mayor_view.columns = ['FECHA', 'TERCERO', 'ORIGEN DEL ASIENTO', 'DEBE', 'HABER', 'SALDO ACUM.']
                     
                     for col in ['DEBE', 'HABER', 'SALDO ACUM.']:
                         df_mayor_view[col] = df_mayor_view[col].apply(lambda x: f"{simbolo_view} {x:,.2f}" if x != 0 else "-")
                         
                     st.dataframe(df_mayor_view, use_container_width=True, hide_index=True)
+                    
             else:
                 st.info("ℹ️ Selecciona una cuenta para auditar sus movimientos.")
 
