@@ -398,7 +398,20 @@ def mostrar_modulo_contabilidad(supabase):
                             for col in ['DEBE', 'HABER', 'SALDO ACUM.']:
                                 df_mayor_view[col] = df_mayor_view[col].apply(lambda x: f"{simbolo_view} {x:,.2f}" if x != 0 else "-")
                                 
-                            st.dataframe(df_mayor_view, use_container_width=True, hide_index=True)
+                            # 💡 SOLUCIÓN: Forzamos el ancho de las columnas para que todas las tablas sean idénticas
+                            st.dataframe(
+                                df_mayor_view, 
+                                use_container_width=True, 
+                                hide_index=True,
+                                column_config={
+                                    "FECHA": st.column_config.TextColumn(width="small"),
+                                    "ORIGEN DEL ASIENTO": st.column_config.TextColumn(width="large"),
+                                    "TERCERO": st.column_config.TextColumn(width="medium"),
+                                    "DEBE": st.column_config.TextColumn(width="small"),
+                                    "HABER": st.column_config.TextColumn(width="small"),
+                                    "SALDO ACUM.": st.column_config.TextColumn(width="small"),
+                                }
+                            )
                             st.write("") # Espacio en blanco entre tablas para que respire visualmente
                             
                     if cuentas_mostradas == 0:
