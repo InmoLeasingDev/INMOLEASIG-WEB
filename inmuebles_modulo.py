@@ -1500,7 +1500,7 @@ def mostrar_modulo_inmuebles(supabase):
                 tarjeta_doc(c4, "Suministros", d_m.get('url_suministros'), "💧")
             st.markdown("---")
             if st.button("❌ Cerrar Bóveda"): st.session_state.modo_mandato = "NADA"; st.rerun()
-            ###
+        ### FIANZA MANDATO ###
         elif st.session_state.modo_mandato == "FIANZA" and not df_man.empty:
             st.markdown("**🛡️ Gestión de Fianza**")
             
@@ -1552,11 +1552,10 @@ def mostrar_modulo_inmuebles(supabase):
                     c_s1, c_s2, c_s3 = st.columns(3)
                     c_s1.info(f"Monto Inicial: **{simbolo_mon} {importe:,.2f}**")
                     c_s2.info(f"Saldo Fianza: **{simbolo_mon} {saldo:,.2f}**")
-                    c_s3.info(f"CxP (Orden de pago): **{'LIQUIDADA' if estado_f == 'LIQUIDADA' else 'PENDIENTE'}**") 
+                    c_s3.info(f"CxP (Orden de pago original): **{'LIQUIDADA' if estado_f == 'LIQUIDADA' else 'PENDIENTE'}**") 
                     
                     c_s4, c_s5, c_s6 = st.columns(3)
                     
-                    # 💡 SOLUCIÓN: Buscar el Asiento Inicial si no está liquidada
                     asiento_mostrar = "---"
                     fecha_asiento_mostrar = "---"
                     if estado_f == 'LIQUIDADA':
@@ -1570,15 +1569,14 @@ def mostrar_modulo_inmuebles(supabase):
                             asiento_mostrar = str(res_ast_c.data[0]['id'])
                             fecha_asiento_mostrar = str(res_ast_c.data[0]['fecha_contable'])
                             
-                    # 💡 SOLUCIÓN: Títulos corregidos para mayor claridad
                     c_s4.info(f"Asiento Contable: **{asiento_mostrar}**") 
                     c_s5.info(f"Fecha Asiento: **{fecha_asiento_mostrar}**") 
                     c_s6.info(f"Mov. Banco: **---**")
                     
                     st.write("**3. Resumen de Liquidación**")
                     c_l1, c_l2, c_l3 = st.columns(3)
-                    with c_l1: st.write(f"**Importe devuelto:** {simbolo_mon} {imp_dev:,.2f}")
-                    with c_l2: st.write(f"**Importe retenido:** {simbolo_mon} {imp_ret:,.2f}")
+                    with c_l1: st.write(f"**Importe a Reintegrar (CxC):** {simbolo_mon} {imp_dev:,.2f}")
+                    with c_l2: st.write(f"**Importe retenido (Gasto):** {simbolo_mon} {imp_ret:,.2f}")
                     with c_l3: st.write(f"**Fecha liquidación:** {fecha_liq}")
                     st.write(f"**Escenario aplicado:** {escenario}")
                     st.write(f"**Motivo retención:** {motivo_ret}")
@@ -1597,7 +1595,7 @@ def mostrar_modulo_inmuebles(supabase):
                         st.session_state.modo_mandato = "NADA"; st.session_state.abrir_modal_liq = False; st.rerun()
 
                     if st.session_state.get('abrir_modal_liq', False) and estado_f != 'LIQUIDADA':
-                        st.markdown("🧮 Asistente de Liquidación de Fianza")
+                        st.markdown("### 🧮 Asistente de Liquidación de Fianza")
                         st.info(f"**Fianza Total a Liquidar: {simbolo_mon} {saldo:,.2f}** (Se descargará de la Cta. 260000)")
                         
                         st.write("Indica los montos a retener por cada concepto (Si aplica):")
@@ -1611,35 +1609,39 @@ def mostrar_modulo_inmuebles(supabase):
                         ret_otros = col_r5.number_input("Otros (Cta. 629)", min_value=0.0, max_value=float(saldo), value=0.0, step=10.0)
                         
                         total_retenido = ret_danos + ret_sumin + ret_limp + ret_penal + ret_otros
-                        total_devolver = saldo - total_retenido
+                        total_reintegro_cxc = saldo - total_retenido
                         
                         if total_retenido > saldo:
                             st.error("❌ El total retenido no puede superar el saldo de la fianza.")
                         else:
-                            st.success(f"**Total a Devolver al Propietario (Bancos 572000): {simbolo_mon} {total_devolver:,.2f}**")
+                            st.success(f"**Total a Reintegrar por el Propietario (CxC): {simbolo_mon} {total_reintegro_cxc:,.2f}**")
+                            st.caption("💡 Esto generará un derecho de cobro (CxC). El ingreso real a banco se registrará desde el módulo de Tesorería.")
                             
-                            if st.button("✅ Confirmar y Generar Asiento Contable", type="primary"):
-                                with st.spinner("Conectando con el motor contable y generando logs..."):
+                            if st.button("✅ Confirmar Liquidación y Crear CxC", type="primary"):
+                                with st.spinner("Conectando con el motor contable y generando CxC..."):
                                     try:
                                         fecha_hoy = time.strftime("%Y-%m-%d")
                                         res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
                                         df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
                                         
-                                        def get_cta_id(codigo_buscado):
-                                            match = df_ctas[df_ctas['codigo'].str.startswith(codigo_buscado)]
-                                            return int(match.iloc[0]['id']) if not match.empty else None
+                                        def get_cta_id(codigos_buscados):
+                                            for cod in codigos_buscados:
+                                                match = df_ctas[df_ctas['codigo'].str.startswith(cod)]
+                                                if not match.empty: return int(match.iloc[0]['id'])
+                                            return None
 
-                                        cta_fianza = get_cta_id("260")
-                                        cta_banco = get_cta_id("572")
-                                        cta_danos = get_cta_id("622")
-                                        cta_sumin = get_cta_id("628")
-                                        cta_limp = get_cta_id("629")
-                                        cta_penal = get_cta_id("678")
+                                        cta_fianza = get_cta_id(["260"])
+                                        cta_cxc = get_cta_id(["440", "1305"]) # Busca Deudores o Clientes
+                                        cta_danos = get_cta_id(["622", "5105"])
+                                        cta_sumin = get_cta_id(["628", "5110"])
+                                        cta_limp = get_cta_id(["629", "5195"])
+                                        cta_penal = get_cta_id(["678", "5320"])
                                         
                                         if not cta_fianza:
                                             st.error("No se encontró la cuenta 260 en el catálogo para descargar la fianza.")
                                             st.stop()
                                             
+                                        # 1. Crear Asiento Cabecera
                                         desc_asiento = f"LIQUIDACIÓN FIANZA - MANDATO {id_mandato_sel}"
                                         res_ast = supabase.table("fin_asientos").insert({
                                             "fecha_contable": fecha_hoy, "descripcion": desc_asiento,
@@ -1648,10 +1650,16 @@ def mostrar_modulo_inmuebles(supabase):
                                         }).execute()
                                         id_ast = res_ast.data[0]['id']
                                         
+                                        # 2. Crear Apuntes Contables
                                         apuntes = []
+                                        # Descarga del Activo (Haber)
                                         apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_fianza, "debito": 0.0, "credito": float(saldo), "id_mandato": int(id_mandato_sel), "descripcion_linea": "Descarga de activo (Fianza liquidada)", "tercero": tercero_titular})
                                         
-                                        if total_devolver > 0 and cta_banco: apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_banco, "debito": float(total_devolver), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Devolución de fianza a banco", "tercero": tercero_titular})
+                                        # Derecho de Cobro (Debe a CxC)
+                                        if total_reintegro_cxc > 0 and cta_cxc: 
+                                            apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_cxc, "debito": float(total_reintegro_cxc), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "CxC por Reintegro de Fianza", "tercero": tercero_titular})
+                                        
+                                        # Gastos por Retención (Debe)
                                         if ret_danos > 0 and cta_danos: apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_danos, "debito": float(ret_danos), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Daños)", "tercero": tercero_titular})
                                         if ret_sumin > 0 and cta_sumin: apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_sumin, "debito": float(ret_sumin), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Suministros)", "tercero": tercero_titular})
                                         if (ret_limp + ret_otros) > 0 and cta_limp: apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_limp, "debito": float(ret_limp + ret_otros), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Limpieza/Otros)", "tercero": tercero_titular})
@@ -1659,6 +1667,32 @@ def mostrar_modulo_inmuebles(supabase):
 
                                         supabase.table("fin_apuntes").insert(apuntes).execute()
                                         
+                                        # 3. 🚀 MAGIA: Crear Documento y Cuenta por Cobrar en Contabilidad
+                                        if total_reintegro_cxc > 0:
+                                            # Crear documento soporte
+                                            doc_data = {
+                                                "tipo_documento": "CUENTA DE COBRO",
+                                                "numero_documento": f"REINT-FZ-{id_mandato_sel}",
+                                                "fecha_emision": fecha_hoy,
+                                                "nombre_entidad": tercero_titular.upper(),
+                                                "total": float(total_reintegro_cxc),
+                                                "moneda": moneda_sesion,
+                                                "estado": "PENDIENTE"
+                                            }
+                                            res_doc = supabase.table("fin_documentos").insert(doc_data).execute()
+                                            
+                                            # Enviar a la Cartera (CxC)
+                                            cxc_data = {
+                                                "id_documento": res_doc.data[0]['id'],
+                                                "nombre_entidad": tercero_titular.upper(),
+                                                "monto_total": float(total_reintegro_cxc),
+                                                "saldo_pendiente": float(total_reintegro_cxc),
+                                                "moneda": moneda_sesion,
+                                                "estado": "PENDIENTE"
+                                            }
+                                            supabase.table("fin_cuentas_cobrar").insert(cxc_data).execute()
+
+                                        # 4. Actualizar tabla fin_fianzas
                                         notas = []
                                         if ret_danos>0: notas.append(f"Daños {ret_danos}")
                                         if ret_sumin>0: notas.append(f"Suministros {ret_sumin}")
@@ -1669,23 +1703,23 @@ def mostrar_modulo_inmuebles(supabase):
                                         
                                         supabase.table("fin_fianzas").update({
                                             "estado": "LIQUIDADA", "saldo_pendiente": 0.0, 
-                                            "monto_devuelto": total_devolver, "monto_retenido": total_retenido,
+                                            "monto_devuelto": total_reintegro_cxc, "monto_retenido": total_retenido,
                                             "fecha_liquidacion": fecha_hoy, "notas_liquidacion": notas_str
                                         }).eq("id", id_fianza_db).execute()
                                         
-                                        # 💡 SOLUCIÓN: INYECCIÓN DE LOGS DE AUDITORÍA
+                                        # 5. Logs de Auditoría
                                         var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
                                         usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
                                         
                                         supabase.table("historial_mandatos").insert({
                                             "id_mandato": int(id_mandato_sel),
-                                            "accion": f"LIQUIDACIÓN FIANZA. Devuelto: {simbolo_mon}{total_devolver} | Retenido: {simbolo_mon}{total_retenido}",
+                                            "accion": f"LIQUIDACIÓN FIANZA. Generada CxC por: {simbolo_mon}{total_reintegro_cxc} | Retenido: {simbolo_mon}{total_retenido}",
                                             "usuario": usuario_actual
                                         }).execute()
                                         
                                         log_accion(supabase, usuario_actual, "LIQUIDAR FIANZA", f"Mandato ID: {id_mandato_sel} | {m_sel_fianza.split(' - ')[0]}")
                                         
-                                        st.success("🚀 ¡Contabilidad, liquidación y auditoría completadas!")
+                                        st.success("🚀 ¡Fianza Liquidada y Cuenta por Cobrar generada en Tesorería!")
                                         time.sleep(2)
                                         st.session_state.abrir_modal_liq = False
                                         st.rerun()
@@ -1694,7 +1728,8 @@ def mostrar_modulo_inmuebles(supabase):
                                         st.error(f"Error en la transacción: {e}")
 
                 else:
-                    st.warning("⚠️ No se encontró registro de fianza para este contrato en la base de datos.")# --- PANEL: GENERADOR DE CONTRATO (BORRADOR INTERACTIVO) ---
+                    st.warning("⚠️ No se encontró registro de fianza para este contrato en la base de datos.")
+        ### GENERAR_CONTRATO ###
         elif st.session_state.modo_mandato == "GENERAR_CONTRATO" and not df_man.empty:
             st.markdown("---")
             st.markdown("### 📄 Generador Interactivo de Contratos Legales")
