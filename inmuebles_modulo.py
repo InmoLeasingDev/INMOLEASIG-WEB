@@ -1522,7 +1522,6 @@ def mostrar_modulo_inmuebles(supabase):
                 except Exception as e:
                     st.error(f"Error de lectura BD: {e}")
                     datos_fianza = None
-
                 if datos_fianza:
                     id_fianza_db = datos_fianza['id']
                     importe = float(datos_fianza.get('importe_inicial', 0))
@@ -1533,6 +1532,15 @@ def mostrar_modulo_inmuebles(supabase):
                     fecha_liq = datos_fianza.get('fecha_liquidacion') or '---'
                     motivo_ret = datos_fianza.get('notas_liquidacion') or '---'
                     
+                    # 💡 NUEVA CONSULTA: Verificar el estado real del pago en Tesorería
+                    estado_cxp_real = "PENDIENTE"
+                    try:
+                        res_cxp = supabase.table("fin_cuentas_pagar").select("estado").eq("modulo_origen", "MANDATOS").eq("id_origen", int(id_mandato_sel)).like("concepto", "Pago de Fianza%").execute()
+                        if res_cxp.data:
+                            estado_cxp_real = res_cxp.data[0]['estado']
+                    except Exception:
+                        pass
+
                     escenario = "No liquidada"
                     if estado_f == 'LIQUIDADA':
                         if imp_dev > 0 and imp_ret == 0: escenario = "Devolución Total"
@@ -1552,7 +1560,9 @@ def mostrar_modulo_inmuebles(supabase):
                     c_s1, c_s2, c_s3 = st.columns(3)
                     c_s1.info(f"Monto Inicial: **{simbolo_mon} {importe:,.2f}**")
                     c_s2.info(f"Saldo Fianza: **{simbolo_mon} {saldo:,.2f}**")
-                    c_s3.info(f"CxP (Orden de pago original): **{'LIQUIDADA' if estado_f == 'LIQUIDADA' else 'PENDIENTE'}**") 
+                    
+                    # 💡 Mostramos el estado real de la orden de pago en pantalla
+                    c_s3.info(f"CxP (Orden de pago original): **{estado_cxp_real}**") 
                     
                     c_s4, c_s5, c_s6 = st.columns(3)
                     
@@ -1584,10 +1594,14 @@ def mostrar_modulo_inmuebles(supabase):
                     st.markdown("---")
                     c_btn1, c_btn2, c_btn3 = st.columns([1.5, 1.5, 6])
                     
+                    # 💡 EL CANDADO DOBLE: Solo si no está liquidada Y si ya fue pagada
                     if estado_f != 'LIQUIDADA':
-                        if c_btn1.button("⚖️ Liquidar Fianza", type="primary"):
-                            st.session_state.abrir_modal_liq = not st.session_state.get('abrir_modal_liq', False)
-                            st.rerun()
+                        if estado_cxp_real == 'PAGADA':
+                            if c_btn1.button("⚖️ Liquidar Fianza", type="primary"):
+                                st.session_state.abrir_modal_liq = not st.session_state.get('abrir_modal_liq', False)
+                                st.rerun()
+                        else:
+                            c_btn1.button("🔒 Requiere Pago", disabled=True, help="La orden de pago original aún no ha sido pagada en Tesorería.")
                     else:
                         c_btn1.button("✅ Fianza Liquidada", disabled=True)
                         
