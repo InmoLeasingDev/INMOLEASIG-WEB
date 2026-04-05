@@ -334,84 +334,75 @@ def mostrar_modulo_contabilidad(supabase):
             st.caption("Revisa el extracto detallado y el saldo acumulado de las cuentas contables.")
             
             if not df_full.empty:
-                # 1. Filtros Superiores (Vista, Cuenta y Mes)
-                c_filtro1, c_filtro2, c_filtro3 = st.columns([1.5, 2.5, 1])
-                
-                # 💡 SOLUCIÓN: Separamos la decisión con un Radio Button
-                tipo_vista = c_filtro1.radio("Tipo de Consulta:", ["Cuenta Específica", "Todas las cuentas"])
-                
-                meses_opciones = ["Todos", "01 - Enero", "02 - Febrero", "03 - Marzo", "04 - Abril", "05 - Mayo", "06 - Junio", "07 - Julio", "08 - Agosto", "09 - Septiembre", "10 - Octubre", "11 - Noviembre", "12 - Diciembre"]
-                mes_sel = c_filtro3.selectbox("📅 Filtrar por Mes:", meses_opciones, index=0)
+                # 1. Filtros Superiores (Cuenta y Mes)
+                c_filtro1, c_filtro2 = st.columns([3, 1])
                 
                 opciones_ctas = df_bp.apply(lambda r: f"{r['codigo']} - {r['nombre']} ({r['naturaleza']})", axis=1).tolist()
                 
-                # Lógica visual dependiendo del radio button
-                if tipo_vista == "Cuenta Específica":
-                    cta_sel = c_filtro2.selectbox("🔍 Selecciona la cuenta a auditar:", ["-- Seleccione --"] + opciones_ctas)
-                else:
-                    cta_sel = "Todas las cuentas"
-                    c_filtro2.info("Se mostrará el mayor de todas las cuentas con movimientos.")
+                # 💡 Volvemos al selectbox con "Todas las cuentas" como primera opción
+                cta_sel = c_filtro1.selectbox("🔍 Selecciona la cuenta a auditar:", ["Todas las cuentas"] + opciones_ctas)
+                
+                meses_opciones = ["Todos", "01 - Enero", "02 - Febrero", "03 - Marzo", "04 - Abril", "05 - Mayo", "06 - Junio", "07 - Julio", "08 - Agosto", "09 - Septiembre", "10 - Octubre", "11 - Noviembre", "12 - Diciembre"]
+                mes_sel = c_filtro2.selectbox("📅 Filtrar por Mes:", meses_opciones, index=0)
                 
                 st.markdown("---")
                 
-                # Ejecutamos la búsqueda si está todo en orden
-                if cta_sel != "-- Seleccione --":
-                    # 2. Preparamos el filtro global de mes
-                    df_base_mayor = df_full.copy()
-                    if mes_sel != "Todos":
-                        num_mes = mes_sel.split(" - ")[0]
-                        df_base_mayor = df_base_mayor[df_base_mayor['fecha_contable'].astype(str).str[5:7] == num_mes]
-                        
-                    if df_base_mayor.empty:
-                        st.info(f"📅 No hay movimientos contables en el periodo seleccionado ({mes_sel}).")
+                # 2. Preparamos el filtro global de mes
+                df_base_mayor = df_full.copy()
+                if mes_sel != "Todos":
+                    num_mes = mes_sel.split(" - ")[0]
+                    df_base_mayor = df_base_mayor[df_base_mayor['fecha_contable'].astype(str).str[5:7] == num_mes]
+                    
+                if df_base_mayor.empty:
+                    st.info(f"📅 No hay movimientos contables en el periodo seleccionado ({mes_sel}).")
+                else:
+                    # 3. Determinamos qué cuentas vamos a procesar
+                    if cta_sel == "Todas las cuentas":
+                        # Procesamos TODAS las cuentas que existen en el balance
+                        cuentas_a_procesar = df_bp[['codigo', 'nombre', 'naturaleza']].to_dict('records')
                     else:
-                        # 3. Determinamos qué cuentas vamos a procesar
-                        if cta_sel == "Todas las cuentas":
-                            # Procesamos TODAS las cuentas que existen en el balance
-                            cuentas_a_procesar = df_bp[['codigo', 'nombre', 'naturaleza']].to_dict('records')
-                        else:
-                            # Procesamos SOLO la cuenta seleccionada
-                            cod_sel = cta_sel.split(" - ")[0]
-                            row_cta = df_bp[df_bp['codigo'] == cod_sel].iloc[0]
-                            cuentas_a_procesar = [{'codigo': cod_sel, 'nombre': row_cta['nombre'], 'naturaleza': row_cta['naturaleza']}]
+                        # Procesamos SOLO la cuenta seleccionada
+                        cod_sel = cta_sel.split(" - ")[0]
+                        row_cta = df_bp[df_bp['codigo'] == cod_sel].iloc[0]
+                        cuentas_a_procesar = [{'codigo': cod_sel, 'nombre': row_cta['nombre'], 'naturaleza': row_cta['naturaleza']}]
+                    
+                    cuentas_mostradas = 0
+                    
+                    # 4. Bucle dinámico para renderizar las tablas
+                    for cta in cuentas_a_procesar:
+                        df_cta = df_base_mayor[df_base_mayor['codigo'] == cta['codigo']].copy()
                         
-                        cuentas_mostradas = 0
-                        
-                        # 4. Bucle dinámico para renderizar las tablas
-                        for cta in cuentas_a_procesar:
-                            df_cta = df_base_mayor[df_base_mayor['codigo'] == cta['codigo']].copy()
+                        # Solo dibujamos la cuenta si tiene movimientos en este mes/filtro
+                        if not df_cta.empty:
+                            cuentas_mostradas += 1
+                            df_cta = df_cta.sort_values('fecha_contable')
+                            nat_sel = cta['naturaleza']
                             
-                            # Solo dibujamos la cuenta si tiene movimientos en este mes/filtro
-                            if not df_cta.empty:
-                                cuentas_mostradas += 1
-                                df_cta = df_cta.sort_values('fecha_contable')
-                                nat_sel = cta['naturaleza']
+                            st.markdown(f"##### 🗂️ {cta['codigo']} - {cta['nombre']} | Naturaleza: `{nat_sel}`")
+                            
+                            # Calcular el saldo acumulado línea por línea para esta cuenta
+                            saldo_acum = 0.0
+                            saldos = []
+                            for _, row in df_cta.iterrows():
+                                if nat_sel == 'DEUDORA': saldo_acum += (row['debito'] - row['credito'])
+                                else: saldo_acum += (row['credito'] - row['debito'])
+                                saldos.append(saldo_acum)
+                            
+                            df_cta['saldo_acumulado'] = saldos
+                            df_cta['tercero'] = df_cta.get('tercero', pd.Series()).fillna("---")
+                            
+                            # Preparar vista (Mismo orden que acordamos)
+                            df_mayor_view = df_cta[['fecha_contable', 'descripcion', 'tercero', 'debito', 'credito', 'saldo_acumulado']].copy()
+                            df_mayor_view.columns = ['FECHA', 'ORIGEN DEL ASIENTO', 'TERCERO', 'DEBE', 'HABER', 'SALDO ACUM.']
+                            
+                            for col in ['DEBE', 'HABER', 'SALDO ACUM.']:
+                                df_mayor_view[col] = df_mayor_view[col].apply(lambda x: f"{simbolo_view} {x:,.2f}" if x != 0 else "-")
                                 
-                                st.markdown(f"##### 🗂️ {cta['codigo']} - {cta['nombre']} | Naturaleza: `{nat_sel}`")
-                                
-                                # Calcular el saldo acumulado línea por línea para esta cuenta
-                                saldo_acum = 0.0
-                                saldos = []
-                                for _, row in df_cta.iterrows():
-                                    if nat_sel == 'DEUDORA': saldo_acum += (row['debito'] - row['credito'])
-                                    else: saldo_acum += (row['credito'] - row['debito'])
-                                    saldos.append(saldo_acum)
-                                
-                                df_cta['saldo_acumulado'] = saldos
-                                df_cta['tercero'] = df_cta.get('tercero', pd.Series()).fillna("---")
-                                
-                                # Preparar vista (Mismo orden que acordamos)
-                                df_mayor_view = df_cta[['fecha_contable', 'descripcion', 'tercero', 'debito', 'credito', 'saldo_acumulado']].copy()
-                                df_mayor_view.columns = ['FECHA', 'ORIGEN DEL ASIENTO', 'TERCERO', 'DEBE', 'HABER', 'SALDO ACUM.']
-                                
-                                for col in ['DEBE', 'HABER', 'SALDO ACUM.']:
-                                    df_mayor_view[col] = df_mayor_view[col].apply(lambda x: f"{simbolo_view} {x:,.2f}" if x != 0 else "-")
-                                    
-                                st.dataframe(df_mayor_view, use_container_width=True, hide_index=True)
-                                st.write("") # Espacio en blanco entre tablas para que respire visualmente
-                                
-                        if cuentas_mostradas == 0:
-                            st.info("ℹ️ Las cuentas seleccionadas no tuvieron movimientos en este periodo.")
+                            st.dataframe(df_mayor_view, use_container_width=True, hide_index=True)
+                            st.write("") # Espacio en blanco entre tablas para que respire visualmente
+                            
+                    if cuentas_mostradas == 0:
+                        st.info("ℹ️ Las cuentas seleccionadas no tuvieron movimientos en este periodo.")
             else:
                 st.info("ℹ️ No hay datos contables registrados en el sistema.")
         # =========================================================
