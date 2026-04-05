@@ -462,8 +462,15 @@ def mostrar_modulo_inmuebles(supabase):
                 res_inm = supabase.table("inmuebles").select("id, estado").eq("moneda", moneda_sesion).execute()
                 df_inm = pd.DataFrame(res_inm.data) if res_inm.data else pd.DataFrame()
                 
+                # 💡 SOLUCIÓN: Traemos las unidades y filtramos según la propiedad
                 res_uni = supabase.table("unidades").select("id, estado, id_inmueble").execute()
-                df_uni = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
+                df_uni_raw = pd.DataFrame(res_uni.data) if res_uni.data else pd.DataFrame()
+                
+                if not df_inm.empty and not df_uni_raw.empty:
+                    # Nos quedamos solo con las unidades cuyo id_inmueble existe en el df_inm (que ya está filtrado por moneda)
+                    df_uni = df_uni_raw[df_uni_raw['id_inmueble'].isin(df_inm['id'])].copy()
+                else:
+                    df_uni = pd.DataFrame()
                 
                 res_man = supabase.table("mandatos").select("id, estado_contrato, fecha_terminacion").eq("moneda", moneda_sesion).execute()
                 df_man = pd.DataFrame(res_man.data) if res_man.data else pd.DataFrame()
@@ -473,7 +480,7 @@ def mostrar_modulo_inmuebles(supabase):
             except Exception as e:
                 st.error(f"Error base de datos: {e}")
                 df_inm, df_uni, df_man, df_act = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
+                
         # --- 3. CÁLCULO DE KPIS ---
         inm_totales = len(df_inm)
         inm_activos = len(df_inm[df_inm['estado'] == 'ACTIVO']) if not df_inm.empty else 0
