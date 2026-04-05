@@ -330,42 +330,64 @@ def mostrar_modulo_contabilidad(supabase):
         # 2. LIBRO MAYOR (CUENTAS T / AUDITORÍA)
         # =========================================================
         with tab_lm:
-            st.markdown("#Libro Mayor (Auditoría por Cuenta)")
+            st.markdown("Libro Mayor (Auditoría por Cuenta)")
             st.caption("Revisa el extracto detallado y el saldo acumulado de cualquier cuenta contable.")
             
             if not df_full.empty:
+                # 1. Filtros Superiores (Cuenta y Mes)
+                c_filtro1, c_filtro2 = st.columns([3, 1])
+                
                 opciones_ctas = df_bp.apply(lambda r: f"{r['codigo']} - {r['nombre']} ({r['naturaleza']})", axis=1).tolist()
-                cta_sel = st.selectbox("🔍 Selecciona la cuenta a auditar:", ["-- Seleccione --"] + opciones_ctas)
+                cta_sel = c_filtro1.selectbox("🔍 Selecciona la cuenta a auditar:", ["-- Seleccione --"] + opciones_ctas)
+                
+                # Opciones de mes (reutilizando la lista de la pestaña Libro Diario)
+                meses_opciones = ["Todos", "01 - Enero", "02 - Febrero", "03 - Marzo", "04 - Abril", "05 - Mayo", "06 - Junio", "07 - Julio", "08 - Agosto", "09 - Septiembre", "10 - Octubre", "11 - Noviembre", "12 - Diciembre"]
+                mes_sel = c_filtro2.selectbox("📅 Filtrar por Mes:", meses_opciones, index=0)
+                
+                st.markdown("---")
                 
                 if cta_sel != "-- Seleccione --":
                     cod_sel = cta_sel.split(" - ")[0]
-                    # Filtramos solo los apuntes de esa cuenta
-                    df_mayor = df_full[df_full['codigo'] == cod_sel].sort_values('fecha_contable').copy()
-                    nat_sel = df_mayor.iloc[0]['naturaleza']
                     
-                    st.markdown(f"**Extracto de Movimientos | Naturaleza: `{nat_sel}`**")
+                    # 2. Filtramos la base maestra
+                    df_mayor = df_full[df_full['codigo'] == cod_sel].copy()
                     
-                    # Calcular el saldo acumulado línea por línea
-                    saldo_acum = 0.0
-                    saldos = []
-                    for _, row in df_mayor.iterrows():
-                        if nat_sel == 'DEUDORA': saldo_acum += (row['debito'] - row['credito'])
-                        else: saldo_acum += (row['credito'] - row['debito'])
-                        saldos.append(saldo_acum)
+                    # 3. Aplicamos el filtro de mes (Si aplica)
+                    if mes_sel != "Todos":
+                        num_mes = mes_sel.split(" - ")[0]
+                        df_mayor = df_mayor[df_mayor['fecha_contable'].astype(str).str[5:7] == num_mes]
                     
-                    df_mayor['saldo_acumulado'] = saldos
-                    # Preparar vista (AHORA CON EL TERCERO)
-                    df_mayor['tercero'] = df_mayor.get('tercero', pd.Series()).fillna("---")
-                    df_mayor_view = df_mayor[['fecha_contable', 'tercero', 'descripcion', 'debito', 'credito', 'saldo_acumulado']].copy()
-                    df_mayor_view.columns = ['FECHA', 'TERCERO', 'ORIGEN DEL ASIENTO', 'DEBE', 'HABER', 'SALDO ACUM.']
-                    
-                    for col in ['DEBE', 'HABER', 'SALDO ACUM.']:
-                        df_mayor_view[col] = df_mayor_view[col].apply(lambda x: f"{simbolo_view} {x:,.2f}" if x != 0 else "-")
+                    if df_mayor.empty:
+                        st.info(f"📅 No hay movimientos para esta cuenta en el periodo seleccionado ({mes_sel}).")
+                    else:
+                        # Ordenamos cronológicamente
+                        df_mayor = df_mayor.sort_values('fecha_contable')
+                        nat_sel = df_mayor.iloc[0]['naturaleza']
                         
-                    st.dataframe(df_mayor_view, use_container_width=True, hide_index=True)
-                    
+                        st.markdown(f"**Extracto de Movimientos | Naturaleza: `{nat_sel}`**")
+                        
+                        # Calcular el saldo acumulado línea por línea
+                        saldo_acum = 0.0
+                        saldos = []
+                        for _, row in df_mayor.iterrows():
+                            if nat_sel == 'DEUDORA': saldo_acum += (row['debito'] - row['credito'])
+                            else: saldo_acum += (row['credito'] - row['debito'])
+                            saldos.append(saldo_acum)
+                        
+                        df_mayor['saldo_acumulado'] = saldos
+                        df_mayor['tercero'] = df_mayor.get('tercero', pd.Series()).fillna("---")
+                        
+                        # 4. Preparar vista (ORDEN DE COLUMNAS CORREGIDO)
+                        # Fecha -> Origen del Asiento (Cuenta) -> Tercero -> Debe -> Haber -> Saldo Acum.
+                        df_mayor_view = df_mayor[['fecha_contable', 'descripcion', 'tercero', 'debito', 'credito', 'saldo_acumulado']].copy()
+                        df_mayor_view.columns = ['FECHA', 'ORIGEN DEL ASIENTO', 'TERCERO', 'DEBE', 'HABER', 'SALDO ACUM.']
+                        
+                        for col in ['DEBE', 'HABER', 'SALDO ACUM.']:
+                            df_mayor_view[col] = df_mayor_view[col].apply(lambda x: f"{simbolo_view} {x:,.2f}" if x != 0 else "-")
+                            
+                        st.dataframe(df_mayor_view, use_container_width=True, hide_index=True)
             else:
-                st.info("ℹ️ Selecciona una cuenta para auditar sus movimientos.")
+                st.info("ℹ️ No hay datos contables registrados en el sistema.")
 
         # =========================================================
         # 3. ESTADOS FINANCIEROS (BALANCE Y P&G)
