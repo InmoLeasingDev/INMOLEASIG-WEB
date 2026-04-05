@@ -1500,6 +1500,7 @@ def mostrar_modulo_inmuebles(supabase):
                 tarjeta_doc(c4, "Suministros", d_m.get('url_suministros'), "💧")
             st.markdown("---")
             if st.button("❌ Cerrar Bóveda"): st.session_state.modo_mandato = "NADA"; st.rerun()
+            ###
         elif st.session_state.modo_mandato == "FIANZA" and not df_man.empty:
             st.markdown("**🛡️ Gestión de Fianza**")
             
@@ -1507,25 +1508,21 @@ def mostrar_modulo_inmuebles(supabase):
             m_sel_fianza = st.selectbox("Selecciona el Contrato:", op_man_fianza)
             
             if m_sel_fianza:
-                # 1. IDENTIFICAR EL MANDATO SELECCIONADO
                 idx = op_man_fianza.index(m_sel_fianza)
                 id_mandato_sel = df_man.iloc[idx]['id']
                 simbolo_mon = "€" if moneda_sesion == "EUR" else "$"
                 tercero_titular = df_view_display.iloc[idx]['TITULAR']
                 
-                # 2. CONSULTAR SUPABASE
                 try:
                     res_man = supabase.table("mandatos").select("fecha_terminacion").eq("id", int(id_mandato_sel)).execute()
                     fecha_exig = res_man.data[0].get("fecha_terminacion", "---") if res_man.data else "---"
                     
                     res_fianza = supabase.table("fin_fianzas").select("*").eq("id_origen", int(id_mandato_sel)).execute()
                     datos_fianza = res_fianza.data[0] if res_fianza.data else None
-                    
                 except Exception as e:
                     st.error(f"Error de lectura BD: {e}")
                     datos_fianza = None
 
-                # 3. RENDERIZAR PANEL
                 if datos_fianza:
                     id_fianza_db = datos_fianza['id']
                     importe = float(datos_fianza.get('importe_inicial', 0))
@@ -1559,14 +1556,23 @@ def mostrar_modulo_inmuebles(supabase):
                     
                     c_s4, c_s5, c_s6 = st.columns(3)
                     
-                    asiento_liq = "---"
+                    # 💡 SOLUCIÓN: Buscar el Asiento Inicial si no está liquidada
+                    asiento_mostrar = "---"
+                    fecha_asiento_mostrar = "---"
                     if estado_f == 'LIQUIDADA':
-                        res_ast_b = supabase.table("fin_asientos").select("id").like("descripcion", f"%LIQUIDACIÓN FIANZA%MANDATO {id_mandato_sel}%").execute()
+                        res_ast_b = supabase.table("fin_asientos").select("id, fecha_contable").like("descripcion", f"%LIQUIDACIÓN FIANZA%MANDATO {id_mandato_sel}%").execute()
                         if res_ast_b.data:
-                            asiento_liq = str(res_ast_b.data[0]['id'])
+                            asiento_mostrar = str(res_ast_b.data[0]['id'])
+                            fecha_asiento_mostrar = str(res_ast_b.data[0]['fecha_contable'])
+                    else:
+                        res_ast_c = supabase.table("fin_asientos").select("id, fecha_contable").like("descripcion", f"%CAUSACIÓN FIANZA ENTREGADA - MANDATO {id_mandato_sel}%").execute()
+                        if res_ast_c.data:
+                            asiento_mostrar = str(res_ast_c.data[0]['id'])
+                            fecha_asiento_mostrar = str(res_ast_c.data[0]['fecha_contable'])
                             
-                    c_s4.info(f"Asiento Contable: **{asiento_liq}**") 
-                    c_s5.info(f"Fecha de pago: **{fecha_liq}**") 
+                    # 💡 SOLUCIÓN: Títulos corregidos para mayor claridad
+                    c_s4.info(f"Asiento Contable: **{asiento_mostrar}**") 
+                    c_s5.info(f"Fecha Asiento: **{fecha_asiento_mostrar}**") 
                     c_s6.info(f"Mov. Banco: **---**")
                     
                     st.write("**3. Resumen de Liquidación**")
@@ -1590,7 +1596,6 @@ def mostrar_modulo_inmuebles(supabase):
                     if c_btn2.button("❌ Cerrar Panel"):
                         st.session_state.modo_mandato = "NADA"; st.session_state.abrir_modal_liq = False; st.rerun()
 
-                    # --- UI DEL MOTOR DE LIQUIDACIÓN ---
                     if st.session_state.get('abrir_modal_liq', False) and estado_f != 'LIQUIDADA':
                         st.markdown("🧮 Asistente de Liquidación de Fianza")
                         st.info(f"**Fianza Total a Liquidar: {simbolo_mon} {saldo:,.2f}** (Se descargará de la Cta. 260000)")
@@ -1614,10 +1619,9 @@ def mostrar_modulo_inmuebles(supabase):
                             st.success(f"**Total a Devolver al Propietario (Bancos 572000): {simbolo_mon} {total_devolver:,.2f}**")
                             
                             if st.button("✅ Confirmar y Generar Asiento Contable", type="primary"):
-                                with st.spinner("Conectando con el motor contable..."):
+                                with st.spinner("Conectando con el motor contable y generando logs..."):
                                     try:
                                         fecha_hoy = time.strftime("%Y-%m-%d")
-                                        
                                         res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
                                         df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
                                         
@@ -1647,20 +1651,11 @@ def mostrar_modulo_inmuebles(supabase):
                                         apuntes = []
                                         apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_fianza, "debito": 0.0, "credito": float(saldo), "id_mandato": int(id_mandato_sel), "descripcion_linea": "Descarga de activo (Fianza liquidada)", "tercero": tercero_titular})
                                         
-                                        if total_devolver > 0 and cta_banco:
-                                            apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_banco, "debito": float(total_devolver), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Devolución de fianza a banco", "tercero": tercero_titular})
-                                            
-                                        if ret_danos > 0 and cta_danos:
-                                            apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_danos, "debito": float(ret_danos), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Daños)", "tercero": tercero_titular})
-                                            
-                                        if ret_sumin > 0 and cta_sumin:
-                                            apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_sumin, "debito": float(ret_sumin), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Suministros)", "tercero": tercero_titular})
-                                            
-                                        if (ret_limp + ret_otros) > 0 and cta_limp:
-                                            apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_limp, "debito": float(ret_limp + ret_otros), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Limpieza/Otros)", "tercero": tercero_titular})
-                                            
-                                        if ret_penal > 0 and cta_penal:
-                                            apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_penal, "debito": float(ret_penal), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Penalización)", "tercero": tercero_titular})
+                                        if total_devolver > 0 and cta_banco: apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_banco, "debito": float(total_devolver), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Devolución de fianza a banco", "tercero": tercero_titular})
+                                        if ret_danos > 0 and cta_danos: apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_danos, "debito": float(ret_danos), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Daños)", "tercero": tercero_titular})
+                                        if ret_sumin > 0 and cta_sumin: apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_sumin, "debito": float(ret_sumin), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Suministros)", "tercero": tercero_titular})
+                                        if (ret_limp + ret_otros) > 0 and cta_limp: apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_limp, "debito": float(ret_limp + ret_otros), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Limpieza/Otros)", "tercero": tercero_titular})
+                                        if ret_penal > 0 and cta_penal: apuntes.append({"id_asiento": id_ast, "id_cuenta_contable": cta_penal, "debito": float(ret_penal), "credito": 0.0, "id_mandato": int(id_mandato_sel), "descripcion_linea": "Pérdida retenida (Penalización)", "tercero": tercero_titular})
 
                                         supabase.table("fin_apuntes").insert(apuntes).execute()
                                         
@@ -1678,17 +1673,28 @@ def mostrar_modulo_inmuebles(supabase):
                                             "fecha_liquidacion": fecha_hoy, "notas_liquidacion": notas_str
                                         }).eq("id", id_fianza_db).execute()
                                         
-                                        st.success("🚀 ¡Contabilidad NIIF generada perfectamente!")
+                                        # 💡 SOLUCIÓN: INYECCIÓN DE LOGS DE AUDITORÍA
+                                        var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
+                                        usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
+                                        
+                                        supabase.table("historial_mandatos").insert({
+                                            "id_mandato": int(id_mandato_sel),
+                                            "accion": f"LIQUIDACIÓN FIANZA. Devuelto: {simbolo_mon}{total_devolver} | Retenido: {simbolo_mon}{total_retenido}",
+                                            "usuario": usuario_actual
+                                        }).execute()
+                                        
+                                        log_accion(supabase, usuario_actual, "LIQUIDAR FIANZA", f"Mandato ID: {id_mandato_sel} | {m_sel_fianza.split(' - ')[0]}")
+                                        
+                                        st.success("🚀 ¡Contabilidad, liquidación y auditoría completadas!")
                                         time.sleep(2)
                                         st.session_state.abrir_modal_liq = False
                                         st.rerun()
                                         
                                     except Exception as e:
-                                        st.error(f"Error en la transacción contable: {e}")
+                                        st.error(f"Error en la transacción: {e}")
 
                 else:
-                    st.warning("⚠️ No se encontró registro de fianza para este contrato en la base de datos.")
-# --- PANEL: GENERADOR DE CONTRATO (BORRADOR INTERACTIVO) ---
+                    st.warning("⚠️ No se encontró registro de fianza para este contrato en la base de datos.")# --- PANEL: GENERADOR DE CONTRATO (BORRADOR INTERACTIVO) ---
         elif st.session_state.modo_mandato == "GENERAR_CONTRATO" and not df_man.empty:
             st.markdown("---")
             st.markdown("### 📄 Generador Interactivo de Contratos Legales")
