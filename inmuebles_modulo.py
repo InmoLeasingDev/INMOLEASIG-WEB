@@ -405,11 +405,11 @@ def mostrar_modulo_inmuebles(supabase):
     # 🛡️ DEFINIR LA MONEDA DE LA SESIÓN (El blindaje que faltaba)
     moneda_sesion = st.session_state.get("moneda_usuario", "EUR")
     # --- NAVEGACIÓN PRINCIPAL DEL MÓDULO (Pestañas) ---
-    tab_dash, tab1, tab2, tab3, tab4 = st.tabs([
+    tab_dash, tab1, tab_man, tab_uni, tab4 = st.tabs([
         "📊 Dashboard",
         "🏢 Propiedades", 
-        "🚪 Unidades", 
         "📜 Mandatos",
+        "🚪 Unidades", 
         "🛋️ Activos Fijos"
     ])
     #========================================================
@@ -865,7 +865,7 @@ def mostrar_modulo_inmuebles(supabase):
     # ==========================================
     # TAB 2: UNIDADES (Subdivisión de Propiedades)
     # ==========================================
-    with tab2:
+    with tab_uni:
         # Inicializador de estado para la Barra de Herramientas
         if 'modo_unidad' not in st.session_state:
             st.session_state.modo_unidad = "NADA"
@@ -1196,7 +1196,7 @@ def mostrar_modulo_inmuebles(supabase):
     # ========================================
     # TAB 3: MANDATOS (Contratos y Finanzas)
     # ========================================
-    with tab3:
+    with tab_man:
         if 'modo_mandato' not in st.session_state:
             st.session_state.modo_mandato = "NADA"
 
@@ -1254,19 +1254,28 @@ def mostrar_modulo_inmuebles(supabase):
             if m_c4.button("📁 Documentos", key="btn_docs_man", use_container_width=True): st.session_state.modo_mandato = "DOCUMENTOS"; st.rerun()
             if m_c5.button("🛡️ Fianza", key="btn_hist_man", use_container_width=True): st.session_state.modo_mandato = "FIANZA"; st.rerun()
             if m_c6.button("📊 Reportes", key="btn_rep_man", use_container_width=True): st.session_state.modo_mandato = "REPORTES"; st.rerun()        # --- 4. PANEL CREAR ---
+        
+        # --- 4. PANEL CREAR ---
         if st.session_state.modo_mandato == "CREAR":
             from dateutil.relativedelta import relativedelta
             st.markdown("---")
+            
+            # 💡 NUEVO: Filtrar propiedades que ya tienen un mandato activo asignado
+            inmuebles_con_mandato = df_man['id_inmueble'].tolist() if not df_man.empty else []
+            df_inm_disp = df_inm_m[~df_inm_m['id'].isin(inmuebles_con_mandato)] if not df_inm_m.empty else pd.DataFrame()
+
             with st.form("form_nuevo_mandato_pro", clear_on_submit=False):
                 st.markdown("**Nuevo Contrato de Gestión**")
                 
                 if df_inm_m.empty or df_prop_m.empty:
                     st.error(f"Necesitas crear al menos una propiedad y un propietario en {moneda_sesion} antes de crear un mandato.")
+                elif df_inm_disp.empty:
+                    st.warning("⚠️ Todas tus propiedades activas ya tienen un contrato de mandato asignado.")
                 else:
                     st.write("**1. Titularidad y Propiedad**")
                     col_inm, col_op = st.columns(2)
-                    m_inm_sel = col_inm.selectbox("Propiedad a gestionar *", df_inm_m['nombre'].tolist())
-                    id_inm = df_inm_m[df_inm_m['nombre'] == m_inm_sel].iloc[0]['id']
+                    m_inm_sel = col_inm.selectbox("Propiedad a gestionar *", df_inm_disp['nombre'].tolist())
+                    id_inm = df_inm_disp[df_inm_disp['nombre'] == m_inm_sel].iloc[0]['id']
                     
                     # 💡 SOLUCIÓN: El operador ahora se selecciona directamente para el mandato, auto-asignando si solo hay uno
                     try:
