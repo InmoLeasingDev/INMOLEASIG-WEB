@@ -2121,7 +2121,7 @@ Representada por: {admin_nombre}
                                             # --- CASCADA CONTABLE: VENCIMIENTO = SUSCRIPCIÓN ---
                                             # Extraemos la fecha de firma del pre-contrato
                                             f_vencimiento_legal = str(d_m.get('fecha_suscripcion'))
-
+                                            ### ###
                                             # A. Generar CxP en Tesorería (Vence el día de la firma)
                                             supabase.table("fin_cuentas_pagar").insert({
                                                 "modulo_origen": "MANDATOS", 
