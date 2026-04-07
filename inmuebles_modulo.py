@@ -1237,43 +1237,47 @@ def mostrar_modulo_inmuebles(supabase):
 
             df_view_display['DOCS'] = df_view_display.apply(visor_docs, axis=1)
             df_view_display['RENTA'] = pd.to_numeric(df_view_display['ingreso_garantizado']).fillna(0).apply(lambda x: f"{simbolo_mon} {x:,.2f}")
-            df_view_display.rename(columns={'porcentaje_pago_1': '% COBRO', 'estado_financiero': 'FINANZAS'}, inplace=True)
+            df_view_display.rename(columns={'porcentaje_pago_1': '% COBRO', 'estado_contrato': 'ESTADO', 'estado_financiero': 'FINANZAS'}, inplace=True)
             
-            st.dataframe(df_view_display[['INMUEBLE', 'TITULAR', '% COBRO', 'RENTA', 'FINANZAS', 'DOCS']], use_container_width=True, hide_index=True)
+            # Formateo visual del estado en la tabla
+            df_view_display['ESTADO'] = df_view_display['ESTADO'].apply(lambda x: f"📝 {x}" if x == 'BORRADOR' else f"✅ {x}")
+            
+            st.dataframe(df_view_display[['INMUEBLE', 'TITULAR', 'ESTADO', 'RENTA', 'FINANZAS', 'DOCS']], use_container_width=True, hide_index=True)
         else:
             st.info(f"ℹ️ No hay mandatos vigentes en el entorno {moneda_sesion}.")
 
-# --- 3. BARRA DE HERRAMIENTAS ---
+        # --- 3. NUEVA BARRA DE HERRAMIENTAS (FLUJO NATURAL) ---
         st.markdown("---")
-        m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns([1.5, 1.5, 1.5, 1.6, 1.5, 1.5])
+        m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns([1.8, 1.5, 1.5, 1.5, 1.5, 1.5])
         
-        if m_c1.button("➕ Nuevo", key="btn_nuevo_man", use_container_width=True): st.session_state.modo_mandato = "CREAR"; st.rerun()
+        if m_c1.button("➕ Nuevo Pre-Contrato", key="btn_nuevo_man", use_container_width=True): st.session_state.modo_mandato = "PRE_CONTRATO"; st.rerun()
         if not df_man.empty:
-            if m_c2.button("⚙️ Gestionar", key="btn_edit_man", use_container_width=True): st.session_state.modo_mandato = "EDITAR"; st.rerun()
-            if m_c3.button("📄 Contrato", key="btn_gen_doc_man", use_container_width=True): st.session_state.modo_mandato = "GENERAR_CONTRATO"; st.rerun()
+            if m_c2.button("📄 Contrato", key="btn_gen_doc_man", use_container_width=True): st.session_state.modo_mandato = "GENERAR_CONTRATO"; st.rerun()
+            if m_c3.button("🚀 Alta Contrato", key="btn_activar_man", use_container_width=True): st.session_state.modo_mandato = "ACTIVAR"; st.rerun()
             if m_c4.button("📁 Documentos", key="btn_docs_man", use_container_width=True): st.session_state.modo_mandato = "DOCUMENTOS"; st.rerun()
             if m_c5.button("🛡️ Fianza", key="btn_hist_man", use_container_width=True): st.session_state.modo_mandato = "FIANZA"; st.rerun()
-            if m_c6.button("📊 Reportes", key="btn_rep_man", use_container_width=True): st.session_state.modo_mandato = "REPORTES"; st.rerun()        # --- 4. PANEL CREAR ---
-        
-        # --- 4. PANEL CREAR ---
-        if st.session_state.modo_mandato == "CREAR":
+            if m_c6.button("📊 Reportes", key="btn_rep_man", use_container_width=True): st.session_state.modo_mandato = "REPORTES"; st.rerun()        
+        # --- 4. PANEL PRE CONTRATO (Antes Crear) ---
+        if st.session_state.modo_mandato == "PRE_CONTRATO":
             from dateutil.relativedelta import relativedelta
             st.markdown("---")
-            
             # 💡 NUEVO: Filtrar propiedades que ya tienen un mandato activo asignado
             inmuebles_con_mandato = df_man['id_inmueble'].tolist() if not df_man.empty else []
             df_inm_disp = df_inm_m[~df_inm_m['id'].isin(inmuebles_con_mandato)] if not df_inm_m.empty else pd.DataFrame()
 
-            with st.form("form_nuevo_mandato_pro", clear_on_submit=False):
-                st.markdown("**Nuevo Contrato de Gestión**")
-                
-                if df_inm_m.empty or df_prop_m.empty:
-                    st.error(f"Necesitas crear al menos una propiedad y un propietario en {moneda_sesion} antes de crear un mandato.")
-                elif df_inm_disp.empty:
-                    st.warning("⚠️ Todas tus propiedades activas ya tienen un contrato de mandato asignado.")
-                else:
+            st.markdown("### 📝 Parámetros del Pre-Contrato (Borrador)")
+            
+            if df_inm_m.empty or df_prop_m.empty:
+                st.error(f"Necesitas crear al menos una propiedad y un propietario en {moneda_sesion} antes de crear un mandato.")
+                if st.button("❌ Volver"): st.session_state.modo_mandato = "NADA"; st.rerun()
+            elif df_inm_disp.empty:
+                st.warning("⚠️ Todas tus propiedades activas ya tienen un contrato de mandato (o borrador) asignado.")
+                st.info("💡 Si quieres ver o editar el texto del borrador que acabas de crear, usa el botón '📝 Redactar PDF' de la barra superior.")
+                if st.button("❌ Volver"): st.session_state.modo_mandato = "NADA"; st.rerun()
+            else:
+                with st.form("form_nuevo_mandato_pro", clear_on_submit=False):
                     st.write("**1. Titularidad y Propiedad**")
-                    col_inm, col_op = st.columns(2)
+                    col_inm, col_op = st.columns(2)            
                     m_inm_sel = col_inm.selectbox("Propiedad a gestionar *", df_inm_disp['nombre'].tolist())
                     id_inm = df_inm_disp[df_inm_disp['nombre'] == m_inm_sel].iloc[0]['id']
                     
@@ -1348,41 +1352,21 @@ def mostrar_modulo_inmuebles(supabase):
                     mapa_ind = {"NO APLICA": "NINGUNA", "MONTO FIJO (Cualquier momento)": "FIJA", "AMORTIZACIÓN DECRECIENTE (5 Años)": "DECRECIENTE_5Y"}
                     m_tipo_ind_db = mapa_ind[m_tipo_ind_ui]
                     m_indemnizacion = c_ind2.number_input(f"Monto Base 100% ({simbolo_mon})", min_value=0.0, step=50.0)
-
-                    st.write("**4. Documentación Escaneada**")
-                    cd1, cd2 = st.columns(2)
-                    doc_contrato = cd1.file_uploader("Contrato Firmado", type=["pdf", "jpg", "png"])
-                    doc_empadrona = cd2.file_uploader("Aut. Empadronamiento", type=["pdf", "jpg", "png"])
-                    cd3, cd4 = st.columns(2)
-                    doc_inv = cd3.file_uploader("Acta Inventario", type=["pdf", "jpg", "png"])
-                    doc_sum = cd4.file_uploader("Recibos Suministros", type=["pdf", "jpg", "png"])
-
                     st.markdown("---")
-                    col_b1, col_b2, _ = st.columns([2.0, 1.5, 6.5])
-                    if col_b1.form_submit_button("💾 Generar Mandato"):
+                    col_b1, col_b2, _ = st.columns([3.0, 1.5, 5.5])
+                    
+                    # 💡 Añadimos type="primary" para que el botón destaque visualmente
+                    if col_b1.form_submit_button("💾 Guardar Datos y Ver Borrador", type="primary"):
                         if (m_porc_pago_1 + m_porc_pago_2) > 100.1 or (m_porc_prop_1 + m_porc_prop_2) > 100.1:
                             st.error("❌ Los porcentajes superan el 100%.")
                         elif not id_op_heredado:
                             st.error("❌ Debes seleccionar un operador fiscal.")
                         else:
-                            with st.spinner("Registrando contrato y vinculando operador..."):
+                            with st.spinner("Creando borrador seguro..."):
                                 try:
                                     id_p1 = df_prop_m[df_prop_m['nombre'] == m_prop_sel_1].iloc[0]['id']
                                     id_p2 = int(df_prop_m[df_prop_m['nombre'] == m_prop_sel_2].iloc[0]['id']) if m_prop_sel_2 != "-- Ninguno --" else None
                                     
-                                    def subir_pdf(archivo, prefijo):
-                                        if not archivo: return None
-                                        ext = archivo.name.split('.')[-1].lower()
-                                        tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
-                                        n_nube = f"{prefijo}_{id_inm}_{int(time.time())}.{ext}"
-                                        supabase.storage.from_("documentos_mandatos").upload(n_nube, archivo.getvalue(), file_options={"content-type": tipo_mime})
-                                        return supabase.storage.from_("documentos_mandatos").get_public_url(n_nube)
-
-                                    url_c = subir_pdf(doc_contrato, "contrato")
-                                    url_e = subir_pdf(doc_empadrona, "empadronamiento")
-                                    url_i = subir_pdf(doc_inv, "inventario")
-                                    url_s = subir_pdf(doc_sum, "suministros")
-
                                     datos = {
                                         "id_inmueble": int(id_inm), "id_propietario": int(id_p1), "id_propietario_2": id_p2,
                                         "id_operador": int(id_op_heredado), "moneda": moneda_sesion, 
@@ -1395,104 +1379,30 @@ def mostrar_modulo_inmuebles(supabase):
                                         "fecha_suscripcion": str(f_suscripcion), "fecha_entrega": str(f_entrega),
                                         "fecha_inicio_pagos": str(f_inicio_pagos), "fecha_terminacion": str(f_vencimiento),
                                         "fecha_aviso_no_renovacion": str(f_limite_aviso), "fecha_fin_carencia": str(f_fin_carencia),
-                                        "url_contrato": url_c, "url_empadronamiento": url_e,
-                                        "url_inventario": url_i, "url_suministros": url_s,
-                                        "estado_contrato": "FIRMADO", "estado_financiero": "PENDIENTE_FIANZA"
+                                        "url_contrato": None, "url_empadronamiento": None,
+                                        "url_inventario": None, "url_suministros": None,
+                                        "estado_contrato": "BORRADOR", "estado_financiero": "PRE_CONTRATO"
                                     }
                                     res = supabase.table("mandatos").insert(datos).execute()
                                     id_mandato_nuevo = res.data[0]['id']
                                     
-                                    # 🚀 MOTOR AUTOMÁTICO CONTABLE: FIANZAS Y TERCEROS
-                                    # 1. Buscar Catálogo de Cuentas Inteligente
-                                    id_cta_fianza, id_cta_pasivo = None, None
-                                    try:
-                                        res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo, nombre").eq("moneda", moneda_sesion).execute()
-                                        df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
-                                        if not df_ctas.empty:
-                                            df_ctas['cod_str'] = df_ctas['codigo'].astype(str)
-                                            df_ctas['nom_low'] = df_ctas['nombre'].astype(str).str.lower()
-                                            df_ctas['cod_str'] = df_ctas['codigo'].astype(str).str.strip() # Limpiamos espacios invisibles
-                                            df_ctas['nom_low'] = df_ctas['nombre'].astype(str).str.lower()
-                                            
-                                            # --- 🛑 PRUEBA DEL ÁCIDO ---
-                                            #@st.error(f"🛑 DETENIDO: Encontré {len(df_ctas)} cuentas en la BD.")
-                                            #st.warning(f"¿Python puede ver la 260000?: {'260000' in df_ctas['cod_str'].values}")
-                                            #st.stop() # Esto APAGA el motor de golpe. ¡Es imposible que genere un asiento!
-                                            
-                                            # 🎯 Buscamos Activo: Fianzas Constituidas (Con estricto orden de prioridad)    
-                                        # 🎯 Buscamos Activo: Fianzas Constituidas (Con estricto orden de prioridad)
-                                            for pref in ['260', '26', '15', '11']:
-                                                fianzas = df_ctas[df_ctas['cod_str'].str.startswith(pref)]
-                                                if not fianzas.empty: 
-                                                    id_cta_fianza = int(fianzas.iloc[0]['id'])
-                                                    break
-                                            if not id_cta_fianza: # Fallback de emergencia por nombre
-                                                fianzas = df_ctas[df_ctas['nom_low'].str.contains('fianza|deposito', regex=True)]
-                                                if not fianzas.empty: id_cta_fianza = int(fianzas.iloc[0]['id'])
-                                            
-                                            # 🎯 LA MAGIA DEL TERCERO: Pasivo Acreedores (Con estricto orden de prioridad)
-                                            # Intento 1: Cuenta 410 específica del tercero
-                                            cta_tercero = df_ctas[(df_ctas['cod_str'].str.startswith('410')) & (df_ctas['nom_low'].str.contains(str(m_prop_sel_1).lower(), na=False, regex=False))]
-                                            if not cta_tercero.empty:
-                                                id_cta_pasivo = int(cta_tercero.iloc[0]['id'])
-                                            else:
-                                                # Intento 2: Cuentas genéricas en ESTRICO ORDEN (Obligando a agarrar la 410000 primero)
-                                                for pref in ['410000', '4100', '22', '41']:    
-                                                    pasivos = df_ctas[(df_ctas['cod_str'].str.startswith(pref)) & (~df_ctas['nom_low'].str.contains('impuesto|retenci', regex=True))]
-                                                    if not pasivos.empty:
-                                                        id_cta_pasivo = int(pasivos.iloc[0]['id'])
-                                                        break
-                                    except Exception as e:
-                                        pass
-
-                                    # 🚀 2. CAUSACIÓN ÚNICAMENTE DE LA FIANZA
-                                    if m_fianza > 0:
-                                        # A. Registrar Fianza Operativa
-                                        supabase.table("fin_fianzas").insert({"tipo": "ENTREGADA", "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo, "id_inmueble": int(id_inm), "tercero": m_prop_sel_1, "importe_inicial": m_fianza, "saldo_pendiente": m_fianza, "moneda": moneda_sesion, "estado": "REGISTRADA"}).execute()
-                                        
-                                        # B. Orden de Pago (CxP Tesorería)
-                                        supabase.table("fin_cuentas_pagar").insert({"modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo, "acreedor": m_prop_sel_1, "concepto": f"Pago de Fianza - Mandato {id_mandato_nuevo}", "monto_total": m_fianza, "saldo_pendiente": m_fianza, "moneda": moneda_sesion, "estado": "PENDIENTE"}).execute()
-                                        
-                                        # C. Asiento Contable
-                                        if id_cta_fianza and id_cta_pasivo:
-                                            res_ast_f = supabase.table("fin_asientos").insert({"fecha_contable": str(f_suscripcion), "descripcion": f"CAUSACIÓN FIANZA ENTREGADA - MANDATO {id_mandato_nuevo}", "concepto_general": "Fianza a Propietario", "origen": "MODULO_MANDATOS", "moneda": moneda_sesion, "estado": "CONTABILIZADO"}).execute()
-                                            id_ast_f = res_ast_f.data[0]['id']
-                                            supabase.table("fin_apuntes").insert([
-                                                {"id_asiento": id_ast_f, "id_cuenta_contable": id_cta_fianza, "debito": float(m_fianza), "credito": 0.0, "descripcion_linea": "Fianza constituida a largo plazo", "tercero": m_prop_sel_1},
-                                                {"id_asiento": id_ast_f, "id_cuenta_contable": id_cta_pasivo, "debito": 0.0, "credito": float(m_fianza), "descripcion_linea": "CxP Fianza a Propietario", "tercero": m_prop_sel_1}
-                                            ]).execute()
-
-                                    # ⚠️ NOTA: La causación de la Renta Garantizada se trasladó al Motor Mensual de Arrendamientos.
-
-                                    # 🚀 3. MOTOR AUTOMÁTICO: Auditoría Estricta del Evento
-                                    periodo_actual = pd.Timestamp.now().strftime("%Y-%m")
-                                    supabase.table("sys_motor_automatico_logs").insert({
-                                        "evento": "contrato_activado", "modulo_origen": "MANDATOS", "id_origen": id_mandato_nuevo,
-                                        "regla_evaluada": "SI mandato_activo -> generar_cxp_y_fianza",
-                                        "accion_ejecutada": "generar_cxp, generar_asiento, registrar_fianza",
-                                        "periodo": periodo_actual, "resultado": "EXITO",
-                                        "detalles": f"CxP y Asiento: {m_renta} | Fianza: {m_fianza}"
-                                    }).execute()
-
-                                    # Log Tradicional Historial de Inmuebles
+                                    # Log Historial Básico
                                     var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
                                     usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
-                                    
                                     supabase.table("historial_mandatos").insert({
                                         "id_mandato": id_mandato_nuevo, 
-                                        "accion": f"CREACIÓN MANDATO (Firma: {f_suscripcion}). Operador: {nom_op}",
+                                        "accion": f"CREACIÓN PRE-CONTRATO (Borrador). Operador: {nom_op}",
                                         "usuario": usuario_actual
                                     }).execute()
                                     
-                                    # 🚀 4. EL LOG GLOBAL QUE FALTABA (Dashboard de Actividad Principal)
-                                    log_accion(supabase, usuario_actual, "CREAR MANDATO", f"Propiedad: {m_inm_sel} | Propietario: {m_prop_sel_1}")
+                                    log_accion(supabase, usuario_actual, "NUEVO PRE-CONTRATO", f"Propiedad: {m_inm_sel}")
 
-                                    st.success("✅ Mandato registrado. Motor automático: CxP, Asiento Contable y Fianza generadas.")
-                                    st.session_state.modo_mandato = "NADA"; time.sleep(2.5); st.rerun()
-                                except Exception as e: st.error(f"❌ Error al orquestar: {e}")
-
-                    if col_b2.form_submit_button("❌ Cancelar"): st.session_state.modo_mandato = "NADA"; st.rerun()
-
+                                    st.success("✅ Pre-Contrato guardado como BORRADOR. La contabilidad NO se ha tocado.")
+                                    # 💡 Lo enviamos directamente a ver el editor de texto
+                                    st.session_state.modo_mandato = "GENERAR_CONTRATO"
+                                    st.session_state.id_borrador_activo = id_mandato_nuevo
+                                    time.sleep(2); st.rerun()
+                                except Exception as e: st.error(f"❌ Error al guardar borrador: {e}")
 
         elif st.session_state.modo_mandato == "DOCUMENTOS" and not df_man.empty:
             st.markdown("---")
@@ -1764,30 +1674,38 @@ def mostrar_modulo_inmuebles(supabase):
             st.markdown("---")
             st.markdown("### 📄 Generador Interactivo de Contratos Legales")
             
-            op_man_gen = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
-            m_sel_gen = st.selectbox("1. Selecciona el Mandato para redactar su contrato:", op_man_gen)
+            # 💡 FILTRO DE SEGURIDAD: Solo mostrar los que están en estado BORRADOR
+            df_borradores_gen = df_man[df_man['estado_contrato'] == 'BORRADOR'].reset_index(drop=True)
             
-            if m_sel_gen:
-                idx = op_man_gen.index(m_sel_gen)
-                d_m = df_man.iloc[idx]
-                id_m = str(d_m['id'])
+            if df_borradores_gen.empty:
+                st.info("✅ No hay pre-contratos en estado BORRADOR pendientes de redactar.")
+            else:
+                op_man_gen = df_borradores_gen.apply(
+                    lambda r: f"{r['inmuebles'].get('nombre', 'N/A') if isinstance(r.get('inmuebles'), dict) else 'N/A'} - {r['propietarios'].get('nombre', 'N/A') if isinstance(r.get('propietarios'), dict) else 'N/A'}", axis=1
+                ).tolist()
                 
-                # Extracción de datos maestros
-                res_inm = supabase.table("inmuebles").select("nombre, ciudad, referencia_catastral").eq("id", d_m['id_inmueble']).execute()
+                m_sel_gen = st.selectbox("1. Selecciona el Pre-Contrato para redactar el texto:", op_man_gen)
+                
+                if m_sel_gen:
+                    idx = op_man_gen.index(m_sel_gen)
+                    d_m = df_borradores_gen.iloc[idx]
+                    id_m = str(d_m['id'])
+                res_inm = supabase.table("inmuebles").select("nombre, ciudad, referencia_catastral").eq("id", int(float(d_m['id_inmueble']))).execute()
                 datos_inm = res_inm.data[0] if res_inm.data else {"nombre": "N/A", "ciudad": "N/A", "referencia_catastral": "N/A"}
                 
                 # Etiqueta dinámica según el país
                 lbl_catastro = "Matrícula Inmobiliaria" if moneda_sesion == "COP" else "Referencia Catastral"
-                res_p1 = supabase.table("propietarios").select("nombre, identificacion").eq("id", d_m['id_propietario']).execute()
+                res_p1 = supabase.table("propietarios").select("nombre, identificacion").eq("id", int(float(d_m['id_propietario']))).execute()
                 datos_p1 = res_p1.data[0] if res_p1.data else {"nombre": "N/A", "identificacion": "N/A"}
                 
                 datos_p2 = None
-                if d_m.get('id_propietario_2'):
-                    res_p2 = supabase.table("propietarios").select("nombre, identificacion").eq("id", d_m['id_propietario_2']).execute()
+                if pd.notna(d_m.get('id_propietario_2')) and str(d_m.get('id_propietario_2')).strip() != "":
+                    id_p2_seguro = int(float(d_m['id_propietario_2']))
+                    res_p2 = supabase.table("propietarios").select("nombre, identificacion").eq("id", id_p2_seguro).execute()
                     datos_p2 = res_p2.data[0] if res_p2.data else None
                     
                 # Extracción de la DB incluyendo la dirección y el correo
-                res_op = supabase.table("operadores").select("nombre, identificacion, direccion, correo").eq("id", d_m['id_operador']).execute()
+                res_op = supabase.table("operadores").select("nombre, identificacion, direccion, correo").eq("id", int(float(d_m['id_operador']))).execute()
                 datos_op = res_op.data[0] if res_op.data else {"nombre": "N/A", "identificacion": "N/A", "direccion": "DIRECCIÓN NO REGISTRADA", "correo": "CORREO NO REGISTRADO"}
                 # 🌍 Lógica de Tratamiento y Documentos por Región
                 if moneda_sesion == "EUR":
@@ -2063,142 +1981,176 @@ Representada por: {admin_nombre}
                         else:
                             pdf.multi_cell(0, 6, linea.encode('latin-1', 'ignore').decode('latin-1'))
                     return pdf.output(dest='S').encode('latin-1')
-                # 🚀 3. BOTONERA BIFURCADA
+            # 🚀 3. BOTONERA BIFURCADA (LA MAGIA VUELVE)
                 st.write("**4. Acciones de Generación**")
                 c_acc1, c_acc2 = st.columns(2)
                 
                 with c_acc1:
-                    # 🟢 Vía Rápida: Descarga directa
+                    # 🟢 Vía Rápida: Descarga Automática (El botón mágico)
                     st.download_button(
-                        label="⚡ Generar Contrato Automático (PDF)", 
+                        label="⚡ Generar Contrato Automáticamente", 
                         data=generar_pdf_contrato_legal(plantilla), 
                         file_name=f"Contrato_{datos_inm['nombre'].replace(' ','_')}.pdf", 
                         mime="application/pdf",
-                        use_container_width=True
+                        use_container_width=True,
+                        type="primary"
                     )
                     
                 with c_acc2:
                     # 🟡 Vía Lenta: Borrador Editable
-                    if st.button("📝 Revisar/Editar Borrador (Opcional)", use_container_width=True):
+                    if st.button("📝 Revisar / Editar Borrador", use_container_width=True):
                         st.session_state[f"borrador_{id_m}"] = plantilla
                         st.rerun()
-
-                # 📝 EL BORRADOR INTERACTIVO (Solo se muestra si hacen clic en Revisar)
+                # 📝 EL BORRADOR INTERACTIVO
                 if f"borrador_{id_m}" in st.session_state:
-                    st.success("✅ **Borrador Abierto.** Edita el texto libremente antes de descargar el PDF definitivo.")
-                    texto_final = st.text_area("Borrador del Contrato", value=st.session_state[f"borrador_{id_m}"], height=600)
+                    st.markdown("---")
+                    st.info("✅ **Borrador Abierto.** Edita el texto libremente.")
                     
-                    st.download_button(
-                        label="🔒 Confirmar Cambios y Descargar PDF", 
-                        data=generar_pdf_contrato_legal(texto_final), 
-                        file_name=f"Contrato_{datos_inm['nombre'].replace(' ','_')}_Editado.pdf", 
-                        mime="application/pdf",
-                        use_container_width=True,
-                        key="btn_descarga_editado"
-                    )            
+                    texto_editado = st.text_area("Borrador del Contrato", value=st.session_state[f"borrador_{id_m}"], height=600)
+                    
+                    # 💡 SOLUCIÓN SIMPLE: Textos estáticos y lógica directa
+                    if f"texto_confirmado_{id_m}" not in st.session_state:
+                        st.session_state[f"texto_confirmado_{id_m}"] = "" 
+                    
+                    # Comparamos si el texto actual es exactamente el que se confirmó en esta sesión
+                    requiere_confirmacion = texto_editado != st.session_state[f"texto_confirmado_{id_m}"]
+                    
+                    col_save, col_down = st.columns(2)
+                    
+                    with col_save:
+                        # Botón 1: Siempre visible, siempre con el mismo nombre
+                        if st.button("💾 Guardar Cambios", use_container_width=True, type="primary"):
+                            st.session_state[f"borrador_{id_m}"] = texto_editado
+                            st.session_state[f"texto_confirmado_{id_m}"] = texto_editado
+                            st.rerun()
+                            
+                    with col_down:
+                        # Botón 2: Siempre con el mismo nombre, solo se deshabilita silenciosamente
+                        st.download_button(
+                            label="📥 Descargar contrato", 
+                            data=generar_pdf_contrato_legal(st.session_state[f"borrador_{id_m}"]), 
+                            file_name=f"PreContrato_{datos_inm['nombre'].replace(' ','_')}.pdf", 
+                            mime="application/pdf",
+                            use_container_width=True,
+                            disabled=requiere_confirmacion, # 🔒 Candado silencioso
+                            type="secondary"
+                        )
             st.markdown("---")
             if st.button("❌ Cerrar Panel"): 
                 st.session_state.modo_mandato = "NADA"
                 st.rerun()
-# --- PANEL EDITAR (AHORA CON BÓVEDA DOCUMENTAL) ---
-        elif st.session_state.modo_mandato == "EDITAR" and not df_man.empty:
+# --- PANEL: DAR DE ALTA (NUEVO) ---
+# --- PANEL: DAR DE ALTA (MOTOR CONTABLE ACTIVADO) ---
+        elif st.session_state.modo_mandato == "ACTIVAR" and not df_man.empty:
             st.markdown("---")
-            st.markdown("### ⚙️ Gestionar Contrato y Documentos")
-            op_man_edit = df_view_display.apply(lambda r: f"{r['INMUEBLE']} - {r['TITULAR']}", axis=1).tolist()
-            m_sel_edit = st.selectbox("Selecciona el Mandato a gestionar:", op_man_edit)
+            st.markdown("### 🚀 Alta de Contrato (Paso Definitivo)")    
             
-            if m_sel_edit:
-                idx = op_man_edit.index(m_sel_edit)
-                d_m = df_man.iloc[idx]
-                id_m = str(d_m['id'])
+            # Filtramos para mostrar SOLO los que están en BORRADOR
+            df_borradores = df_man[df_man['estado_contrato'] == 'BORRADOR']
+            
+            if df_borradores.empty:
+                st.info("✅ No hay contratos en estado BORRADOR pendientes de alta.")
+            else:
+                st.warning("⚠️ **Atención:** Dar de alta un contrato genera automáticamente los Asientos Contables, Cuentas por Pagar y Fianza.")
                 
-                with st.form(f"form_edit_man_{id_m}", clear_on_submit=False):
-                    st.write("**1. Condiciones Financieras**")
-                    c1, c2, c3 = st.columns(3)
-                    e_renta = c1.number_input(f"Renta Garantizada ({simbolo_mon})", value=float(d_m.get('ingreso_garantizado', 0.0)), step=50.0)
-                    e_fianza = c2.number_input(f"Fianza ({simbolo_mon})", value=float(d_m.get('valor_fianza', 0.0)), step=50.0)
+                op_man_act = df_borradores.apply(lambda r: f"{r['inmuebles'].get('nombre', 'N/A')} - {r['propietarios'].get('nombre', 'N/A')} (ID: {r['id']})", axis=1).tolist()
+                m_sel_act = st.selectbox("Selecciona el Pre-Contrato a firmar y dar de alta:", op_man_act)
+                
+                if m_sel_act:
+                    idx = op_man_act.index(m_sel_act)
+                    d_m = df_borradores.iloc[idx]
+                    id_m = str(d_m['id'])
                     
-                    lista_act = ["IPC", "FIJO", "NO APLICA"]
-                    idx_act = lista_act.index(d_m.get('tipo_actualizacion', 'IPC')) if d_m.get('tipo_actualizacion') in lista_act else 0
-                    e_act = c3.selectbox("Actualización Anual", lista_act, index=idx_act)
-                    
-                    c4, c5 = st.columns(2)
-                    e_cta1 = c4.text_input("Cuenta / IBAN Principal", value=str(d_m.get('cuenta_pago', '')))
-                    e_cta2 = c5.text_input("Cuenta / IBAN Secundaria", value=str(d_m.get('cuenta_pago_2', '')).replace("None", ""))
+                    st.write(f"**Renta Mensual:** {simbolo_mon} {float(d_m.get('ingreso_garantizado', 0)):,.2f}")
+                    st.write(f"**Fianza Acordada:** {simbolo_mon} {float(d_m.get('valor_fianza', 0)):,.2f}")
                     
                     st.markdown("---")
-                    st.write("**2. Anexar Documentos Faltantes (Opcional)**")
-                    st.caption("Sube un archivo solo si deseas reemplazar el actual o si estaba pendiente.")
-                    cd1, cd2 = st.columns(2)
-                    doc_contrato = cd1.file_uploader("Contrato Firmado", type=["pdf", "jpg", "png"], key="edit_doc_c")
-                    doc_empadrona = cd2.file_uploader("Aut. Empadronamiento", type=["pdf", "jpg", "png"], key="edit_doc_e")
-                    cd3, cd4 = st.columns(2)
-                    doc_inv = cd3.file_uploader("Acta Inventario", type=["pdf", "jpg", "png"], key="edit_doc_i")
-                    doc_sum = cd4.file_uploader("Recibos Suministros", type=["pdf", "jpg", "png"], key="edit_doc_s")
-
-                    st.markdown("---")
-                    col_b1, col_b2, _ = st.columns([2, 1.5, 6.5])
+                    st.write("**Documento Definitivo**")
+                    doc_final = st.file_uploader("Sube el PDF del Contrato firmado (Requisito para Alta)", type=["pdf", "jpg", "png"])
                     
-                    if col_b1.form_submit_button("💾 Guardar Cambios"):
-                        with st.spinner("Actualizando contrato y subiendo documentos..."):
-                            # Preparar URLs actuales
-                            url_c = d_m.get('url_contrato')
-                            url_e = d_m.get('url_empadronamiento')
-                            url_i = d_m.get('url_inventario')
-                            url_s = d_m.get('url_suministros')
-                            
-                            # Función auxiliar de subida
-                            def subir_reemplazo(archivo, prefijo):
-                                if not archivo: return None
-                                ext = archivo.name.split('.')[-1].lower()
-                                tipo_mime = "application/pdf" if ext == "pdf" else f"image/{ext.replace('jpg', 'jpeg')}"
-                                n_nube = f"{prefijo}_edit_{id_m}_{int(time.time())}.{ext}"
-                                supabase.storage.from_("documentos_mandatos").upload(n_nube, archivo.getvalue(), file_options={"content-type": tipo_mime})
-                                return supabase.storage.from_("documentos_mandatos").get_public_url(n_nube)
-                            
-                            # Si hay archivo nuevo, sobrescribe la variable
-                            if doc_contrato: url_c = subir_reemplazo(doc_contrato, "contrato")
-                            if doc_empadrona: url_e = subir_reemplazo(doc_empadrona, "empadronamiento")
-                            if doc_inv: url_i = subir_reemplazo(doc_inv, "inventario")
-                            if doc_sum: url_s = subir_reemplazo(doc_sum, "suministros")
+                    c_act1, c_act2, _ = st.columns([2.5, 1.5, 6])
+                    
+                    if c_act1.button("🚀 Dar de Alta", type="primary"):
+                        if not doc_final and not d_m.get('url_contrato'):
+                            st.error("❌ Debes adjuntar el contrato firmado.")
+                        else:
+                            with st.spinner("Ejecutando motor contable..."):
+                                try:
+                                    # 1. Subir el documento final
+                                    url_c = d_m.get('url_contrato')
+                                    if doc_final:
+                                        ext = doc_final.name.split('.')[-1].lower()
+                                        n_nube = f"contrato_firmado_{id_m}_{int(time.time())}.{ext}"
+                                        supabase.storage.from_("documentos_mandatos").upload(n_nube, doc_final.getvalue(), file_options={"content-type": "application/pdf"})
+                                        url_c = supabase.storage.from_("documentos_mandatos").get_public_url(n_nube)
 
-                            # Actualizar Base de Datos
-                            datos_upd = {
-                                "ingreso_garantizado": e_renta, "valor_fianza": e_fianza, 
-                                "tipo_actualizacion": e_act, "cuenta_pago": e_cta1.strip(), "cuenta_pago_2": e_cta2.strip(),
-                                "url_contrato": url_c, "url_empadronamiento": url_e,
-                                "url_inventario": url_i, "url_suministros": url_s
-                            }
-                            supabase.table("mandatos").update(datos_upd).eq("id", int(id_m)).execute()
-                            
-                            var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
-                            usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
-                            supabase.table("historial_mandatos").insert({"id_mandato": int(id_m), "accion": f"CONDICIONES / DOCS ACTUALIZADOS", "usuario": usuario_actual}).execute()
-                            
-                            st.success("✅ Contrato actualizado con éxito.")
-                            st.session_state.modo_mandato = "NADA"
-                            time.sleep(1)
-                            st.rerun()
-                            
-                    if col_b2.form_submit_button("❌ Cerrar"): 
-                        st.session_state.modo_mandato = "NADA"
-                        st.rerun()
-                
-                # ZONA DE PELIGRO (Se mantiene intacta)
-                st.write("")
-                st.error("🚨 Zona de Peligro: Finalización de Contrato")
-                c_del1, c_del2 = st.columns([7, 3])
-                confirmar_fin = c_del1.checkbox("⚠️ Confirmo que deseo FINALIZAR este contrato.", key=f"chk_fin_{id_m}")
-                if c_del2.button("🛑 Finalizar Contrato", disabled=not confirmar_fin, use_container_width=True):
-                    supabase.table("mandatos").update({"estado_contrato": "FINALIZADO"}).eq("id", int(id_m)).execute()
-                    var_sesion = st.session_state.get("usuario_actual", st.session_state.get("usuario", "ADMINISTRADOR"))
-                    usuario_actual = var_sesion.get("nombre", "ADMINISTRADOR") if isinstance(var_sesion, dict) else str(var_sesion)
-                    supabase.table("historial_mandatos").insert({"id_mandato": int(id_m), "accion": "CONTRATO FINALIZADO POR EL USUARIO", "usuario": usuario_actual}).execute()
-                    # 💡 Próximamente: El Motor Automático atrapará esto para devolver la fianza
-                    st.success("✅ El contrato ha sido finalizado.")
-                    st.session_state.modo_mandato = "NADA"
-                    time.sleep(1.5)
-                    st.rerun()
+                                    # 2. CASCADA CONTABLE
+                                    fecha_hoy = time.strftime("%Y-%m-%d")
+                                    m_fianza = float(d_m.get('valor_fianza', 0))
+                                    nom_propietario = d_m['propietarios'].get('nombre', 'PROPIETARIO')
+                                    nom_inmueble = d_m['inmuebles'].get('nombre', 'INMUEBLE')
+                                    
+                                    if m_fianza > 0:
+                                        res_ctas = supabase.table("fin_cuentas_contables").select("id, codigo").eq("moneda", moneda_sesion).execute()
+                                        df_ctas = pd.DataFrame(res_ctas.data) if res_ctas.data else pd.DataFrame()
+                                        
+                                        def get_cta_id(codigos_buscados):
+                                            for cod in codigos_buscados:
+                                                match = df_ctas[df_ctas['codigo'].str.startswith(cod)]
+                                                if not match.empty: return int(match.iloc[0]['id'])
+                                            return None
+                                            
+                                        cta_fianza_entregada = get_cta_id(["260"])
+                                        cta_cxp = get_cta_id(["410", "400"]) # Acreedores en España
+                                        
+                                        if cta_fianza_entregada and cta_cxp:
+                                            # Crear Asiento de Causación
+                                            desc_asiento = f"CAUSACIÓN FIANZA ENTREGADA - MANDATO {id_m} ({nom_inmueble})"
+                                            res_ast = supabase.table("fin_asientos").insert({
+                                                "fecha_contable": fecha_hoy, "descripcion": desc_asiento,
+                                                "concepto_general": "Fianza de Arrendamiento", "origen": "MODULO_MANDATOS",
+                                                "moneda": moneda_sesion, "estado": "CONTABILIZADO"
+                                            }).execute()
+                                            id_ast = res_ast.data[0]['id']
+
+                                            # Apuntes contables
+                                            supabase.table("fin_apuntes").insert([
+                                                {"id_asiento": id_ast, "id_cuenta_contable": cta_fianza_entregada, "debito": m_fianza, "credito": 0.0, "id_mandato": int(id_m), "descripcion_linea": "Reconocimiento Fianza", "tercero": nom_propietario},
+                                                {"id_asiento": id_ast, "id_cuenta_contable": cta_cxp, "debito": 0.0, "credito": m_fianza, "id_mandato": int(id_m), "descripcion_linea": "Obligación pago fianza", "tercero": nom_propietario}
+                                            ]).execute()
+
+                                            # Generar CxP en Tesorería (Estructura validada según SQL)
+                                            supabase.table("fin_cuentas_pagar").insert({
+                                                "modulo_origen": "MANDATOS", 
+                                                "id_origen": int(id_m),
+                                                "acreedor": nom_propietario, 
+                                                "concepto": f"Pago Fianza - Mandato {id_m}",
+                                                "monto_total": m_fianza, 
+                                                "saldo_pendiente": m_fianza,
+                                                "moneda": moneda_sesion, 
+                                                "estado": "PENDIENTE"
+                                            }).execute()
+                                            # Registro en el auxiliar de fianzas
+                                            supabase.table("fin_fianzas").insert({
+                                                "modulo_origen": "MANDATOS", "id_origen": int(id_m), "tipo_fianza": "ENTREGADA",
+                                                "tercero": nom_propietario, "importe_inicial": m_fianza, "saldo_pendiente": m_fianza,
+                                                "moneda": moneda_sesion, "estado": "REGISTRADA", "fecha_constitucion": fecha_hoy
+                                            }).execute()
+                                            
+                                    # 3. Actualizar estado a FIRMADO
+                                    supabase.table("mandatos").update({
+                                        "estado_contrato": "FIRMADO", "estado_financiero": "ACTIVO", "url_contrato": url_c
+                                    }).eq("id", int(id_m)).execute()
+                                    
+                                    log_accion(supabase, usuario_actual, "ALTA MANDATO", f"ID: {id_m} | {nom_inmueble}")
+                                    st.success("✅ ¡Contrato Dado de Alta! Asientos y fianza generados.")
+                                    time.sleep(2); st.session_state.modo_mandato = "NADA"; st.rerun()
+                                    
+                                except Exception as e:
+                                    st.error(f"❌ Error en motor contable: {e}")
+
+                    if c_act2.button("❌ Cancelar"):
+                        st.session_state.modo_mandato = "NADA"; st.rerun()
 
         elif st.session_state.modo_mandato == "REPORTES" and not df_man.empty:
             st.markdown("---")
