@@ -2118,25 +2118,35 @@ Representada por: {admin_nombre}
                                                 {"id_asiento": id_ast, "id_cuenta_contable": cta_fianza_entregada, "debito": m_fianza, "credito": 0.0, "id_mandato": int(id_m), "descripcion_linea": "Reconocimiento Fianza", "tercero": nom_propietario},
                                                 {"id_asiento": id_ast, "id_cuenta_contable": cta_cxp, "debito": 0.0, "credito": m_fianza, "id_mandato": int(id_m), "descripcion_linea": "Obligación pago fianza", "tercero": nom_propietario}
                                             ]).execute()
+                                            # --- CASCADA CONTABLE: VENCIMIENTO = SUSCRIPCIÓN ---
+                                            # Extraemos la fecha de firma del pre-contrato
+                                            f_vencimiento_legal = str(d_m.get('fecha_suscripcion'))
 
-                                            # Generar CxP en Tesorería (Estructura validada según SQL)
+                                            # A. Generar CxP en Tesorería (Vence el día de la firma)
                                             supabase.table("fin_cuentas_pagar").insert({
                                                 "modulo_origen": "MANDATOS", 
                                                 "id_origen": int(id_m),
                                                 "acreedor": nom_propietario, 
-                                                "concepto": f"Pago Fianza - Mandato {id_m}",
+                                                "conceptos": f"Pago Fianza - Mandato {id_m}",
                                                 "monto_total": m_fianza, 
                                                 "saldo_pendiente": m_fianza,
                                                 "moneda": moneda_sesion, 
-                                                "estado": "PENDIENTE"
+                                                "estado": "PENDIENTE",
+                                                "fecha_vencimiento": f_vencimiento_legal 
                                             }).execute()
-                                            # Registro en el auxiliar de fianzas
+
+                                            # B. Registro en el auxiliar de fianzas (Fiel a tu SQL)
                                             supabase.table("fin_fianzas").insert({
-                                                "modulo_origen": "MANDATOS", "id_origen": int(id_m), "tipo_fianza": "ENTREGADA",
-                                                "tercero": nom_propietario, "importe_inicial": m_fianza, "saldo_pendiente": m_fianza,
-                                                "moneda": moneda_sesion, "estado": "REGISTRADA", "fecha_constitucion": fecha_hoy
-                                            }).execute()
-                                            
+                                                "modulo_origen": "MANDATOS", 
+                                                "id_origen": int(id_m), 
+                                                "tipo": "ENTREGADA", 
+                                                "tercero": nom_propietario, 
+                                                "importe_inicial": m_fianza, 
+                                                "saldo_pendiente": m_fianza,
+                                                "moneda": moneda_sesion, 
+                                                "estado": "REGISTRADA",
+                                                "fecha_inicio_legal": f_vencimiento_legal
+                                            }).execute()                                            
                                     # 3. Actualizar estado a FIRMADO
                                     supabase.table("mandatos").update({
                                         "estado_contrato": "FIRMADO", "estado_financiero": "ACTIVO", "url_contrato": url_c
